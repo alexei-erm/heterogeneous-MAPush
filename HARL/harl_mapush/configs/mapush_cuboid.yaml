@@ -1,0 +1,25 @@
+# MAPush Cuboid Task Configuration
+# This file documents the MAPush environment configuration
+# Actual configuration is set in train.py
+
+task: go1push_mid
+n_threads: 500  # Number of parallel environments
+state_type: "EP"  # Environment Provided state (all agents see same global state)
+
+# Episode Configuration (MAPush Environment):
+# - Duration: 20 seconds
+# - Control frequency: 50Hz (period: 0.02s)
+# - Steps per episode: 1000 (20s × 50Hz)
+# - Episode ends on: success (object within 1m of target), failure (fall/collision/tilt), or timeout
+
+# HARL Training Configuration:
+# - Rollout length: 200 steps (matches original MAPPO training)
+# - Each MAPush episode spans 5 rollouts (1000 steps / 200 = 5)
+# - Network updates happen every 200 steps (after each rollout)
+# - Episodes can be truncated mid-rollout (handled automatically)
+
+# Task description:
+# - 2 agents (Unitree Go1 quadrupeds)
+# - 2 NPCs (cuboid box + target area)
+# - Randomly placed obstacles
+# - Goal: Push cuboid to target location collaboratively
