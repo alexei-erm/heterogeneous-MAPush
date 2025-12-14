@@ -104,7 +104,9 @@ class Go1PushMidCfg(Go1Cfg):
         class scales:
             target_reward_scale = 0.00325
             approach_reward_scale = 0.00075
-            collision_punishment_scale = -0.0025
+            # Iter4: Reduced from -0.0025 to -0.0008 so agents tolerate being near each other
+            # Previously collision penalty dominated, causing agents to escape rather than push together
+            collision_punishment_scale = -0.0008
             push_reward_scale = 0.0015
             ocb_reward_scale = 0.004
             reach_target_reward_scale = 10

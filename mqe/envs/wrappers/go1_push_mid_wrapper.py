@@ -76,6 +76,12 @@ class Go1PushMidWrapper(EmptyWrapper):
             "reach_target_reward":0,
             "push_reward":0,
             "ocb_reward":0,
+            "goal_push_bonus": 0,
+            # Iter6 new rewards
+            "engagement_bonus": 0,
+            "cooperation_bonus": 0,
+            "same_side_bonus": 0,
+            "blocking_penalty": 0,
             "step_count": 0,
         }
 
@@ -84,6 +90,16 @@ class Go1PushMidWrapper(EmptyWrapper):
         self.contact_threshold = getattr(self.cfg.rewards, "contact_threshold", 0.8)
         # Whether to use individualized rewards (for HAPPO)
         self.individualized_rewards = getattr(self.cfg.rewards, "individualized_rewards", False)
+
+        # Iter5: Goal push bonus - reward agents pushing box TOWARD goal (not just moving)
+        self.goal_push_bonus_scale = getattr(self.cfg.rewards, "goal_push_bonus_scale", 0.003)
+
+        # Iter6: New reward scales based on successful Iter10 from previous experiments
+        self.engagement_bonus_scale = getattr(self.cfg.rewards, "engagement_bonus_scale", 0.02)  # Near box
+        self.cooperation_bonus_scale = getattr(self.cfg.rewards, "cooperation_bonus_scale", 0.01)  # Both near box
+        self.same_side_bonus_scale = getattr(self.cfg.rewards, "same_side_bonus_scale", 0.02)  # Both on push side
+        self.blocking_penalty_scale = getattr(self.cfg.rewards, "blocking_penalty_scale", -0.05)  # Between box and goal
+        self.directional_progress_scale = getattr(self.cfg.rewards, "directional_progress_scale", 0.15)  # Shared: box toward goal
 
     def _init_extras(self, obs):
         return
@@ -314,10 +330,18 @@ class Go1PushMidWrapper(EmptyWrapper):
         reward = torch.zeros([self.env.num_envs, self.num_agents], device=self.env.device)
 
         # calculate reach target reward and set finish task termination
-        # ALWAYS SHARED - both agents celebrate success together
+        # Iter5: INDIVIDUAL - only agents near box get credit for completion
         if self.reach_target_reward_scale != 0:
-            reward[self.finished_buf, :] += self.reach_target_reward_scale
-            self.reward_buffer["reach_target_reward"] += self.reach_target_reward_scale * self.finished_buf.sum().item()
+            if self.individualized_rewards:
+                for i in range(self.num_agents):
+                    agent_box_dist = torch.norm(box_pos - base_pos[:, i, :], dim=1)
+                    contact_weight = torch.clamp(1.0 - (agent_box_dist - self.contact_threshold) / self.contact_threshold, 0.0, 1.0)
+                    reward[self.finished_buf, i] += self.reach_target_reward_scale * contact_weight[self.finished_buf]
+                self.reward_buffer["reach_target_reward"] += self.reach_target_reward_scale * self.finished_buf.sum().item()
+            else:
+                # Original: shared
+                reward[self.finished_buf, :] += self.reach_target_reward_scale
+                self.reward_buffer["reach_target_reward"] += self.reach_target_reward_scale * self.finished_buf.sum().item()
         
         # calculate exception punishment
         if self.exception_punishment_scale != 0:
@@ -328,6 +352,7 @@ class Go1PushMidWrapper(EmptyWrapper):
                     (self.exception_buf.sum().item()+self.value_exception_buf.sum().item())
 
         # calculate distance from current_box_pos to target_box_pos reward
+        # Iter5: INDIVIDUAL - only agents near box get credit for progress
         if self.target_reward_scale != 0:
             if self.last_box_state is None:
                 self.last_box_state = copy(box_state)
@@ -335,11 +360,19 @@ class Go1PushMidWrapper(EmptyWrapper):
             distance = self.env.dist_calculator.cal_dist(box_state, target_state)
             distance_reward = self.target_reward_scale * 100 * (2 * (past_distance - distance) - 0.01 * distance)
 
-            # ALWAYS SHARED - both agents benefit from box moving toward target
-            reward[:, :] += distance_reward.unsqueeze(1).repeat(1, self.num_agents)
+            if self.individualized_rewards:
+                # Only agents near box get credit
+                for i in range(self.num_agents):
+                    agent_box_dist = torch.norm(box_pos - base_pos[:, i, :], dim=1)
+                    contact_weight = torch.clamp(1.0 - (agent_box_dist - self.contact_threshold) / self.contact_threshold, 0.0, 1.0)
+                    reward[:, i] += distance_reward * contact_weight
+            else:
+                # Original: shared
+                reward[:, :] += distance_reward.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["distance_to_target_reward"] += torch.sum(distance_reward).cpu()
 
-        # calculate distance from each robot to box reward
+        # calculate distance from each robot to box reward (NEGATIVE - penalty for being far)
+        # Iter5: Keep as per-agent (already was), no direction multiplier
         if self.approach_reward_scale != 0:
             reward_logger=[]
             for i in range(self.num_agents):
@@ -362,22 +395,21 @@ class Go1PushMidWrapper(EmptyWrapper):
             self.reward_buffer["collision_punishment"] += np.sum(np.array(punishment_logger))
 
         # calculate push reward for each agent
+        # Iter5: INDIVIDUAL - only agents near box get credit when box moves
         if self.push_reward_scale != 0:
             # Check if box is moving (velocity > 0.1)
             box_moving = torch.norm(self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 0, 7:9], dim=1) > 0.1
 
             if self.individualized_rewards:
-                # Individualized: only agents in contact with box get push reward
-                # This prevents freeloading - agents must be near box to get credit
+                # Only agents near box get push reward
                 for i in range(self.num_agents):
                     agent_box_dist = torch.norm(box_pos - base_pos[:, i, :], dim=1)
-                    # Agent is "pushing" if close to box AND box is moving
                     contact_weight = torch.clamp(1.0 - (agent_box_dist - self.contact_threshold) / self.contact_threshold, 0.0, 1.0)
                     individual_push_reward = self.push_reward_scale * contact_weight
                     reward[box_moving, i] += individual_push_reward[box_moving]
                 self.reward_buffer["push_reward"] += self.push_reward_scale * box_moving.sum().item()
             else:
-                # Original: shared reward
+                # Original: shared
                 push_reward = torch.zeros((self.env.num_envs,), device=self.env.device)
                 push_reward[box_moving] = self.push_reward_scale
                 reward[:, :] += push_reward.unsqueeze(1).repeat(1, self.num_agents)
@@ -409,6 +441,103 @@ class Go1PushMidWrapper(EmptyWrapper):
                 reward[:, i] += ocb_reward
                 reward_logger.append(torch.sum(ocb_reward).cpu())
             self.reward_buffer["ocb_reward"] += np.sum(np.array(reward_logger))
+
+        # ============================================================
+        # ITER6: New reward structure based on successful Iter10
+        # ============================================================
+
+        if self.individualized_rewards:
+            # Get box velocity
+            box_vel = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 0, 7:9]  # (num_envs, 2)
+            box_speed = torch.norm(box_vel, dim=1)
+
+            # Direction from box to target
+            box_to_target = target_pos[:, :2] - box_pos[:, :2]
+            box_to_target_norm = box_to_target / (torch.norm(box_to_target, dim=1, keepdim=True) + 1e-6)
+
+            # Box velocity direction (normalized)
+            box_vel_norm = box_vel / (box_speed.unsqueeze(1) + 1e-6)
+
+            # How much box is moving toward goal
+            velocity_alignment = torch.sum(box_vel_norm * box_to_target_norm, dim=1)  # -1 to 1
+
+            # Calculate per-agent distances to box
+            agent_box_dists = []
+            for i in range(self.num_agents):
+                dist = torch.norm(box_pos[:, :2] - base_pos[:, i, :2], dim=1)
+                agent_box_dists.append(dist)
+            agent_box_dists = torch.stack(agent_box_dists, dim=1)  # (num_envs, num_agents)
+
+            # Check if agents are on the push side (behind box relative to target)
+            agent_on_push_side = []
+            for i in range(self.num_agents):
+                agent_to_box = box_pos[:, :2] - base_pos[:, i, :2]
+                dot = torch.sum(agent_to_box * box_to_target_norm, dim=1)
+                on_push_side = dot > 0  # Agent is behind box (correct side to push)
+                agent_on_push_side.append(on_push_side)
+            agent_on_push_side = torch.stack(agent_on_push_side, dim=1)  # (num_envs, num_agents)
+
+            # Check if agents are blocking (between box and goal)
+            agent_blocking = []
+            for i in range(self.num_agents):
+                agent_to_target = target_pos[:, :2] - base_pos[:, i, :2]
+                box_to_agent = base_pos[:, i, :2] - box_pos[:, :2]
+                # Agent is blocking if: closer to target than box AND in front of box
+                dot = torch.sum(box_to_agent * box_to_target_norm, dim=1)
+                is_blocking = dot > 0  # Agent is in front of box (blocking)
+                agent_blocking.append(is_blocking)
+            agent_blocking = torch.stack(agent_blocking, dim=1)  # (num_envs, num_agents)
+
+            # 1. ENGAGEMENT BONUS: Reward being close to box (POSITIVE!)
+            engagement_threshold = 1.5  # meters
+            for i in range(self.num_agents):
+                engagement = torch.clamp(1.0 - agent_box_dists[:, i] / engagement_threshold, 0.0, 1.0)
+                engagement_reward = self.engagement_bonus_scale * engagement
+                reward[:, i] += engagement_reward
+            self.reward_buffer["engagement_bonus"] += self.engagement_bonus_scale * self.num_envs
+
+            # 2. COOPERATION BONUS: Both agents near box
+            both_near = (agent_box_dists[:, 0] < engagement_threshold) & (agent_box_dists[:, 1] < engagement_threshold)
+            for i in range(self.num_agents):
+                coop_reward = self.cooperation_bonus_scale * both_near.float()
+                reward[:, i] += coop_reward
+            self.reward_buffer["cooperation_bonus"] += self.cooperation_bonus_scale * both_near.sum().item()
+
+            # 3. SAME SIDE BONUS: Both agents on push side
+            both_on_push_side = agent_on_push_side[:, 0] & agent_on_push_side[:, 1]
+            for i in range(self.num_agents):
+                same_side_reward = self.same_side_bonus_scale * both_on_push_side.float()
+                reward[:, i] += same_side_reward
+            self.reward_buffer["same_side_bonus"] += self.same_side_bonus_scale * both_on_push_side.sum().item()
+
+            # 4. BLOCKING PENALTY: Agent between box and goal
+            for i in range(self.num_agents):
+                blocking_penalty = self.blocking_penalty_scale * agent_blocking[:, i].float()
+                reward[:, i] += blocking_penalty
+            self.reward_buffer["blocking_penalty"] += self.blocking_penalty_scale * agent_blocking.sum().item()
+
+            # 5. VELOCITY-BASED PUSH CONTRIBUTION (replaces old goal_push_bonus)
+            # Reward based on ACTUAL box velocity toward goal, not agent position
+            # Only agents close to box get credit
+            reward_logger = []
+            for i in range(self.num_agents):
+                contact_weight = torch.clamp(1.0 - (agent_box_dists[:, i] - self.contact_threshold) / self.contact_threshold, 0.0, 1.0)
+                # Reward = velocity_alignment * box_speed * contact_weight * scale
+                push_contribution = self.goal_push_bonus_scale * velocity_alignment * box_speed * contact_weight
+                # Only give positive reward (don't punish for box moving wrong way)
+                push_contribution = torch.clamp(push_contribution, min=0)
+                reward[:, i] += push_contribution
+                reward_logger.append(torch.sum(push_contribution).cpu())
+            self.reward_buffer["goal_push_bonus"] += np.sum(np.array(reward_logger))
+
+            # 6. SHARED DIRECTIONAL PROGRESS: Box moves toward goal = both rewarded
+            if self.last_box_state is not None:
+                old_dist = torch.norm(self.last_box_state[:, :2] - target_pos[:, :2], dim=1)
+                new_dist = torch.norm(box_pos[:, :2] - target_pos[:, :2], dim=1)
+                progress = old_dist - new_dist  # positive = closer to goal
+                directional_reward = self.directional_progress_scale * progress
+                reward[:, :] += directional_reward.unsqueeze(1)
+                self.reward_buffer["distance_to_target_reward"] += torch.sum(directional_reward).cpu()
 
         self.last_box_state = deepcopy(box_state)
 
