@@ -30,24 +30,27 @@ Agent 1 learned to escape/freeload. The approach penalty wasn't enough - agent g
 
 ---
 
-## New Reward Structure
+## New Reward Structure (Matching Iter10 Proposal)
 
 | Component | Scale | Type | Description |
 |-----------|-------|------|-------------|
+| `push_contribution` (goal_push_bonus) | **0.15** | per-agent | Box velocity toward goal * contact_weight |
+| `directional_progress` | **0.15** | **SHARED** | Box distance to goal decreased |
 | `engagement_bonus` | 0.02 | per-agent | Being close to box (< 1.5m) |
 | `cooperation_bonus` | 0.01 | per-agent | BOTH agents near box |
 | `same_side_bonus` | 0.02 | per-agent | BOTH agents on push side |
 | `blocking_penalty` | -0.05 | per-agent | Agent between box and goal |
-| `goal_push_bonus` | 0.003 | per-agent | Box velocity toward goal * contact_weight |
-| `directional_progress` | 0.15 | **SHARED** | Box distance to goal decreased |
 
-**Old rewards kept:**
-- `reach_target_reward` - individual (contact-weighted)
-- `target_reward` - individual (contact-weighted)
-- `push_reward` - individual (contact-weighted)
-- `ocb_reward` - individual
-- `approach_reward` - individual (penalty for being far)
-- `collision_punishment` - individual
+**Old rewards kept (when individualized_rewards=True):**
+- `reach_target_reward` - individual (contact-weighted) - completion bonus
+- `exception_punishment` - shared (simulation errors)
+- `collision_punishment` - individual (prevent crashing)
+
+**Old rewards SKIPPED (replaced by iter6 rewards):**
+- `target_reward` - replaced by `directional_progress`
+- `approach_reward` - replaced by `engagement_bonus` (positive instead of negative!)
+- `push_reward` - replaced by `goal_push_bonus` (velocity-based)
+- `ocb_reward` - replaced by `same_side_bonus`
 
 ---
 
