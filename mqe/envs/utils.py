@@ -43,7 +43,7 @@ def make_mqe_env(env_name: str, args=None, custom_cfg=None) -> Tuple[LeggedRobot
 
     return env, env_cfg
 
-def custom_cfg(args, individualized_rewards=False):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -55,6 +55,10 @@ def custom_cfg(args, individualized_rewards=False):
         # Enable individualized rewards for HAPPO if requested
         if individualized_rewards and hasattr(cfg, 'rewards'):
             cfg.rewards.individualized_rewards = True
+
+        # Iter8: Enable gated shared rewards
+        if shared_gated_rewards and hasattr(cfg, 'rewards'):
+            cfg.rewards.shared_gated_rewards = True
 
         return cfg
 

@@ -179,7 +179,7 @@ class MAPushHAPPORunner(OnPolicyHARunner):
         print(f"\n{'='*60}")
         print(f"Training Summary")
         print(f"{'='*60}")
-        print(f"Total episodes: {episodes}")
+        print(f"Total rollouts: {rollouts}")
         print(f"Total steps: {self.total_steps:,}")
         print(f"Checkpoints saved: {self.total_steps // self.checkpoint_interval}")
         print(f"{'='*60}\n")
@@ -220,6 +220,14 @@ class MAPushHAPPORunner(OnPolicyHARunner):
             checkpoint_path: Path to checkpoint folder (e.g., .../checkpoints/50M/)
         """
         print(f"\nRestoring checkpoint from: {checkpoint_path}")
+
+        # Extract step count from checkpoint path (e.g., "100M" -> 100_000_000)
+        checkpoint_name = os.path.basename(checkpoint_path.rstrip('/'))
+        if checkpoint_name.endswith('M'):
+            restored_steps = int(checkpoint_name[:-1]) * 1_000_000
+            self.total_steps = restored_steps
+            self.last_checkpoint_step = restored_steps
+            print(f"  Resuming from step: {restored_steps:,}")
 
         # Load actor models
         for agent_id in range(self.num_agents):

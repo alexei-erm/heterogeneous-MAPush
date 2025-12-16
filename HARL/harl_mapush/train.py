@@ -41,16 +41,18 @@ def main():
                        help="MAPush task variant")
     parser.add_argument("--individualized_rewards", action="store_true", default=False,
                        help="Enable individualized rewards for HAPPO (prevents freeloading)")
+    parser.add_argument("--shared_gated_rewards", action="store_true", default=False,
+                       help="Iter8: Gate all shared rewards by min agent engagement (prevents freeloading)")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
     # Training arguments
-    parser.add_argument("--n_rollout_threads", type=int, default=500,
-                       help="Number of parallel environments")
-    parser.add_argument("--num_env_steps", type=int, default=100_000_000,
-                       help="Total number of environment steps")
-    parser.add_argument("--episode_length", type=int, default=200,
-                       help="Rollout length: steps to collect before update (MAPush episodes: 1000 steps, split into 5 rollouts)")
+    parser.add_argument("--n_rollout_threads", type=int, default=None,
+                       help="Number of parallel environments (default: from YAML config)")
+    parser.add_argument("--num_env_steps", type=int, default=None,
+                       help="Total number of environment steps (default: from YAML config)")
+    parser.add_argument("--episode_length", type=int, default=None,
+                       help="Rollout length: steps to collect before update (default: from YAML config)")
 
     # Optional arguments
     parser.add_argument("--use_tensorboard", action="store_true", default=True,
@@ -76,17 +78,28 @@ def main():
     algo_args, _ = get_defaults_yaml_args(args["algo"], "pettingzoo_mpe")
 
     # Override with MAPush-specific environment config
+    # ALWAYS use EP mode for critic (single global value function)
+    # FP mode causes critic divergence - per-agent value estimation is unstable
+    # Individualized rewards only affects reward shaping, NOT critic mode
+    use_individual = args.get("individualized_rewards", False)
+    use_shared_gated = args.get("shared_gated_rewards", False)
+    # n_threads defaults to YAML config value if not specified on command line
+    n_threads = args.get("n_rollout_threads") or algo_args["train"]["n_rollout_threads"]
     env_args = {
         "task": args.get("task", "go1push_mid"),  # Use task from command line
-        "n_threads": args.get("n_rollout_threads", 500),
-        "state_type": "EP",  # Environment Provided state (all agents see same global state)
-        "individualized_rewards": args.get("individualized_rewards", False),  # For HAPPO
+        "n_threads": n_threads,
+        "state_type": "EP",  # ALWAYS EP - HAPPO uses single global critic per documentation
+        "individualized_rewards": use_individual,  # For reward shaping only
+        "shared_gated_rewards": use_shared_gated,  # Iter8: Gate shared rewards by min engagement
     }
 
-    # Override training parameters
-    algo_args["train"]["n_rollout_threads"] = args.get("n_rollout_threads", 500)
-    algo_args["train"]["num_env_steps"] = args.get("num_env_steps", 100_000_000)
-    algo_args["train"]["episode_length"] = args.get("episode_length", 200)
+    # Override training parameters only if specified on command line
+    if args.get("n_rollout_threads") is not None:
+        algo_args["train"]["n_rollout_threads"] = args["n_rollout_threads"]
+    if args.get("num_env_steps") is not None:
+        algo_args["train"]["num_env_steps"] = args["num_env_steps"]
+    if args.get("episode_length") is not None:
+        algo_args["train"]["episode_length"] = args["episode_length"]
 
     # Set seed
     algo_args["seed"]["seed"] = args.get("seed", 1)
@@ -102,7 +115,10 @@ def main():
     print(f"Algorithm: {args['algo']}")
     print(f"Environment: {env_args['task']}")
     print(f"Experiment: {args['exp_name']}")
+    print(f"Critic mode: {env_args['state_type']} (EP = single global critic)")
     print(f"Individualized rewards: {env_args['individualized_rewards']}")
+    if env_args['individualized_rewards']:
+        print(f"  → Contact-weighted rewards averaged to team reward for stable critic")
     print(f"Seed: {algo_args['seed']['seed']}")
     print(f"Parallel envs: {algo_args['train']['n_rollout_threads']}")
     print(f"Total steps: {algo_args['train']['num_env_steps']:,}")

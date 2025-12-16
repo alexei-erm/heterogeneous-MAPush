@@ -60,10 +60,12 @@ class MAPushEnv:
 
         # Create MQE environment with custom config
         individualized_rewards = env_args.get("individualized_rewards", False)
+        shared_gated_rewards = env_args.get("shared_gated_rewards", False)
         self.env, self.env_cfg = make_mqe_env(
             args.task,
             args,
-            custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards)
+            custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards,
+                                  shared_gated_rewards=shared_gated_rewards)
         )
 
         self.n_envs = self.env.num_envs
@@ -115,9 +117,9 @@ class MAPushEnv:
         # Dones - broadcast to all agents
         dones_np = np.broadcast_to(dones_np[:, np.newaxis], (self.n_envs, self.n_agents))
 
-        # Infos - HARL expects list of dicts with agent ID keys for EP mode
-        # For EP (Environment Provided) state, info[0] contains shared info
-        infos_list = [{0: {}} for _ in range(self.n_envs)]
+        # Infos - HARL expects list of dicts with agent ID keys
+        # For EP mode: info[0] is used; for FP mode: info[agent_id] for all agents
+        infos_list = [{agent_id: {} for agent_id in range(self.n_agents)} for _ in range(self.n_envs)]
 
         # Track statistics for episodes that just finished
         for env_idx in range(self.n_envs):

@@ -118,10 +118,15 @@ class MAPushLogger(BaseLogger):
                 self.writter.add_scalar('rewards/cooperation_bonus', rb.get("cooperation_bonus", 0) / step_count, self.total_num_steps)
                 self.writter.add_scalar('rewards/same_side_bonus', rb.get("same_side_bonus", 0) / step_count, self.total_num_steps)
                 self.writter.add_scalar('rewards/blocking_penalty', rb.get("blocking_penalty", 0) / step_count, self.total_num_steps)
+                # Iter8 gated rewards
+                self.writter.add_scalar('rewards/gating_factor', rb.get("gating_factor", 0) / step_count, self.total_num_steps)
 
                 # Log if individualized rewards are enabled
                 if hasattr(wrapper, 'individualized_rewards'):
                     self.writter.add_scalar('config/individualized_rewards', float(wrapper.individualized_rewards), self.total_num_steps)
+                # Log if gated shared rewards are enabled
+                if hasattr(wrapper, 'shared_gated_rewards'):
+                    self.writter.add_scalar('config/shared_gated_rewards', float(wrapper.shared_gated_rewards), self.total_num_steps)
 
                 # Reset reward buffer
                 for key in rb:
