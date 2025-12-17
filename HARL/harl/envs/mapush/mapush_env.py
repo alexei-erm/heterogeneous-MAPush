@@ -77,11 +77,14 @@ class MAPushEnv:
         self.action_space = [self.env.action_space] * self.n_agents
 
         # Share observation space (for centralized critic)
-        # Global state: box(3) + target(3) + agent0(3) + agent1(3) = 12 dims
-        # [box_x, box_y, box_yaw, target_x, target_y, target_yaw,
-        #  agent0_x, agent0_y, agent0_yaw, agent1_x, agent1_y, agent1_yaw]
+        # Global state: box(3) + target(2) + agents(6 each) = 3 + 2 + 6*n_agents dims
+        # [box_x, box_y, box_yaw,                                    = 3 dims
+        #  target_x, target_y,                                       = 2 dims (NO yaw for target!)
+        #  agent0_x, agent0_y, agent0_yaw, vx, vy, vyaw,            = 6 dims
+        #  agent1_x, agent1_y, agent1_yaw, vx, vy, vyaw]            = 6 dims
+        # Total for 2 agents: 3 + 2 + 6 + 6 = 17 dims
         from gym import spaces
-        global_state_dim = 3 + 3 + 3 * self.n_agents  # box + target + all agents
+        global_state_dim = 3 + 2 + 6 * self.n_agents  # box + target + all agents (pos + vel)
         self.share_observation_space = [
             spaces.Box(low=-float('inf'), high=float('inf'),
                       shape=(global_state_dim,), dtype=np.float32)
@@ -108,13 +111,17 @@ class MAPushEnv:
 
         # Get NPC states (box and target) from root_states_npc
         # root_states_npc shape: [num_envs * num_npcs, 13] (pos, quat, lin_vel, ang_vel)
+        # root_states_npc is in WORLD FRAME (includes env_origins offset)
         npc_states = wrapper.root_states_npc.reshape(self.n_envs, wrapper.num_npcs, -1)
 
         # Box state (NPC 0)
+        # SUBTRACT env_origins to convert to environment-relative frame
+        # This matches the coordinate frame used by obs_buf.base_pos (which also subtracts env_origins)
         box_pos_global = npc_states[:, 0, :3] - wrapper.env.env_origins  # [n_envs, 3]
         box_quat = npc_states[:, 0, 3:7]  # [n_envs, 4]
 
         # Target state (NPC 1)
+        # SUBTRACT env_origins to convert to environment-relative frame
         target_pos_global = npc_states[:, 1, :3] - wrapper.env.env_origins  # [n_envs, 3]
         target_quat = npc_states[:, 1, 3:7]  # [n_envs, 4]
 
@@ -123,35 +130,78 @@ class MAPushEnv:
         box_rpy = torch.stack(get_euler_xyz(box_quat), dim=1)  # [n_envs, 3]
         target_rpy = torch.stack(get_euler_xyz(target_quat), dim=1)  # [n_envs, 3]
 
-        # Get agent states from obs_buf (which has base_pos and base_rpy)
+        # Get agent states from obs_buf (includes position, velocity, rpy)
         # We need to access the raw observation buffer from the base environment
         obs_buf = wrapper.env.obs_buf if hasattr(wrapper, 'env') else wrapper.obs_buf
 
-        # base_pos and base_rpy are in the obs_buf
+        # Agent position and orientation
+        # NOTE: obs_buf.base_pos ALREADY has env_origins subtracted (see go1.py:161)
+        # So it's in environment-relative frame, matching box_pos_global and target_pos_global above
         base_pos = obs_buf.base_pos.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
         base_rpy = obs_buf.base_rpy.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
 
-        # Construct global state: [box(3), target(3), agent0(3), agent1(3), ...]
-        # Only use x, y, yaw (2D projection)
+        # Agent velocities (linear and angular)
+        # These should be [n_envs * n_agents, 3] and we reshape to [n_envs, n_agents, 3]
+        try:
+            base_lin_vel = obs_buf.lin_vel.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
+            base_ang_vel = obs_buf.ang_vel.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
+        except Exception as e:
+            print(f"\nERROR accessing velocities:")
+            print(f"  obs_buf.lin_vel shape: {obs_buf.lin_vel.shape if hasattr(obs_buf, 'lin_vel') else 'DOES NOT EXIST'}")
+            print(f"  obs_buf.ang_vel shape: {obs_buf.ang_vel.shape if hasattr(obs_buf, 'ang_vel') else 'DOES NOT EXIST'}")
+            print(f"  Expected reshape: [{self.n_envs}, {self.n_agents}, 3]")
+            print(f"  Error: {e}")
+            raise
+
+        # Construct global state: [box(3), target(2), agent0(6), agent1(6), ...]
+        # Only use x, y, yaw for 2D projection
         global_state_list = [
             box_pos_global[:, :2],         # box x, y
             box_rpy[:, 2:3],               # box yaw
-            target_pos_global[:, :2],      # target x, y
-            target_rpy[:, 2:3],            # target yaw
+            target_pos_global[:, :2],      # target x, y (NO yaw! Target is just a point)
         ]
 
-        # Add all agents' states
+        # Add all agents' states (position + velocity)
         for agent_id in range(self.n_agents):
-            global_state_list.append(base_pos[:, agent_id, :2])  # agent x, y
-            global_state_list.append(base_rpy[:, agent_id, 2:3])  # agent yaw
+            global_state_list.append(base_pos[:, agent_id, :2])      # agent x, y
+            global_state_list.append(base_rpy[:, agent_id, 2:3])     # agent yaw
+            global_state_list.append(base_lin_vel[:, agent_id, :2])  # agent vx, vy
+            global_state_list.append(base_ang_vel[:, agent_id, 2:3]) # agent vyaw (angular velocity around z)
 
         # Concatenate into single tensor
         global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 6 + 3*n_agents]
 
         # Convert to numpy
+        import numpy as np
         global_state_np = global_state_torch.cpu().numpy().astype(np.float32)
 
+        # Diagnostic logging (first call only)
+        if not hasattr(self, '_logged_global_state'):
+            print("\n" + "="*80)
+            print("GLOBAL STATE DIAGNOSTIC (First Step)")
+            print("="*80)
+            print(f"Global state shape: {global_state_np.shape}")
+            print(f"Expected: [500, 17] for 2 agents")
+            print(f"\nEnvironment 0 global state (17 dims):")
+            print(f"  Box:    x={global_state_np[0,0]:.3f}, y={global_state_np[0,1]:.3f}, yaw={global_state_np[0,2]:.3f}")
+            print(f"  Target: x={global_state_np[0,3]:.3f}, y={global_state_np[0,4]:.3f}")
+            print(f"  Agent0: x={global_state_np[0,5]:.3f}, y={global_state_np[0,6]:.3f}, yaw={global_state_np[0,7]:.3f}, vx={global_state_np[0,8]:.3f}, vy={global_state_np[0,9]:.3f}, vyaw={global_state_np[0,10]:.3f}")
+            print(f"  Agent1: x={global_state_np[0,11]:.3f}, y={global_state_np[0,12]:.3f}, yaw={global_state_np[0,13]:.3f}, vx={global_state_np[0,14]:.3f}, vy={global_state_np[0,15]:.3f}, vyaw={global_state_np[0,16]:.3f}")
+            print(f"\nStatistics across all {self.n_envs} environments:")
+            print(f"  Min values:  {np.min(global_state_np, axis=0)}")
+            print(f"  Max values:  {np.max(global_state_np, axis=0)}")
+            print(f"  Mean values: {np.mean(global_state_np, axis=0)}")
+            print(f"  Std values:  {np.std(global_state_np, axis=0)}")
+            print(f"\nNaN count: {np.isnan(global_state_np).sum()}")
+            print(f"Inf count: {np.isinf(global_state_np).sum()}")
+            print("="*80 + "\n")
+            self._logged_global_state = True
+
         # Handle NaN and Inf
+        nan_count = np.isnan(global_state_np).sum()
+        inf_count = np.isinf(global_state_np).sum()
+        if nan_count > 0 or inf_count > 0:
+            print(f"WARNING: Found {nan_count} NaN and {inf_count} Inf values in global state!")
         global_state_np[np.isnan(global_state_np)] = 0.0
         global_state_np[np.isinf(global_state_np)] = 0.0
 

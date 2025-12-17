@@ -59,6 +59,25 @@ class VNet(nn.Module):
         rnn_states = check(rnn_states).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
 
+        # VERIFICATION: Log critic input dimension on first call
+        if not hasattr(self, '_logged_input_dim'):
+            print(f"\n{'='*80}")
+            print(f"CRITIC VNet INPUT VERIFICATION")
+            print(f"{'='*80}")
+            print(f"Centralized observation shape: {cent_obs.shape}")
+            print(f"Expected for MAPush 2-agent: [batch_size, 17]")
+            print(f"  - Box: [x, y, yaw] = 3 dims")
+            print(f"  - Target: [x, y] = 2 dims (NO yaw!)")
+            print(f"  - Agent0: [x, y, yaw, vx, vy, vyaw] = 6 dims")
+            print(f"  - Agent1: [x, y, yaw, vx, vy, vyaw] = 6 dims")
+            print(f"  - Total: 17 dims")
+            if cent_obs.shape[-1] == 17:
+                print(f"✓ CORRECT: Critic receiving 17-dim global state with velocities")
+            else:
+                print(f"✗ ERROR: Expected 17 dims, got {cent_obs.shape[-1]} dims!")
+            print(f"{'='*80}\n")
+            self._logged_input_dim = True
+
         critic_features = self.base(cent_obs)
         if self.use_naive_recurrent_policy or self.use_recurrent_policy:
             critic_features, rnn_states = self.rnn(critic_features, rnn_states, masks)

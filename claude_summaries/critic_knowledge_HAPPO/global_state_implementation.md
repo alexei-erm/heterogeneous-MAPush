@@ -2,33 +2,296 @@
 
 ## Summary
 
-Implemented **true global state** for HAPPO critic in HARL, replacing the incorrect agent 0's local observation with a global coordinate frame representation.
+Implemented **true global state** for HAPPO critic in HARL, replacing the incorrect agent 0's local observation with a consistent environment-relative coordinate frame representation including agent dynamics.
+
+**CRITICAL FIXES:**
+- **Dec 17, 2025 (Fix #1)**: Fixed coordinate frame mismatch where box/target were in world frame but agents were in environment-relative frame
+- **Dec 17, 2025 (Fix #2)**: Added agent velocities and fixed target representation (target is a point, not an oriented object)
 
 ---
 
-## Global State Format
+## Global State Format (FINAL - 17 Dimensions)
 
 ### Dimensions
-- **Total**: 12 dimensions for 2 agents
-- **Formula**: `3 (box) + 3 (target) + 3 * n_agents`
+- **Total**: 17 dimensions for 2 agents
+- **Formula**: `3 (box) + 2 (target) + 6 * n_agents (position + velocity per agent)`
 
 ### Content (in order)
 ```
-[0:2]   box_x, box_y           - Box position in global frame
-[2]     box_yaw                - Box orientation (yaw angle)
-[3:5]   target_x, target_y     - Target position in global frame
-[5]     target_yaw             - Target orientation (yaw angle)
-[6:8]   agent0_x, agent0_y     - Agent 0 position in global frame
-[8]     agent0_yaw             - Agent 0 orientation (yaw angle)
-[9:11]  agent1_x, agent1_y     - Agent 1 position in global frame
-[11]    agent1_yaw             - Agent 1 orientation (yaw angle)
+[0:2]   box_x, box_y                    - Box position (relative to env origin)
+[2]     box_yaw                         - Box orientation (yaw angle, absolute)
+[3:4]   target_x, target_y              - Target position (relative to env origin, NO yaw!)
+[5:7]   agent0_x, agent0_y, agent0_yaw  - Agent 0 position & orientation
+[8:10]  agent0_vx, agent0_vy, agent0_vyaw - Agent 0 linear & angular velocity
+[11:13] agent1_x, agent1_y, agent1_yaw  - Agent 1 position & orientation
+[14:16] agent1_vx, agent1_vy, agent1_vyaw - Agent 1 linear & angular velocity
 ```
 
 ### Properties
-1. **Global coordinate frame** - All positions/orientations are absolute, not relative to any agent
-2. **Agent-order invariant** - State fully describes the environment
-3. **Complete information** - Contains all task-relevant state
-4. **2D projection** - Uses x, y, yaw (ignoring z for ground-based robots)
+1. **Environment-relative coordinate frame** - All positions are relative to environment origin (`env_origins` subtracted)
+2. **Consistent frame** - All entities (box, target, agents) use same coordinate system
+3. **Agent-order invariant** - State fully describes the environment
+4. **Complete information** - Includes both kinematics (position/orientation) AND dynamics (velocities)
+5. **Correct target representation** - Target is 2D point (x, y), NOT an oriented object
+6. **2D projection** - Uses x, y, yaw for positions, vx, vy, vyaw for velocities (ignoring z for ground-based task)
+
+---
+
+## CRITICAL BUG FIX - Coordinate Frame Mismatch (Dec 17, 2025)
+
+### The Problem
+
+**Symptom**: Critic value loss exploded from 0.05 to 0.41 (711% increase), indicating the critic was learning garbage.
+
+**Root Cause**: Mixed coordinate frames in global state construction:
+- **Box/Target positions**: Were in **world frame** (included `env_origins` offset)
+- **Agent positions**: Were in **environment-relative frame** (`env_origins` already subtracted)
+
+This created an inconsistent state representation that prevented the critic from learning meaningful value predictions.
+
+### Technical Details
+
+#### Isaac Gym Coordinate Frames
+
+Isaac Gym places multiple environments in a grid with `env_origins` offsets:
+```
+Environment 0: env_origins = [0.0, 0.0, 0.0]
+Environment 1: env_origins = [5.0, 0.0, 0.0]
+Environment 2: env_origins = [10.0, 0.0, 0.0]
+...
+```
+
+All actor positions from `gym.acquire_actor_root_state_tensor()` are in **world frame** (absolute coordinates including these offsets).
+
+#### The Wrapper's Processing
+
+In `mqe/envs/go1/go1.py:161`, the observation buffer processes positions:
+```python
+self.obs_buf.base_pos = (self.base_pos - self.env_origins_repeat) * self.cfg.obs.scales.base_pos
+```
+
+So `obs_buf.base_pos` has `env_origins` **already subtracted**, converting to environment-relative frame.
+
+Similarly, in `mqe/envs/wrappers/go1_push_mid_wrapper.py:163-164`:
+```python
+box_pos = npc_pos[:,0,:] - self.env.env_origins
+target_pos = npc_pos[:,1,:] - self.env.env_origins
+```
+
+The wrapper subtracts `env_origins` to get environment-relative positions.
+
+#### The Bug in `mapush_env.py` (BEFORE FIX)
+
+**Lines 115, 119 (BUGGY)**:
+```python
+# Box state - directly from root_states_npc (WORLD FRAME)
+box_pos_global = npc_states[:, 0, :3]  # Includes env_origins offset!
+
+# Target state - directly from root_states_npc (WORLD FRAME)
+target_pos_global = npc_states[:, 1, :3]  # Includes env_origins offset!
+
+# Agent state - from obs_buf (ENVIRONMENT-RELATIVE FRAME)
+base_pos = obs_buf.base_pos.reshape(...)  # env_origins already subtracted!
+```
+
+**Result**: Critic received mixed frames:
+```python
+# Environment 1 (env_origins = [5.0, 0.0, 0.0]):
+state = [
+    6.0, 2.0, 0.5,    # box in world frame (actual: 1.0m from env origin)
+    10.0, 8.0, 1.0,   # target in world frame (actual: 5.0m from env origin)
+    0.5, 1.0, 0.2,    # agent0 in env-relative frame
+    1.5, 3.0, 0.8     # agent1 in env-relative frame
+]
+```
+
+This is **meaningless** - the critic couldn't learn that a box at `[6.0, 2.0]` and agent at `[0.5, 1.0]` are only 0.7m apart in reality!
+
+### The Fix
+
+**Lines 117, 122 (FIXED)**:
+```python
+# Box state - SUBTRACT env_origins to match agent frame
+box_pos_global = npc_states[:, 0, :3] - wrapper.env.env_origins  # [n_envs, 3]
+
+# Target state - SUBTRACT env_origins to match agent frame
+target_pos_global = npc_states[:, 1, :3] - wrapper.env.env_origins  # [n_envs, 3]
+
+# Agent state - already in environment-relative frame
+base_pos = obs_buf.base_pos.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
+```
+
+**Result**: Critic now receives consistent environment-relative frame:
+```python
+# Environment 1 (env_origins = [5.0, 0.0, 0.0]):
+state = [
+    1.0, 2.0, 0.5,    # box in env-relative frame
+    5.0, 8.0, 1.0,    # target in env-relative frame
+    0.5, 1.0, 0.2,    # agent0 in env-relative frame
+    1.5, 3.0, 0.8     # agent1 in env-relative frame
+]
+```
+
+Now the critic can correctly learn spatial relationships!
+
+### Impact on Training
+
+**Before Fix**:
+- Critic couldn't learn because state representation was incoherent
+- Value loss increased instead of decreased (0.05 → 0.41)
+- Different environments had completely different "meaning" for same state values
+
+**After Fix**:
+- All environments use consistent coordinate frame
+- Spatial relationships are preserved and learnable
+- Critic should now converge properly
+
+---
+
+## CRITICAL FIX #2 - Missing Velocities & Wrong Target Representation (Dec 17, 2025)
+
+### The Problem
+
+**Discovered Issue**: The 12-dim global state was fundamentally incomplete for a dynamics task!
+
+**Three Critical Errors:**
+
+1. **Target had orientation (WRONG!)**
+   - Implemented: `[target_x, target_y, target_yaw]` = 3 dims
+   - Reality: Target is a 2D goal point, NOT an oriented object
+   - Should be: `[target_x, target_y]` = 2 dims
+
+2. **Missing agent velocities (CRITICAL!)**
+   - Implemented: Only positions `[x, y, yaw]` per agent
+   - Problem: Critic cannot distinguish between:
+     - Agent moving toward box at 0.5 m/s (good!)
+     - Agent stationary near box (bad!)
+   - Both have same position → Same state → Same value prediction (WRONG!)
+
+3. **Incomplete state for dynamics prediction**
+   - Pushing task requires understanding momentum, collision dynamics
+   - Position-only state cannot predict:
+     - If agents will successfully push box
+     - Impact of agent velocities on box motion
+     - Coordination quality (are agents approaching from good angles with good speeds?)
+
+### Why This Matters for HAPPO
+
+HAPPO's critic estimates **value function** V(s), which predicts expected future returns.
+
+**With position-only state (12 dims):**
+```python
+State at t=0: [box at (1, 2), agents at (0.5, 1) and (1.5, 3)]
+State at t=1: [box at (1, 2), agents at (0.6, 1.1) and (1.4, 2.9)]
+
+Critic sees: "Agents moved slightly, box didn't move"
+Missing: Were agents accelerating toward box? Or slowing down?
+```
+
+**With position + velocity state (17 dims):**
+```python
+State at t=0: [box at (1, 2), agents at (0.5, 1) with v=(0.2, 0.1) and (1.5, 3) with v=(-0.1, -0.2)]
+State at t=1: [box at (1, 2), agents at (0.6, 1.1) with v=(0.3, 0.2) and (1.4, 2.9) with v=(-0.2, -0.3)]
+
+Critic sees: "Agents accelerating toward box from opposite sides - high value, imminent push!"
+```
+
+### The Fix
+
+**Lines 87, 144-154 in `mapush_env.py`:**
+
+**BEFORE (12 dims):**
+```python
+global_state_dim = 3 + 3 + 3 * self.n_agents  # box + target + agents
+
+global_state_list = [
+    box_pos_global[:, :2],      # box x, y
+    box_rpy[:, 2:3],            # box yaw
+    target_pos_global[:, :2],   # target x, y
+    target_rpy[:, 2:3],         # target yaw (WRONG!)
+]
+
+for agent_id in range(self.n_agents):
+    global_state_list.append(base_pos[:, agent_id, :2])     # x, y
+    global_state_list.append(base_rpy[:, agent_id, 2:3])    # yaw
+    # MISSING: velocities!
+```
+
+**AFTER (17 dims):**
+```python
+global_state_dim = 3 + 2 + 6 * self.n_agents  # box + target + agents(pos+vel)
+
+# Get velocities from obs_buf
+base_lin_vel = obs_buf.lin_vel.reshape(self.n_envs, self.n_agents, 3)
+base_ang_vel = obs_buf.ang_vel.reshape(self.n_envs, self.n_agents, 3)
+
+global_state_list = [
+    box_pos_global[:, :2],      # box x, y
+    box_rpy[:, 2:3],            # box yaw
+    target_pos_global[:, :2],   # target x, y (NO yaw!)
+]
+
+for agent_id in range(self.n_agents):
+    global_state_list.append(base_pos[:, agent_id, :2])       # x, y
+    global_state_list.append(base_rpy[:, agent_id, 2:3])      # yaw
+    global_state_list.append(base_lin_vel[:, agent_id, :2])   # vx, vy
+    global_state_list.append(base_ang_vel[:, agent_id, 2:3])  # vyaw
+```
+
+### Data Source Verification
+
+Velocities come from `obs_buf` which is populated in `mqe/envs/go1/go1.py:172-176`:
+
+```python
+if self.cfg.obs.cfgs.lin_vel or self.cfg.control.control_type == "C":
+    self.obs_buf.lin_vel = self.base_lin_vel * self.obs_scales.lin_vel
+
+if self.cfg.obs.cfgs.ang_vel or self.cfg.control.control_type == "C":
+    self.obs_buf.ang_vel = self.base_ang_vel * self.obs_scales.ang_vel
+```
+
+Since `control_type = 'C'` in MAPush config, these fields are **always populated**.
+
+Velocities are in **body frame** (robot-centric), which is appropriate since:
+- Each robot's policy uses body-frame velocities for control
+- Critic needs to understand each robot's motion relative to its orientation
+
+### Verification Output
+
+From actual training run:
+```
+Global state shape: (500, 17)
+Expected: [500, 17] for 2 agents
+
+Environment 0 global state (17 dims):
+  Box:    x=12.000, y=0.000, yaw=0.475
+  Target: x=14.155, y=1.456                     ← NO yaw! Correct!
+  Agent0: x=11.549, y=-1.205, yaw=1.487, vx=-0.030, vy=-0.098, vyaw=0.050  ← Velocities!
+  Agent1: x=11.322, y=1.028, yaw=5.350, vx=0.005, vy=0.038, vyaw=-0.006    ← Velocities!
+
+NaN count: 0
+Inf count: 0
+
+✓ CORRECT: Critic receiving 17-dim global state with velocities
+```
+
+### Expected Impact
+
+**With velocities, the critic can now:**
+
+1. **Predict push outcomes**: High velocity + good angle = high value
+2. **Distinguish strategies**:
+   - Slow coordinated approach (medium value, safer)
+   - Fast aggressive push (high value if coordinated, low if not)
+3. **Evaluate momentum**: Fast-moving box = higher/lower value depending on direction
+4. **Credit assignment**: Agent contributing velocity toward goal = higher value contribution
+5. **Learn dynamics**: Box response to agent forces, collision effects, etc.
+
+This should significantly improve:
+- Value function accuracy
+- Credit assignment between agents
+- Training stability (more informative state → better gradients)
+- Final task performance (better coordination through better value estimates)
 
 ---
 
@@ -158,42 +421,45 @@ obs[499] = [...]  # env 499
 
 | Aspect | Before (WRONG) | After (CORRECT) |
 |--------|----------------|-----------------|
-| **Critic Input** | Agent 0's local observation | Global state |
-| **Coordinate Frame** | Ego-centric (agent 0) | Global (world) |
+| **Critic Input** | Agent 0's local observation | Centralized global state |
+| **Coordinate Frame** | Ego-centric (agent 0) | Environment-relative (consistent) |
 | **Input Shape** | `[500, 8]` | `[500, 12]` |
-| **Agent 1 Info** | As relative position to agent 0 | Absolute position in world |
-| **Box/Target Info** | Relative to agent 0 | Absolute position in world |
+| **Agent 1 Info** | As relative position to agent 0 | Position relative to env origin |
+| **Box/Target Info** | Relative to agent 0 | Relative to env origin (consistent!) |
+| **Frame Consistency** | Mixed frames (bug: world + relative) | Single frame (all env-relative) |
 | **Invariance** | NOT agent-order invariant | Agent-order invariant |
 | **HAPPO Theory** | VIOLATED | SATISFIED |
 
 ### Example State Comparison
 
-**Scenario**:
+**Scenario** (all positions relative to environment origin):
 - Box at (1.0, 2.0, 0.5 rad)
 - Target at (5.0, 6.0, 1.0 rad)
 - Agent 0 at (0.5, 1.0, 0.2 rad)
 - Agent 1 at (1.5, 3.0, 0.8 rad)
 
-**Before (Agent 0's local view)**:
+**Before (Agent 0's ego-centric local view)**:
 ```python
 state[0, 0, :] = [
-    4.8, 5.1,      # target relative to agent 0 (rotated)
-    0.6, 1.1,      # box relative to agent 0 (rotated)
+    4.8, 5.1,      # target relative to agent 0 (rotated by agent0's yaw)
+    0.6, 1.1,      # box relative to agent 0 (rotated by agent0's yaw)
     0.3,           # box yaw relative to agent 0
-    1.1, 2.1, 0.6  # agent 1 relative to agent 0 (rotated)
+    1.1, 2.1, 0.6  # agent 1 relative to agent 0 (rotated by agent0's yaw)
 ]  # Shape: (8,)
+# Everything in agent 0's local coordinate frame - NOT suitable for centralized critic!
 ```
 
-**After (Global state)**:
+**After (Environment-relative centralized state)**:
 ```python
 state[0, 0, :] = [
-    1.0, 2.0, 0.5,   # box absolute
-    5.0, 6.0, 1.0,   # target absolute
-    0.5, 1.0, 0.2,   # agent 0 absolute
-    1.5, 3.0, 0.8    # agent 1 absolute
+    1.0, 2.0, 0.5,   # box position (env-relative) + yaw (absolute)
+    5.0, 6.0, 1.0,   # target position (env-relative) + yaw (absolute)
+    0.5, 1.0, 0.2,   # agent 0 position (env-relative) + yaw (absolute)
+    1.5, 3.0, 0.8    # agent 1 position (env-relative) + yaw (absolute)
 ]  # Shape: (12,)
 
-# state[0, 1, :] is IDENTICAL (broadcasted)
+# state[0, 1, :] is IDENTICAL (broadcasted) - all agents see same global state
+# All positions in CONSISTENT environment-relative frame!
 ```
 
 ---
@@ -282,6 +548,16 @@ print("Global state verification PASSED!")
 
 ## Conclusion
 
-The implementation now correctly provides HAPPO's critic with a **true global state** in a **global coordinate frame**, satisfying the theoretical requirements for proper credit assignment and centralized value estimation.
+The implementation now correctly provides HAPPO's critic with a **true centralized state** in a **consistent environment-relative coordinate frame**, satisfying the theoretical requirements for proper credit assignment and centralized value estimation.
 
-This resolves the critical issue identified in `EXACT_critic_input_comparison.md` where the critic was incorrectly using agent 0's ego-centric observation instead of a global state.
+**Key fixes applied**:
+1. ✅ Replaced agent 0's ego-centric observation with centralized global state
+2. ✅ Fixed coordinate frame mismatch (all entities now use environment-relative frame)
+3. ✅ Ensured consistent spatial relationships across all parallel environments
+4. ✅ Enabled proper credit assignment for multi-agent HAPPO training
+
+This resolves two critical issues:
+1. **Original issue**: Critic was using agent 0's ego-centric observation instead of global state
+2. **Coordinate frame bug (Dec 17)**: Mixed world frame and environment-relative frame in state construction
+
+With these fixes, the critic should now be able to learn meaningful value predictions for the collaborative pushing task.
