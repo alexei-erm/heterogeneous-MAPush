@@ -77,11 +77,85 @@ class MAPushEnv:
         self.action_space = [self.env.action_space] * self.n_agents
 
         # Share observation space (for centralized critic)
-        # Using same as observation for now (can be extended for global state)
-        self.share_observation_space = [self.env.observation_space] * self.n_agents
+        # Global state: box(3) + target(3) + agent0(3) + agent1(3) = 12 dims
+        # [box_x, box_y, box_yaw, target_x, target_y, target_yaw,
+        #  agent0_x, agent0_y, agent0_yaw, agent1_x, agent1_y, agent1_yaw]
+        from gym import spaces
+        global_state_dim = 3 + 3 + 3 * self.n_agents  # box + target + all agents
+        self.share_observation_space = [
+            spaces.Box(low=-float('inf'), high=float('inf'),
+                      shape=(global_state_dim,), dtype=np.float32)
+        ] * self.n_agents
 
         # Statistics tracking (for calculator mode)
         self.reset_statistics()
+
+    def _construct_global_state(self) -> np.ndarray:
+        """Construct global state from environment internals.
+
+        Global state contains positions and orientations in global frame:
+        - Box: [x, y, yaw]
+        - Target: [x, y, yaw]
+        - Agent 0: [x, y, yaw]
+        - Agent 1: [x, y, yaw]
+        ...for all agents
+
+        Returns:
+            global_state: [n_envs, global_state_dim] numpy array
+        """
+        # Access underlying wrapper to get global state information
+        wrapper = self.env
+
+        # Get NPC states (box and target) from root_states_npc
+        # root_states_npc shape: [num_envs * num_npcs, 13] (pos, quat, lin_vel, ang_vel)
+        npc_states = wrapper.root_states_npc.reshape(self.n_envs, wrapper.num_npcs, -1)
+
+        # Box state (NPC 0)
+        box_pos_global = npc_states[:, 0, :3] - wrapper.env.env_origins  # [n_envs, 3]
+        box_quat = npc_states[:, 0, 3:7]  # [n_envs, 4]
+
+        # Target state (NPC 1)
+        target_pos_global = npc_states[:, 1, :3] - wrapper.env.env_origins  # [n_envs, 3]
+        target_quat = npc_states[:, 1, 3:7]  # [n_envs, 4]
+
+        # Convert quaternions to yaw using Isaac Gym utils
+        from isaacgym.torch_utils import get_euler_xyz
+        box_rpy = torch.stack(get_euler_xyz(box_quat), dim=1)  # [n_envs, 3]
+        target_rpy = torch.stack(get_euler_xyz(target_quat), dim=1)  # [n_envs, 3]
+
+        # Get agent states from obs_buf (which has base_pos and base_rpy)
+        # We need to access the raw observation buffer from the base environment
+        obs_buf = wrapper.env.obs_buf if hasattr(wrapper, 'env') else wrapper.obs_buf
+
+        # base_pos and base_rpy are in the obs_buf
+        base_pos = obs_buf.base_pos.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
+        base_rpy = obs_buf.base_rpy.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
+
+        # Construct global state: [box(3), target(3), agent0(3), agent1(3), ...]
+        # Only use x, y, yaw (2D projection)
+        global_state_list = [
+            box_pos_global[:, :2],         # box x, y
+            box_rpy[:, 2:3],               # box yaw
+            target_pos_global[:, :2],      # target x, y
+            target_rpy[:, 2:3],            # target yaw
+        ]
+
+        # Add all agents' states
+        for agent_id in range(self.n_agents):
+            global_state_list.append(base_pos[:, agent_id, :2])  # agent x, y
+            global_state_list.append(base_rpy[:, agent_id, 2:3])  # agent yaw
+
+        # Concatenate into single tensor
+        global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 6 + 3*n_agents]
+
+        # Convert to numpy
+        global_state_np = global_state_torch.cpu().numpy().astype(np.float32)
+
+        # Handle NaN and Inf
+        global_state_np[np.isnan(global_state_np)] = 0.0
+        global_state_np[np.isinf(global_state_np)] = 0.0
+
+        return global_state_np
 
     def step(self, actions: np.ndarray) -> Tuple:
         """Step the environment.
@@ -91,7 +165,7 @@ class MAPushEnv:
 
         Returns:
             obs: [n_envs, n_agents, obs_dim]
-            state: [n_envs, n_agents, state_dim]
+            state: [n_envs, global_state_dim] - TRUE GLOBAL STATE
             rewards: [n_envs, n_agents, 1]
             dones: [n_envs, n_agents]
             infos: list of dicts
@@ -108,8 +182,18 @@ class MAPushEnv:
         rewards_np = rewards.cpu().numpy()  # [n_envs, n_agents]
         dones_np = dones.cpu().numpy()  # [n_envs]
 
-        # State (same as obs for now - can be customized for global state)
-        state_np = obs_np.copy()
+        # Construct TRUE global state in global coordinate frame
+        # Shape: [n_envs, global_state_dim]
+        # Content: [box_x, box_y, box_yaw, target_x, target_y, target_yaw,
+        #           agent0_x, agent0_y, agent0_yaw, agent1_x, agent1_y, agent1_yaw, ...]
+        global_state_np = self._construct_global_state()
+
+        # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
+        # The runner will use state[:, 0] to get the global state
+        state_np = np.broadcast_to(
+            global_state_np[:, np.newaxis, :],
+            (self.n_envs, self.n_agents, global_state_np.shape[1])
+        )
 
         # Reshape rewards: [n_envs, n_agents] -> [n_envs, n_agents, 1]
         rewards_np = rewards_np[..., np.newaxis]
@@ -142,12 +226,21 @@ class MAPushEnv:
 
         Returns:
             obs: [n_envs, n_agents, obs_dim]
-            state: [n_envs, n_agents, state_dim]
+            state: [n_envs, n_agents, global_state_dim] - TRUE GLOBAL STATE (broadcasted)
             available_actions: None (continuous action space)
         """
         obs = self.env.reset()
         obs_np = obs.cpu().numpy()
-        state_np = obs_np.copy()
+
+        # Construct TRUE global state in global coordinate frame
+        global_state_np = self._construct_global_state()
+
+        # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
+        state_np = np.broadcast_to(
+            global_state_np[:, np.newaxis, :],
+            (self.n_envs, self.n_agents, global_state_np.shape[1])
+        )
+
         return obs_np, state_np, None
 
     def seed(self, seed: int):
