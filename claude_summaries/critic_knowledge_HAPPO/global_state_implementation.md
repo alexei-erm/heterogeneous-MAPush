@@ -561,3 +561,96 @@ This resolves two critical issues:
 2. **Coordinate frame bug (Dec 17)**: Mixed world frame and environment-relative frame in state construction
 
 With these fixes, the critic should now be able to learn meaningful value predictions for the collaborative pushing task.
+
+---
+
+## CRITICAL FIX #3 - Value Normalizer Non-Stationary Targets (Dec 18, 2025)
+
+### The Problem
+
+**Symptom**: Despite fixes #1 and #2, critic value loss continued to increase over first 40M steps with high oscillations.
+
+**Root Cause**: Value normalizer was being updated **inside the mini-batch training loop**, creating non-stationary training targets.
+
+**Location**: `HARL/harl/algorithms/critics/v_critic.py:91` (in `cal_value_loss()`)
+
+**Bug Code**:
+```python
+if value_normalizer is not None:
+    value_normalizer.update(return_batch)  # ❌ Called EVERY mini-batch!
+    error_original = value_normalizer.normalize(return_batch) - values
+```
+
+**Impact**:
+- With `critic_epoch=5`, normalizer updated **5 times per training iteration**
+- Each update changed mean/std statistics during training
+- Training targets became non-stationary (goal posts moved mid-training)
+- Result: High variance, oscillations, increasing critic loss
+
+### The Fix
+
+**File**: `HARL/harl/algorithms/critics/v_critic.py`
+
+**Change 1**: Removed normalizer update from `cal_value_loss()` (line 91)
+```python
+if value_normalizer is not None:
+    # FIX (Dec 18, 2025): Removed value_normalizer.update() from here
+    # Normalizer now updated ONCE in train() before the training loop
+    error_original = value_normalizer.normalize(return_batch) - values
+```
+
+**Change 2**: Added single normalizer update in `train()` method (lines 175-182)
+```python
+def train(self, critic_buffer, value_normalizer=None):
+    train_info = {}
+    train_info["value_loss"] = 0
+    train_info["critic_grad_norm"] = 0
+
+    # FIX (Dec 18, 2025): Update value normalizer ONCE before training loop
+    if value_normalizer is not None:
+        all_returns = critic_buffer.returns[:-1].reshape(-1, 1)
+        all_returns_tensor = check(all_returns).to(**self.tpdv)
+        value_normalizer.update(all_returns_tensor)
+
+    for _ in range(self.critic_epoch):
+        # ... training loop with FIXED normalizer stats ...
+```
+
+### Why This Works
+
+**Before**:
+```
+train():
+  epoch 1: update normalizer (mean=10.2) → train
+  epoch 2: update normalizer (mean=10.5) → train  # Changed!
+  epoch 3: update normalizer (mean=10.8) → train  # Changed!
+  epoch 4: update normalizer (mean=11.1) → train  # Changed!
+  epoch 5: update normalizer (mean=11.3) → train  # Changed!
+```
+Non-stationary targets → unstable training
+
+**After**:
+```
+train():
+  update normalizer ONCE (mean=10.5, std=5.3)
+  epoch 1: train with mean=10.5  # Fixed
+  epoch 2: train with mean=10.5  # Fixed
+  epoch 3: train with mean=10.5  # Fixed
+  epoch 4: train with mean=10.5  # Fixed
+  epoch 5: train with mean=10.5  # Fixed
+```
+Stationary targets → stable training
+
+### Expected Impact
+
+**Before Fix**:
+- ❌ Critic loss: Increasing or highly oscillating
+- ❌ Training: Unstable, high variance
+- ❌ Value predictions: Inconsistent
+
+**After Fix**:
+- ✅ Critic loss: **Decreasing steadily**
+- ✅ Training: Stable, lower variance
+- ✅ Value predictions: Consistent, tracking returns properly
+
+This fix is critical for HAPPO because unstable value predictions lead to noisy advantages, which propagate through the sequential importance-weighted policy updates.

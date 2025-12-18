@@ -45,7 +45,7 @@ render:
 model:
   # network parameters
   # hidden sizes for mlp module in the network
-  hidden_sizes: [128, 128]
+  hidden_sizes: [256, 256, 128]
   # activation function, choose from sigmoid, tanh, relu, leaky_relu, selu
   activation_func: relu
   # whether to use feature normalization
