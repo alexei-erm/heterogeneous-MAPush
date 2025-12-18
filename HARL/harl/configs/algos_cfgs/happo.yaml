@@ -83,6 +83,10 @@ algo:
   # number of epochs for critic update
   # CRITIC FIX 1 (Dec 18, 2025): Increased from 5 to 25
   critic_epoch: 25
+  # CRITIC FIX 2 (Dec 18, 2025): Pre-train critic before agent updates
+  # Number of epochs to pre-train critic before sequential actor updates begin
+  # This stabilizes value estimates before policies shift
+  critic_pretrain_epochs: 5
   # whether to use clipped value loss
   use_clipped_value_loss: True
   # clip parameter

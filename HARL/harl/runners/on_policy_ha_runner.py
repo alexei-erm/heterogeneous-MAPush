@@ -48,6 +48,21 @@ class OnPolicyHARunner(OnPolicyBaseRunner):
             agent_order = list(range(self.num_agents))
         else:
             agent_order = list(torch.randperm(self.num_agents).numpy())
+
+        # CRITIC FIX 2 (Dec 18, 2025): Pre-train critic before agent updates
+        # Do 5 extra critic-only updates to stabilize value estimates before policies shift
+        # This helps critic "warm up" before each agent changes the joint policy landscape
+        critic_pretrain_epochs = getattr(self.algo_args["algo"], "critic_pretrain_epochs", 5)
+        if critic_pretrain_epochs > 0:
+            # Store original critic_epoch
+            original_critic_epoch = self.critic.critic_epoch
+            # Temporarily set to pretrain epochs
+            self.critic.critic_epoch = critic_pretrain_epochs
+            # Pre-train critic
+            _ = self.critic.train(self.critic_buffer, self.value_normalizer)
+            # Restore original critic_epoch for later
+            self.critic.critic_epoch = original_critic_epoch
+
         for agent_id in agent_order:
             self.actor_buffer[agent_id].update_factor(
                 factor
