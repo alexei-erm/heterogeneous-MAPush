@@ -224,6 +224,12 @@ class MAPushEnv:
         # Convert to torch: actions already in [n_envs, n_agents, action_dim] format
         actions_torch = torch.from_numpy(actions).cuda()
 
+        # CRITIC6 (Dec 19, 2025): Match OpenRL action scaling
+        # OpenRL applies 0.5x scale + clip in wrapper BEFORE MQE's 0.5x scale
+        # This makes effective range [-0.25, 0.25] instead of [-0.5, 0.5]
+        # Without this, HARL agents move 2x faster than OpenRL agents
+        actions_torch = (0.5 * actions_torch).clamp(-1.0, 1.0)
+
         # Step environment
         obs, rewards, dones, infos = self.env.step(actions_torch)
 

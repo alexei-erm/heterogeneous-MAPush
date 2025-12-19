@@ -37,9 +37,16 @@ class OnPolicyBaseRunner:
         self.algo_args = algo_args
         self.env_args = env_args
 
+        # Support separate actor/critic architectures (fall back to hidden_sizes if not specified)
         self.hidden_sizes = algo_args["model"]["hidden_sizes"]
+        self.actor_hidden_sizes = algo_args["model"].get("actor_hidden_sizes", self.hidden_sizes)
+        self.critic_hidden_sizes = algo_args["model"].get("critic_hidden_sizes", self.hidden_sizes)
         self.rnn_hidden_size = self.hidden_sizes[-1]
         self.recurrent_n = algo_args["model"]["recurrent_n"]
+
+        # Log architecture configuration
+        print(f"Actor hidden sizes: {self.actor_hidden_sizes}")
+        print(f"Critic hidden sizes: {self.critic_hidden_sizes}")
         self.action_aggregation = algo_args["algo"]["action_aggregation"]
         self.state_type = env_args.get("state_type", "EP")
         self.share_param = algo_args["algo"]["share_param"]
@@ -93,11 +100,12 @@ class OnPolicyBaseRunner:
         print("observation_space: ", self.envs.observation_space)
         print("action_space: ", self.envs.action_space)
 
-        # actor
+        # actor - use actor_hidden_sizes for actor networks
+        actor_model_args = {**algo_args["model"], "hidden_sizes": self.actor_hidden_sizes}
         if self.share_param:
             self.actor = []
             agent = ALGO_REGISTRY[args["algo"]](
-                {**algo_args["model"], **algo_args["algo"]},
+                {**actor_model_args, **algo_args["algo"]},
                 self.envs.observation_space[0],
                 self.envs.action_space[0],
                 device=self.device,
@@ -116,7 +124,7 @@ class OnPolicyBaseRunner:
             self.actor = []
             for agent_id in range(self.num_agents):
                 agent = ALGO_REGISTRY[args["algo"]](
-                    {**algo_args["model"], **algo_args["algo"]},
+                    {**actor_model_args, **algo_args["algo"]},
                     self.envs.observation_space[agent_id],
                     self.envs.action_space[agent_id],
                     device=self.device,
@@ -124,18 +132,21 @@ class OnPolicyBaseRunner:
                 self.actor.append(agent)
 
         if self.algo_args["render"]["use_render"] is False:  # train, not render
+            # Actor buffer uses actor_hidden_sizes
             self.actor_buffer = []
             for agent_id in range(self.num_agents):
                 ac_bu = OnPolicyActorBuffer(
-                    {**algo_args["train"], **algo_args["model"]},
+                    {**algo_args["train"], **actor_model_args},
                     self.envs.observation_space[agent_id],
                     self.envs.action_space[agent_id],
                 )
                 self.actor_buffer.append(ac_bu)
 
+            # Critic uses critic_hidden_sizes
+            critic_model_args = {**algo_args["model"], "hidden_sizes": self.critic_hidden_sizes}
             share_observation_space = self.envs.share_observation_space[0]
             self.critic = VCritic(
-                {**algo_args["model"], **algo_args["algo"]},
+                {**critic_model_args, **algo_args["algo"]},
                 share_observation_space,
                 device=self.device,
             )
@@ -143,14 +154,14 @@ class OnPolicyBaseRunner:
                 # EP stands for Environment Provided, as phrased by MAPPO paper.
                 # In EP, the global states for all agents are the same.
                 self.critic_buffer = OnPolicyCriticBufferEP(
-                    {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
+                    {**algo_args["train"], **critic_model_args, **algo_args["algo"]},
                     share_observation_space,
                 )
             elif self.state_type == "FP":
                 # FP stands for Feature Pruned, as phrased by MAPPO paper.
                 # In FP, the global states for all agents are different, and thus needs the dimension of the number of agents.
                 self.critic_buffer = OnPolicyCriticBufferFP(
-                    {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
+                    {**algo_args["train"], **critic_model_args, **algo_args["algo"]},
                     share_observation_space,
                     self.num_agents,
                 )
@@ -246,7 +257,7 @@ class OnPolicyBaseRunner:
             self.compute()
             self.prep_training()  # change to train mode
 
-            actor_train_infos, critic_train_info = self.train()
+            actor_train_infos, critic_train_info = self.train(episode)
 
             # log information
             if episode % self.algo_args["train"]["log_interval"] == 0:
