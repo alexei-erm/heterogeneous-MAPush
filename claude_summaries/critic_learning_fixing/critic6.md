@@ -1,8 +1,19 @@
-# CRITIC6: Action Scaling Fix (Match OpenRL)
+# CRITIC6: Action Scaling Fix (Match OpenRL) - **FAILED, REVERTED**
 
 > **Date:** December 19, 2025
 > **Goal:** Match OpenRL's action scaling to fix 2x velocity difference
-> **Impact:** Agents now move at same speed as OpenRL baseline
+> **Impact:** ~~Agents now move at same speed as OpenRL baseline~~
+>
+> ## **RESULT: FAILED - REVERTED ON DEC 21, 2025**
+>
+> This change **completely broke learning**. Evidence:
+> - **critic3 (no scaling)**: 2.5% → **20.2% success** in 100M steps
+> - **critic6 (with 0.5x scaling)**: 0% → **0% success** in 100M steps
+>
+> The 0.5x action scaling made actions too small (±0.25 m/s) to effectively push the box.
+> The entropy increased by 65.8%, indicating the policy found no useful actions and drifted to maximum randomness.
+>
+> **Lesson learned**: Don't blindly match OpenRL scaling. HARL's bounded std (max ~0.5) combined with action scaling creates insufficient exploration.
 
 ---
 
@@ -126,4 +137,110 @@ critic6 should be run with critic5 settings:
 | critic3 | Dec 18 | Value normalizer fix |
 | critic4 | Dec 19 | Actor update interval |
 | critic5 | Dec 19 | Full stability config + separate architectures |
-| **critic6** | Dec 19 | **Action scaling fix (match OpenRL)** |
+| **critic6** | Dec 19 | **Action scaling fix (match OpenRL) - FAILED** |
+| **critic7** | Dec 21 | **Remove velocities from critic input** |
+
+---
+
+# CRITIC7: Remove Agent Velocities from Critic Input
+
+> **Date:** December 21, 2025
+> **Goal:** Simplify critic input to match OpenRL baseline more closely
+> **Status:** TESTING
+
+---
+
+## Rationale
+
+The critic was receiving agent velocities (vx, vy, vyaw) as input, but:
+
+1. **OpenRL baseline doesn't use velocities** - The working OpenRL critic uses only positions
+2. **Velocities ≈ Actions** - In MAPush, actions ARE velocity commands. Including velocities blurs the line between V(s) and Q(s,a)
+3. **Simpler is better** - 11 dims vs 17 dims means fewer parameters to learn
+
+---
+
+## Before vs After Comparison
+
+### BEFORE (17 dimensions)
+```
+Global State:
+├── Box:     [x, y, yaw]                           = 3 dims
+├── Target:  [x, y]                                = 2 dims
+├── Agent 0: [x, y, yaw, vx, vy, vyaw]             = 6 dims  ← velocities included
+└── Agent 1: [x, y, yaw, vx, vy, vyaw]             = 6 dims  ← velocities included
+                                            TOTAL = 17 dims
+```
+
+### AFTER (11 dimensions)
+```
+Global State:
+├── Box:     [x, y, yaw]                           = 3 dims
+├── Target:  [x, y]                                = 2 dims
+├── Agent 0: [x, y, yaw]                           = 3 dims  ← positions only
+└── Agent 1: [x, y, yaw]                           = 3 dims  ← positions only
+                                            TOTAL = 11 dims
+```
+
+---
+
+## Index Mapping
+
+| Index | Before (17-dim) | After (11-dim) |
+|-------|-----------------|----------------|
+| 0 | box_x | box_x |
+| 1 | box_y | box_y |
+| 2 | box_yaw | box_yaw |
+| 3 | target_x | target_x |
+| 4 | target_y | target_y |
+| 5 | agent0_x | agent0_x |
+| 6 | agent0_y | agent0_y |
+| 7 | agent0_yaw | agent0_yaw |
+| 8 | agent0_vx | agent1_x |
+| 9 | agent0_vy | agent1_y |
+| 10 | agent0_vyaw | agent1_yaw |
+| 11 | agent1_x | - |
+| 12 | agent1_y | - |
+| 13 | agent1_yaw | - |
+| 14 | agent1_vx | - |
+| 15 | agent1_vy | - |
+| 16 | agent1_vyaw | - |
+
+---
+
+## File Changes
+
+**Modified:** `HARL/harl/envs/mapush/mapush_env.py`
+
+```python
+# Line 91: Changed dimension calculation
+global_state_dim = 3 + 2 + 3 * self.n_agents  # was: 6 * self.n_agents
+
+# Lines 172-174: Removed velocity collection
+# REMOVED:
+# global_state_list.append(base_lin_vel[:, agent_id, :2])  # agent vx, vy
+# global_state_list.append(base_ang_vel[:, agent_id, 2:3]) # agent vyaw
+```
+
+---
+
+## Expected Impact
+
+1. **Simpler value function** - 11 inputs vs 17 = ~35% reduction in input size
+2. **Cleaner V(s) estimation** - No action-like information in state
+3. **Faster training** - Smaller network input
+4. **Better match to OpenRL** - Same information available to critic
+
+---
+
+## Combined Changes (critic7)
+
+Building on critic3 (best performing so far):
+
+| Change | Status |
+|--------|--------|
+| Action scaling (0.5x) | ❌ REVERTED (broke learning) |
+| Remove velocities from critic | ✅ NEW |
+| Keep: value_loss_coef = 5.0 | ✅ |
+| Keep: critic_epoch = 25 | ✅ |
+| Keep: value normalizer fix | ✅ |

@@ -88,9 +88,7 @@ class VCritic:
             -self.clip_param, self.clip_param
         )
         if value_normalizer is not None:
-            # FIX (Dec 18, 2025): Removed value_normalizer.update() from here
-            # The normalizer is now updated ONCE in train() before the training loop
-            # to prevent non-stationary training targets
+            value_normalizer.update(return_batch)
             error_clipped = (
                 value_normalizer.normalize(return_batch) - value_pred_clipped
             )
@@ -171,15 +169,6 @@ class VCritic:
 
         train_info["value_loss"] = 0
         train_info["critic_grad_norm"] = 0
-
-        # FIX (Dec 18, 2025): Update value normalizer ONCE before training loop
-        # This prevents non-stationary training targets that occur when updating
-        # the normalizer inside the mini-batch loop (which happened critic_epoch times)
-        if value_normalizer is not None:
-            # Collect all returns from the buffer to update normalizer statistics
-            all_returns = critic_buffer.returns[:-1].reshape(-1, 1)
-            all_returns_tensor = check(all_returns).to(**self.tpdv)
-            value_normalizer.update(all_returns_tensor)
 
         for _ in range(self.critic_epoch):
             if self.use_recurrent_policy:

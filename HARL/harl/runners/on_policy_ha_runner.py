@@ -8,14 +8,9 @@ from harl.runners.on_policy_base_runner import OnPolicyBaseRunner
 class OnPolicyHARunner(OnPolicyBaseRunner):
     """Runner for on-policy HA algorithms."""
 
-    def train(self, episode=None):
+    def train(self):
         """Train the model."""
         actor_train_infos = []
-
-        # CRITIC FIX 3 (Dec 19, 2025): Slow down actor updates to stabilize critic
-        # Only update actors every N iterations to give critic breathing room
-        actor_update_interval = getattr(self.algo_args["algo"], "actor_update_interval", 1)
-        should_update_actors = (episode is None) or (episode % actor_update_interval == 0)
 
         # factor is used for considering updates made by previous agents
         factor = np.ones(
@@ -54,83 +49,81 @@ class OnPolicyHARunner(OnPolicyBaseRunner):
         else:
             agent_order = list(torch.randperm(self.num_agents).numpy())
 
-        # Only update actors if we're on an update iteration
-        if should_update_actors:
-            for agent_id in agent_order:
-                self.actor_buffer[agent_id].update_factor(
-                    factor
-                )  # current actor save factor
+        for agent_id in agent_order:
+            self.actor_buffer[agent_id].update_factor(
+                factor
+            )  # current actor save factor
 
-                # the following reshaping combines the first two dimensions (i.e. episode_length and n_rollout_threads) to form a batch
-                available_actions = (
-                    None
-                    if self.actor_buffer[agent_id].available_actions is None
-                    else self.actor_buffer[agent_id]
-                    .available_actions[:-1]
-                    .reshape(-1, *self.actor_buffer[agent_id].available_actions.shape[2:])
+            # the following reshaping combines the first two dimensions (i.e. episode_length and n_rollout_threads) to form a batch
+            available_actions = (
+                None
+                if self.actor_buffer[agent_id].available_actions is None
+                else self.actor_buffer[agent_id]
+                .available_actions[:-1]
+                .reshape(-1, *self.actor_buffer[agent_id].available_actions.shape[2:])
+            )
+
+            # compute action log probs for the actor before update.
+            old_actions_logprob, _, _ = self.actor[agent_id].evaluate_actions(
+                self.actor_buffer[agent_id]
+                .obs[:-1]
+                .reshape(-1, *self.actor_buffer[agent_id].obs.shape[2:]),
+                self.actor_buffer[agent_id]
+                .rnn_states[0:1]
+                .reshape(-1, *self.actor_buffer[agent_id].rnn_states.shape[2:]),
+                self.actor_buffer[agent_id].actions.reshape(
+                    -1, *self.actor_buffer[agent_id].actions.shape[2:]
+                ),
+                self.actor_buffer[agent_id]
+                .masks[:-1]
+                .reshape(-1, *self.actor_buffer[agent_id].masks.shape[2:]),
+                available_actions,
+                self.actor_buffer[agent_id]
+                .active_masks[:-1]
+                .reshape(-1, *self.actor_buffer[agent_id].active_masks.shape[2:]),
+            )
+
+            # update actor
+            if self.state_type == "EP":
+                actor_train_info = self.actor[agent_id].train(
+                    self.actor_buffer[agent_id], advantages.copy(), "EP"
+                )
+            elif self.state_type == "FP":
+                actor_train_info = self.actor[agent_id].train(
+                    self.actor_buffer[agent_id], advantages[:, :, agent_id].copy(), "FP"
                 )
 
-                # compute action log probs for the actor before update.
-                old_actions_logprob, _, _ = self.actor[agent_id].evaluate_actions(
-                    self.actor_buffer[agent_id]
-                    .obs[:-1]
-                    .reshape(-1, *self.actor_buffer[agent_id].obs.shape[2:]),
-                    self.actor_buffer[agent_id]
-                    .rnn_states[0:1]
-                    .reshape(-1, *self.actor_buffer[agent_id].rnn_states.shape[2:]),
-                    self.actor_buffer[agent_id].actions.reshape(
-                        -1, *self.actor_buffer[agent_id].actions.shape[2:]
-                    ),
-                    self.actor_buffer[agent_id]
-                    .masks[:-1]
-                    .reshape(-1, *self.actor_buffer[agent_id].masks.shape[2:]),
-                    available_actions,
-                    self.actor_buffer[agent_id]
-                    .active_masks[:-1]
-                    .reshape(-1, *self.actor_buffer[agent_id].active_masks.shape[2:]),
-                )
+            # compute action log probs for updated agent
+            new_actions_logprob, _, _ = self.actor[agent_id].evaluate_actions(
+                self.actor_buffer[agent_id]
+                .obs[:-1]
+                .reshape(-1, *self.actor_buffer[agent_id].obs.shape[2:]),
+                self.actor_buffer[agent_id]
+                .rnn_states[0:1]
+                .reshape(-1, *self.actor_buffer[agent_id].rnn_states.shape[2:]),
+                self.actor_buffer[agent_id].actions.reshape(
+                    -1, *self.actor_buffer[agent_id].actions.shape[2:]
+                ),
+                self.actor_buffer[agent_id]
+                .masks[:-1]
+                .reshape(-1, *self.actor_buffer[agent_id].masks.shape[2:]),
+                available_actions,
+                self.actor_buffer[agent_id]
+                .active_masks[:-1]
+                .reshape(-1, *self.actor_buffer[agent_id].active_masks.shape[2:]),
+            )
 
-                # update actor
-                if self.state_type == "EP":
-                    actor_train_info = self.actor[agent_id].train(
-                        self.actor_buffer[agent_id], advantages.copy(), "EP"
-                    )
-                elif self.state_type == "FP":
-                    actor_train_info = self.actor[agent_id].train(
-                        self.actor_buffer[agent_id], advantages[:, :, agent_id].copy(), "FP"
-                    )
-
-                # compute action log probs for updated agent
-                new_actions_logprob, _, _ = self.actor[agent_id].evaluate_actions(
-                    self.actor_buffer[agent_id]
-                    .obs[:-1]
-                    .reshape(-1, *self.actor_buffer[agent_id].obs.shape[2:]),
-                    self.actor_buffer[agent_id]
-                    .rnn_states[0:1]
-                    .reshape(-1, *self.actor_buffer[agent_id].rnn_states.shape[2:]),
-                    self.actor_buffer[agent_id].actions.reshape(
-                        -1, *self.actor_buffer[agent_id].actions.shape[2:]
-                    ),
-                    self.actor_buffer[agent_id]
-                    .masks[:-1]
-                    .reshape(-1, *self.actor_buffer[agent_id].masks.shape[2:]),
-                    available_actions,
-                    self.actor_buffer[agent_id]
-                    .active_masks[:-1]
-                    .reshape(-1, *self.actor_buffer[agent_id].active_masks.shape[2:]),
+            # update factor for next agent
+            factor = factor * _t2n(
+                getattr(torch, self.action_aggregation)(
+                    torch.exp(new_actions_logprob - old_actions_logprob), dim=-1
+                ).reshape(
+                    self.algo_args["train"]["episode_length"],
+                    self.algo_args["train"]["n_rollout_threads"],
+                    1,
                 )
-
-                # update factor for next agent
-                factor = factor * _t2n(
-                    getattr(torch, self.action_aggregation)(
-                        torch.exp(new_actions_logprob - old_actions_logprob), dim=-1
-                    ).reshape(
-                        self.algo_args["train"]["episode_length"],
-                        self.algo_args["train"]["n_rollout_threads"],
-                        1,
-                    )
-                )
-                actor_train_infos.append(actor_train_info)
+            )
+            actor_train_infos.append(actor_train_info)
 
         # update critic
         critic_train_info = self.critic.train(self.critic_buffer, self.value_normalizer)

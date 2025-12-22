@@ -77,14 +77,23 @@ class MAPushEnv:
         self.action_space = [self.env.action_space] * self.n_agents
 
         # Share observation space (for centralized critic)
-        # Global state: box(3) + target(2) + agents(6 each) = 3 + 2 + 6*n_agents dims
-        # [box_x, box_y, box_yaw,                                    = 3 dims
-        #  target_x, target_y,                                       = 2 dims (NO yaw for target!)
-        #  agent0_x, agent0_y, agent0_yaw, vx, vy, vyaw,            = 6 dims
-        #  agent1_x, agent1_y, agent1_yaw, vx, vy, vyaw]            = 6 dims
-        # Total for 2 agents: 3 + 2 + 6 + 6 = 17 dims
+        # CRITIC8 (Dec 22, 2025): Concatenate all agents' LOCAL observations
+        # This matches OpenRL's approach more closely:
+        # - Each agent's local obs is 8 dims (target_rel, box_rel, box_yaw_rel, other_agent_rel)
+        # - Concatenate all agents' local obs for the global state
+        # - This is translation/rotation INVARIANT (same situation = same state regardless of map position)
+        #
+        # Global state = concat([agent0_local_obs, agent1_local_obs, ...])
+        # Each agent's local obs (8 dims):
+        #   [target_rel_x, target_rel_y,           = 2 dims (target relative to agent)
+        #    box_rel_x, box_rel_y,                 = 2 dims (box relative to agent)
+        #    box_rel_yaw,                          = 1 dim  (box yaw relative to agent)
+        #    other_agent_rel_x, other_agent_rel_y, = 2 dims (other agent relative to this agent)
+        #    other_agent_rel_yaw]                  = 1 dim  (other agent yaw relative to this agent)
+        # Total for 2 agents: 8 + 8 = 16 dims
         from gym import spaces
-        global_state_dim = 3 + 2 + 6 * self.n_agents  # box + target + all agents (pos + vel)
+        obs_dim = self.env.observation_space.shape[0]  # 8 dims per agent
+        global_state_dim = obs_dim * self.n_agents  # Concatenate all agents' local obs
         self.share_observation_space = [
             spaces.Box(low=-float('inf'), high=float('inf'),
                       shape=(global_state_dim,), dtype=np.float32)
@@ -153,23 +162,24 @@ class MAPushEnv:
             print(f"  Error: {e}")
             raise
 
-        # Construct global state: [box(3), target(2), agent0(6), agent1(6), ...]
-        # Only use x, y, yaw for 2D projection
+        # Construct global state: [box(3), target(2), agent0(3), agent1(3), ...]
+        # CRITIC7: Only positions, NO velocities (see comment at global_state_dim)
         global_state_list = [
             box_pos_global[:, :2],         # box x, y
             box_rpy[:, 2:3],               # box yaw
             target_pos_global[:, :2],      # target x, y (NO yaw! Target is just a point)
         ]
 
-        # Add all agents' states (position + velocity)
+        # Add all agents' positions only (NO velocities - CRITIC7 change)
         for agent_id in range(self.n_agents):
             global_state_list.append(base_pos[:, agent_id, :2])      # agent x, y
             global_state_list.append(base_rpy[:, agent_id, 2:3])     # agent yaw
-            global_state_list.append(base_lin_vel[:, agent_id, :2])  # agent vx, vy
-            global_state_list.append(base_ang_vel[:, agent_id, 2:3]) # agent vyaw (angular velocity around z)
+            # REMOVED (CRITIC7): velocities are essentially actions, shouldn't be in V(s)
+            # global_state_list.append(base_lin_vel[:, agent_id, :2])  # agent vx, vy
+            # global_state_list.append(base_ang_vel[:, agent_id, 2:3]) # agent vyaw
 
         # Concatenate into single tensor
-        global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 6 + 3*n_agents]
+        global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 5 + 3*n_agents]
 
         # Convert to numpy
         import numpy as np
@@ -178,15 +188,15 @@ class MAPushEnv:
         # Diagnostic logging (first call only)
         if not hasattr(self, '_logged_global_state'):
             print("\n" + "="*80)
-            print("GLOBAL STATE DIAGNOSTIC (First Step)")
+            print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC7: No velocities")
             print("="*80)
             print(f"Global state shape: {global_state_np.shape}")
-            print(f"Expected: [500, 17] for 2 agents")
-            print(f"\nEnvironment 0 global state (17 dims):")
+            print(f"Expected: [500, 11] for 2 agents (positions only, no velocities)")
+            print(f"\nEnvironment 0 global state (11 dims):")
             print(f"  Box:    x={global_state_np[0,0]:.3f}, y={global_state_np[0,1]:.3f}, yaw={global_state_np[0,2]:.3f}")
             print(f"  Target: x={global_state_np[0,3]:.3f}, y={global_state_np[0,4]:.3f}")
-            print(f"  Agent0: x={global_state_np[0,5]:.3f}, y={global_state_np[0,6]:.3f}, yaw={global_state_np[0,7]:.3f}, vx={global_state_np[0,8]:.3f}, vy={global_state_np[0,9]:.3f}, vyaw={global_state_np[0,10]:.3f}")
-            print(f"  Agent1: x={global_state_np[0,11]:.3f}, y={global_state_np[0,12]:.3f}, yaw={global_state_np[0,13]:.3f}, vx={global_state_np[0,14]:.3f}, vy={global_state_np[0,15]:.3f}, vyaw={global_state_np[0,16]:.3f}")
+            print(f"  Agent0: x={global_state_np[0,5]:.3f}, y={global_state_np[0,6]:.3f}, yaw={global_state_np[0,7]:.3f}")
+            print(f"  Agent1: x={global_state_np[0,8]:.3f}, y={global_state_np[0,9]:.3f}, yaw={global_state_np[0,10]:.3f}")
             print(f"\nStatistics across all {self.n_envs} environments:")
             print(f"  Min values:  {np.min(global_state_np, axis=0)}")
             print(f"  Max values:  {np.max(global_state_np, axis=0)}")
@@ -224,11 +234,15 @@ class MAPushEnv:
         # Convert to torch: actions already in [n_envs, n_agents, action_dim] format
         actions_torch = torch.from_numpy(actions).cuda()
 
-        # CRITIC6 (Dec 19, 2025): Match OpenRL action scaling
-        # OpenRL applies 0.5x scale + clip in wrapper BEFORE MQE's 0.5x scale
-        # This makes effective range [-0.25, 0.25] instead of [-0.5, 0.5]
-        # Without this, HARL agents move 2x faster than OpenRL agents
-        actions_torch = (0.5 * actions_torch).clamp(-1.0, 1.0)
+        # CRITIC6 REVERTED (Dec 21, 2025): Action scaling BROKE learning!
+        # Evidence: critic3 (no scaling) achieved 20% success in 100M steps
+        #           critic6 (with 0.5x scaling) achieved 0% success in 100M steps
+        # The 0.5x scaling made actions too small to push the box effectively.
+        # MQE wrapper already applies 0.5x scaling, so effective range is [-0.5, 0.5] m/s
+        # This is sufficient for the task. Do NOT add additional scaling here.
+        #
+        # DISABLED:
+        # actions_torch = (0.5 * actions_torch).clamp(-1.0, 1.0)
 
         # Step environment
         obs, rewards, dones, infos = self.env.step(actions_torch)
@@ -238,11 +252,16 @@ class MAPushEnv:
         rewards_np = rewards.cpu().numpy()  # [n_envs, n_agents]
         dones_np = dones.cpu().numpy()  # [n_envs]
 
-        # Construct TRUE global state in global coordinate frame
-        # Shape: [n_envs, global_state_dim]
-        # Content: [box_x, box_y, box_yaw, target_x, target_y, target_yaw,
-        #           agent0_x, agent0_y, agent0_yaw, agent1_x, agent1_y, agent1_yaw, ...]
-        global_state_np = self._construct_global_state()
+        # CRITIC8: Use concatenated local observations as global state
+        # Instead of constructing a separate global state in absolute coordinates,
+        # we concatenate all agents' local observations. This is:
+        # 1. Translation/rotation invariant (same situation = same state)
+        # 2. Matches OpenRL's approach more closely
+        # 3. Contains all information the actors see
+        #
+        # obs_np shape: [n_envs, n_agents, obs_dim] e.g. [500, 2, 8]
+        # Flatten to: [n_envs, n_agents * obs_dim] e.g. [500, 16]
+        global_state_np = obs_np.reshape(self.n_envs, -1)
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
         # The runner will use state[:, 0] to get the global state
@@ -282,14 +301,16 @@ class MAPushEnv:
 
         Returns:
             obs: [n_envs, n_agents, obs_dim]
-            state: [n_envs, n_agents, global_state_dim] - TRUE GLOBAL STATE (broadcasted)
+            state: [n_envs, n_agents, global_state_dim] - Concatenated local observations
             available_actions: None (continuous action space)
         """
         obs = self.env.reset()
         obs_np = obs.cpu().numpy()
 
-        # Construct TRUE global state in global coordinate frame
-        global_state_np = self._construct_global_state()
+        # CRITIC8: Use concatenated local observations as global state
+        # obs_np shape: [n_envs, n_agents, obs_dim] e.g. [500, 2, 8]
+        # Flatten to: [n_envs, n_agents * obs_dim] e.g. [500, 16]
+        global_state_np = obs_np.reshape(self.n_envs, -1)
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
         state_np = np.broadcast_to(

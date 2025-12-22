@@ -71,10 +71,10 @@ model:
   # optimizer parameters
   # actor learning rate, was 0.005 for MAPPO
   # CRITIC5 (Dec 19, 2025): Reduced from 0.001 to 0.0005 for slower policy change
-  lr: 0.0005
+  lr: 0.005
   # critic learning rate, was 0.005 for MAPPO
   # CRITIC5 (Dec 19, 2025): Reduced from 0.005 to 0.003 for more stable updates
-  critic_lr: 0.003
+  critic_lr: 0.005
   # eps in Adam
   opti_eps: 0.00001
   # weight_decay in Adam
@@ -88,20 +88,11 @@ algo:
   # number of epochs for actor update
   ppo_epoch: 5
   # number of epochs for critic update
-  # CRITIC FIX 1 (Dec 18, 2025): Increased from 5 to 25
-  # CRITIC5 (Dec 19, 2025): Increased from 25 to 30 for better fitting per rollout
-  critic_epoch: 30
-  # CRITIC FIX 3 (Dec 19, 2025): Slow down actor updates to stabilize critic
-  # Update actors every N iterations instead of every iteration
-  # This gives critic breathing room - policies stay fixed while critic stabilizes
-  # Default was 1 (update every iteration), now 3 (update every 3rd iteration)
-  # CRITIC5 (Dec 19, 2025): Increased from 3 to 5 for even slower moving target
-  actor_update_interval: 5
+  critic_epoch: 5
   # whether to use clipped value loss
   use_clipped_value_loss: True
   # clip parameter
-  # CRITIC5 (Dec 19, 2025): Reduced from 0.2 to 0.1 for tighter value prediction constraints
-  clip_param: 0.1
+  clip_param: 0.2
   # number of mini-batches per epoch for actor update
   actor_num_mini_batch: 1
   # number of mini-batches per epoch for critic update
@@ -109,21 +100,17 @@ algo:
   # coefficient for entropy term in actor loss
   entropy_coef: 0.01
   # coefficient for value loss
-  # CRITIC FIX 1 (Dec 18, 2025): Increased from 1.0 to 5.0
-  # CRITIC5 (Dec 19, 2025): Reduced from 5.0 to 3.0 to balance with tighter clip_param
-  value_loss_coef: 3.0
+  value_loss_coef: 1.0
   # whether to clip gradient norm
   use_max_grad_norm: True
   # max gradient norm
-  # CRITIC5 (Dec 19, 2025): Reduced from 10.0 to 5.0 for tighter gradient constraints
-  max_grad_norm: 5.0
+  max_grad_norm: 10.0
   # whether to use Generalized Advantage Estimation (GAE)
   use_gae: True
   # discount factor
   gamma: 0.99
   # GAE lambda
-  # CRITIC5 (Dec 19, 2025): Reduced from 0.95 to 0.9 for lower variance advantages
-  gae_lambda: 0.9
+  gae_lambda: 0.95
   # whether to use huber loss
   use_huber_loss: True
   # whether to use policy active masks

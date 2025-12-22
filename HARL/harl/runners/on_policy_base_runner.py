@@ -257,7 +257,7 @@ class OnPolicyBaseRunner:
             self.compute()
             self.prep_training()  # change to train mode
 
-            actor_train_infos, critic_train_info = self.train(episode)
+            actor_train_infos, critic_train_info = self.train()
 
             # log information
             if episode % self.algo_args["train"]["log_interval"] == 0:
