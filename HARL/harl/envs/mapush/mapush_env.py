@@ -76,24 +76,41 @@ class MAPushEnv:
         self.observation_space = [self.env.observation_space] * self.n_agents
         self.action_space = [self.env.action_space] * self.n_agents
 
+        # Flag to control critic input coordinate system
+        # True: Box-centered (relative) coordinates - CRITIC9 (translation invariant, 9 dims)
+        # False: Absolute (world frame) coordinates - CRITIC7 (11 dims)
+        self.use_box_centered_critic = env_args.get("use_box_centered_critic", True)
+
         # Share observation space (for centralized critic)
-        # CRITIC8 (Dec 22, 2025): Concatenate all agents' LOCAL observations
-        # This matches OpenRL's approach more closely:
-        # - Each agent's local obs is 8 dims (target_rel, box_rel, box_yaw_rel, other_agent_rel)
-        # - Concatenate all agents' local obs for the global state
-        # - This is translation/rotation INVARIANT (same situation = same state regardless of map position)
-        #
-        # Global state = concat([agent0_local_obs, agent1_local_obs, ...])
-        # Each agent's local obs (8 dims):
-        #   [target_rel_x, target_rel_y,           = 2 dims (target relative to agent)
-        #    box_rel_x, box_rel_y,                 = 2 dims (box relative to agent)
-        #    box_rel_yaw,                          = 1 dim  (box yaw relative to agent)
-        #    other_agent_rel_x, other_agent_rel_y, = 2 dims (other agent relative to this agent)
-        #    other_agent_rel_yaw]                  = 1 dim  (other agent yaw relative to this agent)
-        # Total for 2 agents: 8 + 8 = 16 dims
         from gym import spaces
-        obs_dim = self.env.observation_space.shape[0]  # 8 dims per agent
-        global_state_dim = obs_dim * self.n_agents  # Concatenate all agents' local obs
+        if self.use_box_centered_critic:
+            # CRITIC9: Box-centered global state
+            # Express everything relative to the box (the object being pushed)
+            # This provides:
+            # 1. Translation invariance (box at different positions = same state)
+            # 2. True global view (not just concatenated local perspectives)
+            # 3. Task-centric representation (value depends on box-target distance and agent-box positions)
+            #
+            # Global state structure (9 dims for 2 agents):
+            #   [target_rel_x, target_rel_y,           = 2 dims (target relative to box)
+            #    agent0_rel_x, agent0_rel_y,           = 2 dims (agent0 relative to box)
+            #    agent0_rel_yaw,                       = 1 dim  (agent0 yaw relative to box)
+            #    agent1_rel_x, agent1_rel_y,           = 2 dims (agent1 relative to box)
+            #    agent1_rel_yaw,                       = 1 dim  (agent1 yaw relative to box)
+            #    box_yaw]                              = 1 dim  (box absolute orientation)
+            # Total: 2 + 3*n_agents + 1 = 9 dims (for 2 agents)
+            global_state_dim = 2 + 3 * self.n_agents + 1  # target(2) + agents(3 each) + box_yaw(1)
+        else:
+            # CRITIC7: Absolute (world frame) global state
+            # All positions in global coordinates
+            # Global state structure (11 dims for 2 agents):
+            #   [box_x, box_y, box_yaw,                = 3 dims (box absolute position)
+            #    target_x, target_y,                   = 2 dims (target absolute position)
+            #    agent0_x, agent0_y, agent0_yaw,       = 3 dims (agent0 absolute position)
+            #    agent1_x, agent1_y, agent1_yaw]       = 3 dims (agent1 absolute position)
+            # Total: 3 + 2 + 3*n_agents = 11 dims (for 2 agents)
+            global_state_dim = 3 + 2 + 3 * self.n_agents  # box(3) + target(2) + agents(3 each)
+
         self.share_observation_space = [
             spaces.Box(low=-float('inf'), high=float('inf'),
                       shape=(global_state_dim,), dtype=np.float32)
@@ -105,12 +122,23 @@ class MAPushEnv:
     def _construct_global_state(self) -> np.ndarray:
         """Construct global state from environment internals.
 
-        Global state contains positions and orientations in global frame:
-        - Box: [x, y, yaw]
-        - Target: [x, y, yaw]
-        - Agent 0: [x, y, yaw]
-        - Agent 1: [x, y, yaw]
-        ...for all agents
+        Depending on self.use_box_centered_critic flag:
+
+        If True (CRITIC9 - Box-centered):
+            Global state structure (9 dims for 2 agents):
+            - Target relative to box: [target_x - box_x, target_y - box_y]           = 2 dims
+            - Agent 0 relative to box: [agent0_x - box_x, agent0_y - box_y, agent0_yaw - box_yaw] = 3 dims
+            - Agent 1 relative to box: [agent1_x - box_x, agent1_y - box_y, agent1_yaw - box_yaw] = 3 dims
+            - Box orientation: [box_yaw]                                             = 1 dim
+            Total: 2 + 3*n_agents + 1 = 9 dims
+
+        If False (CRITIC7 - Absolute):
+            Global state structure (11 dims for 2 agents):
+            - Box: [x, y, yaw]                                                       = 3 dims
+            - Target: [x, y]                                                         = 2 dims
+            - Agent 0: [x, y, yaw]                                                   = 3 dims
+            - Agent 1: [x, y, yaw]                                                   = 3 dims
+            Total: 3 + 2 + 3*n_agents = 11 dims
 
         Returns:
             global_state: [n_envs, global_state_dim] numpy array
@@ -162,24 +190,51 @@ class MAPushEnv:
             print(f"  Error: {e}")
             raise
 
-        # Construct global state: [box(3), target(2), agent0(3), agent1(3), ...]
-        # CRITIC7: Only positions, NO velocities (see comment at global_state_dim)
-        global_state_list = [
-            box_pos_global[:, :2],         # box x, y
-            box_rpy[:, 2:3],               # box yaw
-            target_pos_global[:, :2],      # target x, y (NO yaw! Target is just a point)
-        ]
+        # Construct global state based on coordinate system flag
+        if self.use_box_centered_critic:
+            # CRITIC9: Box-centered (relative) global state
+            # Express everything relative to the box (translation invariant)
+            # Structure: [target_rel(2), agent0_rel(3), agent1_rel(3), ..., box_yaw(1)]
 
-        # Add all agents' positions only (NO velocities - CRITIC7 change)
-        for agent_id in range(self.n_agents):
-            global_state_list.append(base_pos[:, agent_id, :2])      # agent x, y
-            global_state_list.append(base_rpy[:, agent_id, 2:3])     # agent yaw
-            # REMOVED (CRITIC7): velocities are essentially actions, shouldn't be in V(s)
-            # global_state_list.append(base_lin_vel[:, agent_id, :2])  # agent vx, vy
-            # global_state_list.append(base_ang_vel[:, agent_id, 2:3]) # agent vyaw
+            # Target relative to box
+            target_rel = target_pos_global[:, :2] - box_pos_global[:, :2]  # [n_envs, 2]
 
-        # Concatenate into single tensor
-        global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 5 + 3*n_agents]
+            # Start with target relative position
+            global_state_list = [target_rel]
+
+            # Add each agent's position and orientation relative to box
+            for agent_id in range(self.n_agents):
+                # Agent position relative to box
+                agent_pos_rel = base_pos[:, agent_id, :2] - box_pos_global[:, :2]  # [n_envs, 2]
+                # Agent yaw relative to box yaw
+                agent_yaw_rel = base_rpy[:, agent_id, 2:3] - box_rpy[:, 2:3]  # [n_envs, 1]
+
+                global_state_list.append(agent_pos_rel)
+                global_state_list.append(agent_yaw_rel)
+
+            # Add box absolute orientation (for reference)
+            global_state_list.append(box_rpy[:, 2:3])  # [n_envs, 1]
+
+            # Concatenate into single tensor
+            global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 2 + 3*n_agents + 1]
+        else:
+            # CRITIC7: Absolute (world frame) global state
+            # All positions in global coordinates
+            # Structure: [box(3), target(2), agent0(3), agent1(3), ...]
+
+            global_state_list = [
+                box_pos_global[:, :2],         # box x, y
+                box_rpy[:, 2:3],               # box yaw
+                target_pos_global[:, :2],      # target x, y
+            ]
+
+            # Add all agents' positions (NO velocities)
+            for agent_id in range(self.n_agents):
+                global_state_list.append(base_pos[:, agent_id, :2])      # agent x, y
+                global_state_list.append(base_rpy[:, agent_id, 2:3])     # agent yaw
+
+            # Concatenate into single tensor
+            global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 3 + 2 + 3*n_agents]
 
         # Convert to numpy
         import numpy as np
@@ -188,15 +243,26 @@ class MAPushEnv:
         # Diagnostic logging (first call only)
         if not hasattr(self, '_logged_global_state'):
             print("\n" + "="*80)
-            print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC7: No velocities")
-            print("="*80)
-            print(f"Global state shape: {global_state_np.shape}")
-            print(f"Expected: [500, 11] for 2 agents (positions only, no velocities)")
-            print(f"\nEnvironment 0 global state (11 dims):")
-            print(f"  Box:    x={global_state_np[0,0]:.3f}, y={global_state_np[0,1]:.3f}, yaw={global_state_np[0,2]:.3f}")
-            print(f"  Target: x={global_state_np[0,3]:.3f}, y={global_state_np[0,4]:.3f}")
-            print(f"  Agent0: x={global_state_np[0,5]:.3f}, y={global_state_np[0,6]:.3f}, yaw={global_state_np[0,7]:.3f}")
-            print(f"  Agent1: x={global_state_np[0,8]:.3f}, y={global_state_np[0,9]:.3f}, yaw={global_state_np[0,10]:.3f}")
+            if self.use_box_centered_critic:
+                print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC9: Box-centered")
+                print("="*80)
+                print(f"Global state shape: {global_state_np.shape}")
+                print(f"Expected: [500, 9] for 2 agents (box-centered coordinates)")
+                print(f"\nEnvironment 0 global state (9 dims):")
+                print(f"  Target rel to box:  x={global_state_np[0,0]:.3f}, y={global_state_np[0,1]:.3f}")
+                print(f"  Agent0 rel to box:  x={global_state_np[0,2]:.3f}, y={global_state_np[0,3]:.3f}, yaw={global_state_np[0,4]:.3f}")
+                print(f"  Agent1 rel to box:  x={global_state_np[0,5]:.3f}, y={global_state_np[0,6]:.3f}, yaw={global_state_np[0,7]:.3f}")
+                print(f"  Box yaw (abs):      {global_state_np[0,8]:.3f}")
+            else:
+                print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC7: Absolute coordinates")
+                print("="*80)
+                print(f"Global state shape: {global_state_np.shape}")
+                print(f"Expected: [500, 11] for 2 agents (absolute world frame)")
+                print(f"\nEnvironment 0 global state (11 dims):")
+                print(f"  Box:    x={global_state_np[0,0]:.3f}, y={global_state_np[0,1]:.3f}, yaw={global_state_np[0,2]:.3f}")
+                print(f"  Target: x={global_state_np[0,3]:.3f}, y={global_state_np[0,4]:.3f}")
+                print(f"  Agent0: x={global_state_np[0,5]:.3f}, y={global_state_np[0,6]:.3f}, yaw={global_state_np[0,7]:.3f}")
+                print(f"  Agent1: x={global_state_np[0,8]:.3f}, y={global_state_np[0,9]:.3f}, yaw={global_state_np[0,10]:.3f}")
             print(f"\nStatistics across all {self.n_envs} environments:")
             print(f"  Min values:  {np.min(global_state_np, axis=0)}")
             print(f"  Max values:  {np.max(global_state_np, axis=0)}")
@@ -252,16 +318,10 @@ class MAPushEnv:
         rewards_np = rewards.cpu().numpy()  # [n_envs, n_agents]
         dones_np = dones.cpu().numpy()  # [n_envs]
 
-        # CRITIC8: Use concatenated local observations as global state
-        # Instead of constructing a separate global state in absolute coordinates,
-        # we concatenate all agents' local observations. This is:
-        # 1. Translation/rotation invariant (same situation = same state)
-        # 2. Matches OpenRL's approach more closely
-        # 3. Contains all information the actors see
-        #
-        # obs_np shape: [n_envs, n_agents, obs_dim] e.g. [500, 2, 8]
-        # Flatten to: [n_envs, n_agents * obs_dim] e.g. [500, 16]
-        global_state_np = obs_np.reshape(self.n_envs, -1)
+        # CRITIC9: Use box-centered global state
+        # Construct global state with everything relative to the box
+        # This provides translation invariance and a true global view
+        global_state_np = self._construct_global_state()
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
         # The runner will use state[:, 0] to get the global state
@@ -307,10 +367,9 @@ class MAPushEnv:
         obs = self.env.reset()
         obs_np = obs.cpu().numpy()
 
-        # CRITIC8: Use concatenated local observations as global state
-        # obs_np shape: [n_envs, n_agents, obs_dim] e.g. [500, 2, 8]
-        # Flatten to: [n_envs, n_agents * obs_dim] e.g. [500, 16]
-        global_state_np = obs_np.reshape(self.n_envs, -1)
+        # CRITIC9: Use box-centered global state
+        # Construct global state with everything relative to the box
+        global_state_np = self._construct_global_state()
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
         state_np = np.broadcast_to(

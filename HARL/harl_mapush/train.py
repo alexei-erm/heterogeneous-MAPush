@@ -43,6 +43,8 @@ def main():
                        help="Enable individualized rewards for HAPPO (prevents freeloading)")
     parser.add_argument("--shared_gated_rewards", action="store_true", default=False,
                        help="Iter8: Gate all shared rewards by min agent engagement (prevents freeloading)")
+    parser.add_argument("--use_box_centered_critic", type=lambda x: (str(x).lower() == 'true'), default=True,
+                       help="Use box-centered (relative) coordinates for critic (CRITIC9). Set to False for absolute coordinates (CRITIC7)")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -83,6 +85,7 @@ def main():
     # Individualized rewards only affects reward shaping, NOT critic mode
     use_individual = args.get("individualized_rewards", False)
     use_shared_gated = args.get("shared_gated_rewards", False)
+    use_box_centered = args.get("use_box_centered_critic", True)
     # n_threads defaults to YAML config value if not specified on command line
     n_threads = args.get("n_rollout_threads") or algo_args["train"]["n_rollout_threads"]
     env_args = {
@@ -91,6 +94,7 @@ def main():
         "state_type": "EP",  # ALWAYS EP - HAPPO uses single global critic per documentation
         "individualized_rewards": use_individual,  # For reward shaping only
         "shared_gated_rewards": use_shared_gated,  # Iter8: Gate shared rewards by min engagement
+        "use_box_centered_critic": use_box_centered,  # CRITIC9: Box-centered (True) vs CRITIC7: Absolute (False)
     }
 
     # Override training parameters only if specified on command line

@@ -1,8 +1,8 @@
-# CRITIC9: Box-Centered Global State (PREPARED - NOT IMPLEMENTED)
+# CRITIC9: Box-Centered Global State
 
 > **Date:** December 22, 2025
 > **Goal:** Alternative approach - express everything relative to the box
-> **Status:** PREPARED (implement if critic8 fails)
+> **Status:** IMPLEMENTED
 
 ---
 
@@ -19,13 +19,12 @@ By using box-centered coordinates, we get translation invariance while maintaini
 
 ---
 
-## Proposed Structure (10-11 dims)
+## Proposed Structure (9 dims)
 
 ```
 Box-Centered Global State:
 ├── Target relative to box:
-│   ├── [target_x - box_x, target_y - box_y]    = 2 dims
-│   └── [target_yaw - box_yaw] (optional)       = 0-1 dim
+│   └── [target_x - box_x, target_y - box_y]    = 2 dims
 ├── Agent 0 relative to box:
 │   ├── [agent0_x - box_x, agent0_y - box_y]    = 2 dims
 │   └── [agent0_yaw - box_yaw]                  = 1 dim
@@ -33,9 +32,9 @@ Box-Centered Global State:
 │   ├── [agent1_x - box_x, agent1_y - box_y]    = 2 dims
 │   └── [agent1_yaw - box_yaw]                  = 1 dim
 └── Box orientation:
-    └── [box_yaw]                                = 1 dim (or use as reference)
+    └── [box_yaw]                                = 1 dim
 
-TOTAL: 10 dims (without target yaw) or 11 dims (with target yaw)
+TOTAL: 2 + 3*n_agents + 1 = 9 dims (for 2 agents)
 ```
 
 ---
@@ -62,7 +61,7 @@ Box-centered coordinates capture exactly this.
 Unlike concatenated local obs (critic8), this gives ONE unified view of the entire scene, not two separate agent perspectives.
 
 ### 4. Compact
-Only 10-11 dims vs 16 dims for critic8.
+Only 9 dims vs 16 dims for critic8.
 
 ---
 
@@ -72,7 +71,7 @@ Only 10-11 dims vs 16 dims for critic8.
 |----------|------|----------------------|-------------------|-------------|
 | critic7 (absolute) | 11 | ❌ | ❌ | ✅ |
 | critic8 (concat local) | 16 | ✅ | ✅ | ⚠️ Two views |
-| **critic9 (box-centered)** | 10 | ✅ | ⚠️ Partial | ✅ |
+| **critic9 (box-centered)** | 9 | ✅ | ⚠️ Partial | ✅ |
 
 ---
 
@@ -81,8 +80,8 @@ Only 10-11 dims vs 16 dims for critic8.
 ### In `__init__`:
 ```python
 # CRITIC9: Box-centered global state
-# [target_rel(2), agent0_rel(3), agent1_rel(3), box_yaw(1), target_yaw(1)] = 10-11 dims
-global_state_dim = 2 + 3 * self.n_agents + 1  # + 1 for target yaw if needed
+# [target_rel(2), agent0_rel(3), agent1_rel(3), box_yaw(1)] = 9 dims (for 2 agents)
+global_state_dim = 2 + 3 * self.n_agents + 1  # target(2) + agents(3 each) + box_yaw(1)
 ```
 
 ### In `step()` and `reset()`:
@@ -169,10 +168,39 @@ Implement critic9 if:
 
 ---
 
+## Implementation Details (COMPLETED)
+
+### Files Modified:
+
+**1. `HARL/harl/envs/mapush/mapush_env.py`**
+
+#### Changed share_observation_space (lines 79-100):
+```python
+# Changed from 16 dims (critic8) to 9 dims (critic9)
+global_state_dim = 2 + 3 * self.n_agents + 1  # target(2) + agents(3 each) + box_yaw(1) = 9 dims for 2 agents
+```
+
+#### Modified `_construct_global_state()` (lines 105-193):
+- Target relative to box: `target_pos - box_pos`
+- Each agent relative to box: `agent_pos - box_pos`, `agent_yaw - box_yaw`
+- Box absolute yaw: `box_yaw`
+
+#### Updated `step()` method (line 268):
+```python
+global_state_np = self._construct_global_state()  # Changed from obs_np.reshape()
+```
+
+#### Updated `reset()` method (line 316):
+```python
+global_state_np = self._construct_global_state()  # Changed from obs_np.reshape()
+```
+
+---
+
 ## History
 
 | Version | Approach | Dims | Status |
 |---------|----------|------|--------|
 | critic7 | Absolute global | 11 | Failed |
 | critic8 | Concatenated local | 16 | Testing |
-| **critic9** | **Box-centered** | **10** | **Prepared** |
+| **critic9** | **Box-centered** | **9** | **IMPLEMENTED** |
