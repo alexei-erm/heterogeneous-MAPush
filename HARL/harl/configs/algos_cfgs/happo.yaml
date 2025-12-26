@@ -71,10 +71,10 @@ model:
   # optimizer parameters
   # actor learning rate, was 0.005 for MAPPO
   # CRITIC5 (Dec 19, 2025): Reduced from 0.001 to 0.0005 for slower policy change
-  lr: 0.005
+  lr: 0.0005
   # critic learning rate, was 0.005 for MAPPO
   # CRITIC5 (Dec 19, 2025): Reduced from 0.005 to 0.003 for more stable updates
-  critic_lr: 0.005
+  critic_lr: 0.0005
   # eps in Adam
   opti_eps: 0.00001
   # weight_decay in Adam

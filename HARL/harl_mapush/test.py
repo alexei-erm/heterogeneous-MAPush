@@ -46,11 +46,26 @@ def load_models(checkpoint_dir, n_agents, obs_spaces, act_spaces, device="cuda")
     """
     print(f"\nLoading models from: {checkpoint_dir}")
 
-    # Load default HAPPO args
-    algo_args, _ = get_defaults_yaml_args("happo", "pettingzoo_mpe")
+    # Load config from training run (go up 2 levels: checkpoints/10M -> seed-xxx -> config.json)
+    config_path = os.path.join(os.path.dirname(os.path.dirname(checkpoint_dir)), "config.json")
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    import json
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+
+    # Extract algo_args from config
+    algo_args = config["algo_args"]
 
     # Merge algo and model args (HAPPO needs both)
     actor_args = {**algo_args["model"], **algo_args["algo"]}
+
+    # Override hidden_sizes with actor_hidden_sizes if it exists
+    if "actor_hidden_sizes" in algo_args["model"]:
+        actor_args["hidden_sizes"] = algo_args["model"]["actor_hidden_sizes"]
+
+    print(f"  Using actor hidden sizes: {actor_args['hidden_sizes']}")
 
     actors = []
 
