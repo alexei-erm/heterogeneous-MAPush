@@ -76,14 +76,32 @@ class MAPushEnv:
         self.observation_space = [self.env.observation_space] * self.n_agents
         self.action_space = [self.env.action_space] * self.n_agents
 
-        # Flag to control critic input coordinate system
-        # True: Box-centered (relative) coordinates - CRITIC9 (translation invariant, 9 dims)
-        # False: Absolute (world frame) coordinates - CRITIC7 (11 dims)
-        self.use_box_centered_critic = env_args.get("use_box_centered_critic", True)
+        # Flags to control critic input coordinate system
+        # Priority: concat_observations > box_centered > absolute
+        # use_concat_agent_observations_critic: CRITIC8 (16 dims) - Concatenated agent local observations
+        # use_box_centered_critic: CRITIC9 (9 dims) - Box-centered coordinates (translation invariant)
+        # Neither: CRITIC7 (11 dims) - Absolute world frame coordinates
+        # DEFAULT: Both False (absolute coordinates)
+        self.use_concat_agent_observations_critic = env_args.get("use_concat_agent_observations_critic", False)
+        self.use_box_centered_critic = env_args.get("use_box_centered_critic", False)
 
         # Share observation space (for centralized critic)
         from gym import spaces
-        if self.use_box_centered_critic:
+        if self.use_concat_agent_observations_critic:
+            # CRITIC8: Concatenated agent local observations
+            # Simply concatenate all agents' local observations without modification
+            # Each agent observation is in its own frame of reference (already rotated to local frame)
+            #
+            # Each agent observation (8 dims for 2 agents):
+            #   [target_x, target_y,                  = 2 dims (target relative to agent)
+            #    box_x, box_y,                        = 2 dims (box relative to agent)
+            #    box_yaw,                             = 1 dim  (box yaw relative to agent)
+            #    other_agent_x, other_agent_y, other_agent_yaw] = 3 dims (other agent relative to this agent)
+            #
+            # Global state = [agent0_obs, agent1_obs] = 8 * n_agents = 16 dims (for 2 agents)
+            obs_dim = self.env.observation_space.shape[0]  # 8 dims per agent
+            global_state_dim = obs_dim * self.n_agents     # 8 * 2 = 16 dims
+        elif self.use_box_centered_critic:
             # CRITIC9: Box-centered global state
             # Express everything relative to the box (the object being pushed)
             # This provides:
@@ -191,6 +209,9 @@ class MAPushEnv:
             raise
 
         # Construct global state based on coordinate system flag
+        # Priority: concat_observations > box_centered > absolute
+        # NOTE: This method is NOT called when use_concat_agent_observations_critic=True
+        # For CRITIC8, global state is constructed directly in step() and reset() by flattening obs_np
         if self.use_box_centered_critic:
             # CRITIC9: Box-centered (relative) global state
             # Express everything relative to the box (translation invariant)
@@ -243,7 +264,21 @@ class MAPushEnv:
         # Diagnostic logging (first call only)
         if not hasattr(self, '_logged_global_state'):
             print("\n" + "="*80)
-            if self.use_box_centered_critic:
+            if self.use_concat_agent_observations_critic:
+                print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC8: Concatenated Agent Observations")
+                print("="*80)
+                print(f"Global state shape: {global_state_np.shape}")
+                obs_dim = self.env.observation_space.shape[0]
+                print(f"Expected: [{self.n_envs}, {obs_dim * self.n_agents}] for {self.n_agents} agents (concatenated local obs)")
+                print(f"\nEnvironment 0 global state ({obs_dim * self.n_agents} dims):")
+                print(f"  Agent0 obs ({obs_dim} dims): {global_state_np[0, :obs_dim]}")
+                print(f"  Agent1 obs ({obs_dim} dims): {global_state_np[0, obs_dim:obs_dim*2]}")
+                print(f"\nAgent observation structure (each {obs_dim} dims):")
+                print(f"  - Target (x, y) relative to agent: 2 dims")
+                print(f"  - Box (x, y) relative to agent: 2 dims")
+                print(f"  - Box yaw relative to agent: 1 dim")
+                print(f"  - Other agent (x, y, yaw) relative to this agent: 3 dims")
+            elif self.use_box_centered_critic:
                 print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC9: Box-centered")
                 print("="*80)
                 print(f"Global state shape: {global_state_np.shape}")
@@ -318,10 +353,15 @@ class MAPushEnv:
         rewards_np = rewards.cpu().numpy()  # [n_envs, n_agents]
         dones_np = dones.cpu().numpy()  # [n_envs]
 
-        # CRITIC9: Use box-centered global state
-        # Construct global state with everything relative to the box
-        # This provides translation invariance and a true global view
-        global_state_np = self._construct_global_state()
+        # Construct global state based on critic mode
+        if self.use_concat_agent_observations_critic:
+            # CRITIC8: Simply concatenate agent observations (no modification)
+            # obs_np is [n_envs, n_agents, obs_dim], flatten to [n_envs, n_agents * obs_dim]
+            global_state_np = obs_np.reshape(self.n_envs, -1)
+        else:
+            # CRITIC9 or CRITIC7: Use box-centered or absolute global state
+            # Construct global state with everything relative to the box (or absolute)
+            global_state_np = self._construct_global_state()
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
         # The runner will use state[:, 0] to get the global state
@@ -367,9 +407,15 @@ class MAPushEnv:
         obs = self.env.reset()
         obs_np = obs.cpu().numpy()
 
-        # CRITIC9: Use box-centered global state
-        # Construct global state with everything relative to the box
-        global_state_np = self._construct_global_state()
+        # Construct global state based on critic mode
+        if self.use_concat_agent_observations_critic:
+            # CRITIC8: Simply concatenate agent observations (no modification)
+            # obs_np is [n_envs, n_agents, obs_dim], flatten to [n_envs, n_agents * obs_dim]
+            global_state_np = obs_np.reshape(self.n_envs, -1)
+        else:
+            # CRITIC9 or CRITIC7: Use box-centered or absolute global state
+            # Construct global state with everything relative to the box (or absolute)
+            global_state_np = self._construct_global_state()
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
         state_np = np.broadcast_to(
