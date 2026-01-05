@@ -106,7 +106,7 @@ class Go1PushMidCfg(Go1Cfg):
             approach_reward_scale = 0.00075
             collision_punishment_scale = -0.0025 
             push_reward_scale = 0.0015
-            ocb_reward_scale = 0.004
+            ocb_reward_scale = 0.01  # v5b: 2.5x increase for stronger positioning signal (joint binary OCB)
             reach_target_reward_scale = 10
             exception_punishment_scale = -5
 

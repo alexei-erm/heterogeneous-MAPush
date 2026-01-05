@@ -46,7 +46,11 @@ def main():
     parser.add_argument("--use_box_centered_critic", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="Use box-centered (relative) coordinates for critic (CRITIC9). Set to False for absolute coordinates (CRITIC7). DEFAULT: False (absolute)")
     parser.add_argument("--use_concat_agent_observations_critic", type=lambda x: (str(x).lower() == 'true'), default=False,
-                       help="Use concatenated agent observations for critic (CRITIC8). Takes priority over other critic modes. DEFAULT: False")
+                       help="Use concatenated agent observations for critic (CRITIC10). DEFAULT: False")
+    parser.add_argument("--use_relative_obs_critic", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="Use relative observations for critic (CRITIC11): [robot1_to_box, robot2_to_box, inter_robot_dist, goal_to_box]. Takes highest priority. DEFAULT: False")
+    parser.add_argument("--cooperation_rewards", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="CRITIC12: Enable three-tier cooperation bonuses (dual_engagement, synchronized_contact, bilateral_push). DEFAULT: False")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -89,6 +93,8 @@ def main():
     use_shared_gated = args.get("shared_gated_rewards", False)
     use_box_centered = args.get("use_box_centered_critic", False)
     use_concat_obs = args.get("use_concat_agent_observations_critic", False)
+    use_relative_obs = args.get("use_relative_obs_critic", False)
+    use_cooperation = args.get("cooperation_rewards", False)
     # n_threads defaults to YAML config value if not specified on command line
     n_threads = args.get("n_rollout_threads") or algo_args["train"]["n_rollout_threads"]
     env_args = {
@@ -98,7 +104,9 @@ def main():
         "individualized_rewards": use_individual,  # For reward shaping only
         "shared_gated_rewards": use_shared_gated,  # Iter8: Gate shared rewards by min engagement
         "use_box_centered_critic": use_box_centered,  # CRITIC9: Box-centered (True) vs CRITIC7: Absolute (False)
-        "use_concat_agent_observations_critic": use_concat_obs,  # CRITIC8: Concatenated agent observations (takes priority)
+        "use_concat_agent_observations_critic": use_concat_obs,  # CRITIC10: Concatenated agent observations
+        "use_relative_obs_critic": use_relative_obs,  # CRITIC11: Relative observations with inter-robot distance (highest priority)
+        "cooperation_rewards": use_cooperation,  # CRITIC12: Three-tier cooperation bonuses
     }
 
     # Override training parameters only if specified on command line

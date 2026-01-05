@@ -61,11 +61,13 @@ class MAPushEnv:
         # Create MQE environment with custom config
         individualized_rewards = env_args.get("individualized_rewards", False)
         shared_gated_rewards = env_args.get("shared_gated_rewards", False)
+        cooperation_rewards = env_args.get("cooperation_rewards", False)
         self.env, self.env_cfg = make_mqe_env(
             args.task,
             args,
             custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards,
-                                  shared_gated_rewards=shared_gated_rewards)
+                                  shared_gated_rewards=shared_gated_rewards,
+                                  cooperation_rewards=cooperation_rewards)
         )
 
         self.n_envs = self.env.num_envs
@@ -77,18 +79,30 @@ class MAPushEnv:
         self.action_space = [self.env.action_space] * self.n_agents
 
         # Flags to control critic input coordinate system
-        # Priority: concat_observations > box_centered > absolute
-        # use_concat_agent_observations_critic: CRITIC8 (16 dims) - Concatenated agent local observations
+        # Priority: relative_obs > concat_observations > box_centered > absolute
+        # use_relative_obs_critic: CRITIC11 (9 dims) - Relative observations with inter-robot distance
+        # use_concat_agent_observations_critic: CRITIC10 (16 dims) - Concatenated agent local observations
         # use_box_centered_critic: CRITIC9 (9 dims) - Box-centered coordinates (translation invariant)
-        # Neither: CRITIC7 (11 dims) - Absolute world frame coordinates
-        # DEFAULT: Both False (absolute coordinates)
+        # None: CRITIC7 (11 dims) - Absolute world frame coordinates
+        # DEFAULT: All False (absolute coordinates)
+        self.use_relative_obs_critic = env_args.get("use_relative_obs_critic", False)
         self.use_concat_agent_observations_critic = env_args.get("use_concat_agent_observations_critic", False)
         self.use_box_centered_critic = env_args.get("use_box_centered_critic", False)
 
         # Share observation space (for centralized critic)
         from gym import spaces
-        if self.use_concat_agent_observations_critic:
-            # CRITIC8: Concatenated agent local observations
+        if self.use_relative_obs_critic:
+            # CRITIC11: Relative observations with explicit inter-robot distance
+            # Structure: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
+            #
+            # robot_to_box: (dx, dy, dψ) - agent position and yaw relative to box
+            # inter_robot_dist: scalar - Euclidean distance between agents
+            # goal_to_box: (dx, dy) - target position relative to box
+            #
+            # Total: 3 + 3 + 1 + 2 = 9 dims
+            global_state_dim = 3 + 3 + 1 + 2  # robot1(3) + robot2(3) + dist(1) + goal(2)
+        elif self.use_concat_agent_observations_critic:
+            # CRITIC10: Concatenated agent local observations
             # Simply concatenate all agents' local observations without modification
             # Each agent observation is in its own frame of reference (already rotated to local frame)
             #
@@ -209,10 +223,14 @@ class MAPushEnv:
             raise
 
         # Construct global state based on coordinate system flag
-        # Priority: concat_observations > box_centered > absolute
-        # NOTE: This method is NOT called when use_concat_agent_observations_critic=True
-        # For CRITIC8, global state is constructed directly in step() and reset() by flattening obs_np
-        if self.use_box_centered_critic:
+        # Priority: relative_obs > concat_observations > box_centered > absolute
+        # NOTE: This method is NOT called when use_concat_agent_observations_critic=True or use_relative_obs_critic=True
+        # For CRITIC10 and CRITIC11, global state is constructed directly in step() and reset()
+        if self.use_relative_obs_critic:
+            # CRITIC11: Relative observations with inter-robot distance
+            # This should not be reached as CRITIC11 constructs state directly in step()/reset()
+            raise RuntimeError("CRITIC11 should construct state directly in step()/reset(), not call _construct_global_state()")
+        elif self.use_box_centered_critic:
             # CRITIC9: Box-centered (relative) global state
             # Express everything relative to the box (translation invariant)
             # Structure: [target_rel(2), agent0_rel(3), agent1_rel(3), ..., box_yaw(1)]
@@ -318,6 +336,116 @@ class MAPushEnv:
 
         return global_state_np
 
+    def _construct_relative_obs_state(self) -> np.ndarray:
+        """Construct CRITIC11 relative observations with inter-robot distance.
+
+        Structure (9 dims for 2 agents):
+            [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
+
+        - robot_to_box: (dx, dy, dψ) - agent position and yaw relative to box
+        - inter_robot_dist: scalar - Euclidean distance between agents
+        - goal_to_box: (dx, dy) - target position relative to box
+
+        Returns:
+            global_state_np: [n_envs, 9] numpy array
+        """
+        # Access underlying wrapper to get global state information
+        wrapper = self.env
+
+        # Get NPC states (box and target) from root_states_npc
+        # root_states_npc shape: [num_envs * num_npcs, 13] (pos, quat, lin_vel, ang_vel)
+        # root_states_npc is in WORLD FRAME (includes env_origins offset)
+        npc_states = wrapper.root_states_npc.reshape(self.n_envs, wrapper.num_npcs, -1)
+
+        # Box state (NPC 0)
+        # SUBTRACT env_origins to convert to environment-relative frame
+        box_pos_global = npc_states[:, 0, :3] - wrapper.env.env_origins  # [n_envs, 3]
+        box_quat = npc_states[:, 0, 3:7]  # [n_envs, 4]
+
+        # Target state (NPC 1)
+        # SUBTRACT env_origins to convert to environment-relative frame
+        target_pos_global = npc_states[:, 1, :3] - wrapper.env.env_origins  # [n_envs, 3]
+
+        # Convert quaternions to yaw
+        from isaacgym.torch_utils import get_euler_xyz
+        box_rpy = torch.stack(get_euler_xyz(box_quat), dim=1)  # [n_envs, 3]
+
+        # Get agent states from obs_buf
+        obs_buf = wrapper.env.obs_buf if hasattr(wrapper, 'env') else wrapper.obs_buf
+
+        # Agent position and orientation
+        # NOTE: obs_buf.base_pos ALREADY has env_origins subtracted
+        base_pos = obs_buf.base_pos.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
+        base_rpy = obs_buf.base_rpy.reshape(self.n_envs, self.n_agents, 3)  # [n_envs, n_agents, 3]
+
+        # Convert to numpy
+        import numpy as np
+        box_pos_np = box_pos_global.cpu().numpy()  # [n_envs, 3]
+        box_yaw_np = box_rpy[:, 2].cpu().numpy()  # [n_envs]
+        target_pos_np = target_pos_global.cpu().numpy()  # [n_envs, 3]
+        agent_pos_np = base_pos.cpu().numpy()  # [n_envs, n_agents, 3]
+        agent_yaw_np = base_rpy[:, :, 2].cpu().numpy()  # [n_envs, n_agents]
+
+        # Construct state components
+        global_state_list = []
+
+        # For each agent: position and yaw relative to box
+        for agent_id in range(self.n_agents):
+            # Agent position relative to box (dx, dy)
+            agent_to_box_pos = agent_pos_np[:, agent_id, :2] - box_pos_np[:, :2]  # [n_envs, 2]
+
+            # Agent yaw relative to box yaw (dψ)
+            agent_to_box_yaw = agent_yaw_np[:, agent_id] - box_yaw_np  # [n_envs]
+            agent_to_box_yaw = agent_to_box_yaw[:, np.newaxis]  # [n_envs, 1]
+
+            # Concatenate: [dx, dy, dψ]
+            robot_to_box = np.concatenate([agent_to_box_pos, agent_to_box_yaw], axis=1)  # [n_envs, 3]
+            global_state_list.append(robot_to_box)
+
+        # Inter-robot distance: ||robot1_pos - robot2_pos||
+        inter_robot_diff = agent_pos_np[:, 0, :2] - agent_pos_np[:, 1, :2]  # [n_envs, 2]
+        inter_robot_dist = np.linalg.norm(inter_robot_diff, axis=1, keepdims=True)  # [n_envs, 1]
+        global_state_list.append(inter_robot_dist)
+
+        # Goal/target relative to box (dx, dy)
+        goal_to_box = target_pos_np[:, :2] - box_pos_np[:, :2]  # [n_envs, 2]
+        global_state_list.append(goal_to_box)
+
+        # Concatenate all components: [robot1(3), robot2(3), dist(1), goal(2)] = 9 dims
+        global_state_np = np.concatenate(global_state_list, axis=1).astype(np.float32)
+
+        # Diagnostic logging (first call only)
+        if not hasattr(self, '_logged_global_state'):
+            print("\n" + "="*80)
+            print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC11: Relative Observations")
+            print("="*80)
+            print(f"Global state shape: {global_state_np.shape}")
+            print(f"Expected: [{self.n_envs}, 9] for 2 agents (relative observations)")
+            print(f"\nEnvironment 0 global state (9 dims):")
+            print(f"  Robot1 to box:  dx={global_state_np[0,0]:.3f}, dy={global_state_np[0,1]:.3f}, dψ={global_state_np[0,2]:.3f}")
+            print(f"  Robot2 to box:  dx={global_state_np[0,3]:.3f}, dy={global_state_np[0,4]:.3f}, dψ={global_state_np[0,5]:.3f}")
+            print(f"  Inter-robot distance: {global_state_np[0,6]:.3f}")
+            print(f"  Goal to box:    dx={global_state_np[0,7]:.3f}, dy={global_state_np[0,8]:.3f}")
+            print(f"\nStatistics across all {self.n_envs} environments:")
+            print(f"  Min values:  {np.min(global_state_np, axis=0)}")
+            print(f"  Max values:  {np.max(global_state_np, axis=0)}")
+            print(f"  Mean values: {np.mean(global_state_np, axis=0)}")
+            print(f"  Std values:  {np.std(global_state_np, axis=0)}")
+            print(f"\nNaN count: {np.isnan(global_state_np).sum()}")
+            print(f"Inf count: {np.isinf(global_state_np).sum()}")
+            print("="*80 + "\n")
+            self._logged_global_state = True
+
+        # Handle NaN and Inf
+        nan_count = np.isnan(global_state_np).sum()
+        inf_count = np.isinf(global_state_np).sum()
+        if nan_count > 0 or inf_count > 0:
+            print(f"WARNING: Found {nan_count} NaN and {inf_count} Inf values in global state!")
+        global_state_np[np.isnan(global_state_np)] = 0.0
+        global_state_np[np.isinf(global_state_np)] = 0.0
+
+        return global_state_np
+
     def step(self, actions: np.ndarray) -> Tuple:
         """Step the environment.
 
@@ -354,8 +482,12 @@ class MAPushEnv:
         dones_np = dones.cpu().numpy()  # [n_envs]
 
         # Construct global state based on critic mode
-        if self.use_concat_agent_observations_critic:
-            # CRITIC8: Simply concatenate agent observations (no modification)
+        if self.use_relative_obs_critic:
+            # CRITIC11: Relative observations with inter-robot distance
+            # Construct: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
+            global_state_np = self._construct_relative_obs_state()
+        elif self.use_concat_agent_observations_critic:
+            # CRITIC10: Simply concatenate agent observations (no modification)
             # obs_np is [n_envs, n_agents, obs_dim], flatten to [n_envs, n_agents * obs_dim]
             global_state_np = obs_np.reshape(self.n_envs, -1)
         else:
@@ -408,8 +540,12 @@ class MAPushEnv:
         obs_np = obs.cpu().numpy()
 
         # Construct global state based on critic mode
-        if self.use_concat_agent_observations_critic:
-            # CRITIC8: Simply concatenate agent observations (no modification)
+        if self.use_relative_obs_critic:
+            # CRITIC11: Relative observations with inter-robot distance
+            # Construct: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
+            global_state_np = self._construct_relative_obs_state()
+        elif self.use_concat_agent_observations_critic:
+            # CRITIC10: Simply concatenate agent observations (no modification)
             # obs_np is [n_envs, n_agents, obs_dim], flatten to [n_envs, n_agents * obs_dim]
             global_state_np = obs_np.reshape(self.n_envs, -1)
         else:

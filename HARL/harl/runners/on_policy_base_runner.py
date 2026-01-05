@@ -41,7 +41,11 @@ class OnPolicyBaseRunner:
         self.hidden_sizes = algo_args["model"]["hidden_sizes"]
         self.actor_hidden_sizes = algo_args["model"].get("actor_hidden_sizes", self.hidden_sizes)
         self.critic_hidden_sizes = algo_args["model"].get("critic_hidden_sizes", self.hidden_sizes)
-        self.rnn_hidden_size = self.hidden_sizes[-1]
+        # Separate RNN hidden sizes for actor and critic
+        self.actor_rnn_hidden_size = self.actor_hidden_sizes[-1]
+        self.critic_rnn_hidden_size = self.critic_hidden_sizes[-1]
+        # Legacy: keep rnn_hidden_size for backwards compatibility (defaults to actor)
+        self.rnn_hidden_size = self.actor_rnn_hidden_size
         self.recurrent_n = algo_args["model"]["recurrent_n"]
 
         # Log architecture configuration
@@ -382,7 +386,7 @@ class OnPolicyBaseRunner:
         # If env is done, then reset rnn_state_critic to all zero
         if self.state_type == "EP":
             rnn_states_critic[dones_env == True] = np.zeros(
-                ((dones_env == True).sum(), self.recurrent_n, self.rnn_hidden_size),
+                ((dones_env == True).sum(), self.recurrent_n, self.critic_rnn_hidden_size),
                 dtype=np.float32,
             )
         elif self.state_type == "FP":
@@ -391,7 +395,7 @@ class OnPolicyBaseRunner:
                     (dones_env == True).sum(),
                     self.num_agents,
                     self.recurrent_n,
-                    self.rnn_hidden_size,
+                    self.critic_rnn_hidden_size,
                 ),
                 dtype=np.float32,
             )

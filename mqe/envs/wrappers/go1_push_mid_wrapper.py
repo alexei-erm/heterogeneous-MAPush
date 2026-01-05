@@ -77,13 +77,17 @@ class Go1PushMidWrapper(EmptyWrapper):
             "push_reward":0,
             "ocb_reward":0,
             "goal_push_bonus": 0,
-            # Iter6 new rewards
+            # Iter6 new rewards (old, not used)
             "engagement_bonus": 0,
             "cooperation_bonus": 0,
             "same_side_bonus": 0,
             "blocking_penalty": 0,
             # Iter8 gated rewards
             "gating_factor": 0,
+            # CRITIC12: Three-tier cooperation bonuses
+            "dual_engagement_bonus": 0,
+            "synchronized_contact_bonus": 0,
+            "bilateral_push_bonus": 0,
             "step_count": 0,
         }
 
@@ -97,10 +101,16 @@ class Go1PushMidWrapper(EmptyWrapper):
         self.shared_gated_rewards = getattr(self.cfg.rewards, "shared_gated_rewards", False)
         self.gating_threshold = getattr(self.cfg.rewards, "gating_threshold", 2.0)  # meters
 
-        # Iter6: Velocity-based push contribution - reward agents when box moves toward goal
-        # Scaled down ~50x from Iter10 proposal to match this codebase's reward magnitudes
-        # (Old codebase used scales like 0.15, this one uses scales like 0.003)
-        self.goal_push_bonus_scale = getattr(self.cfg.rewards, "goal_push_bonus_scale", 0.003)
+        # CRITIC12: Three-tier cooperation bonuses (prevents freeloading through positive rewards)
+        # v2: Relaxed thresholds to make Tier 2 & 3 achievable
+        self.cooperation_rewards = getattr(self.cfg.rewards, "cooperation_rewards", False)
+        self.dual_engagement_threshold = 2.0  # meters - both agents within this distance of box (was 1.5)
+        self.contact_threshold_sync = 1.2  # meters - both agents in contact with box (was 0.8, +50%)
+        self.push_force_threshold = 0.03  # minimum useful push force magnitude (was 0.1, -70%)
+
+        # CRITIC12 v7b: Directional push reward - rewards box velocity toward goal, punishes away
+        # Increased from 0.003 to 0.01 to strongly discourage pushing in wrong direction
+        self.goal_push_bonus_scale = getattr(self.cfg.rewards, "goal_push_bonus_scale", 0.01)
 
         # Iter6: New reward scales - scaled down to match codebase (old rewards are ~0.001-0.004)
         self.engagement_bonus_scale = getattr(self.cfg.rewards, "engagement_bonus_scale", 0.0004)  # Near box
@@ -449,9 +459,41 @@ class Go1PushMidWrapper(EmptyWrapper):
                     push_reward = push_reward * gating_factor
                 reward[:, :] += push_reward.unsqueeze(1).repeat(1, self.num_agents)
                 self.reward_buffer["push_reward"] += torch.sum(push_reward).cpu()
-            
-        # calculate OCB reward for each agent
-        # Iter9: Always use this (individual per agent)
+
+        # =================================================================
+        # CRITIC12 v7: Directional Push Reward
+        # Rewards box velocity TOWARD goal, penalizes velocity away from goal
+        # This directly incentivizes pushing in the correct direction
+        # =================================================================
+        if self.goal_push_bonus_scale != 0:
+            # Get box velocity (linear velocity from root states)
+            box_velocity = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 0, 7:9]  # (num_envs, 2)
+
+            # Direction from box to goal (normalized)
+            box_to_goal = target_pos[:, :2] - box_pos[:, :2]  # (num_envs, 2)
+            box_to_goal_norm = box_to_goal / (torch.norm(box_to_goal, dim=1, keepdim=True) + 1e-6)
+
+            # Project box velocity onto goal direction
+            # Positive = moving toward goal, Negative = moving away
+            velocity_toward_goal = torch.sum(box_velocity * box_to_goal_norm, dim=1)  # (num_envs,)
+
+            # Scale the reward (continuous, not binary)
+            directional_push_reward = self.goal_push_bonus_scale * velocity_toward_goal
+
+            # Iter8: Apply gating if enabled
+            if self.shared_gated_rewards:
+                directional_push_reward = directional_push_reward * gating_factor
+
+            # Add as shared team reward
+            reward[:, :] += directional_push_reward.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["goal_push_bonus"] += torch.sum(directional_push_reward).cpu().item()
+
+        # =================================================================
+        # CRITIC12 v5: Joint OCB Reward (binary)
+        # Only reward positively when BOTH agents are on correct pushing side
+        # Punish (weaker) when any agent is on wrong side
+        # This fixes the issue where per-agent OCB cancels out in team reward
+        # =================================================================
         if self.ocb_reward_scale != 0:
             if getattr(self.cfg.rewards,"expanded_ocb_reward",False):
                 original_target_direction=(target_pos[:, :2] - box_pos[:, :2])/(torch.norm((target_pos[:, :2] - box_pos[:, :2]+0.01),dim=1,keepdim=True))
@@ -461,25 +503,80 @@ class Go1PushMidWrapper(EmptyWrapper):
                 # rotate target direction by delta_yaw/2
                 target_direction = torch.stack([original_target_direction[:, 0] * torch.cos(-delta_yaw/2) - original_target_direction[:, 1] * torch.sin(-delta_yaw/2),
                                                 original_target_direction[:, 0] * torch.sin(-delta_yaw/2) + original_target_direction[:, 1] * torch.cos(-delta_yaw/2)], dim=1)
-                pass
             else:
                 target_direction = (target_pos[:, :2] - box_pos[:, :2])/(torch.norm((target_pos[:, :2] - box_pos[:, :2]),dim=1,keepdim=True))
-            vertex_list=self.cfg.asset.vertex_list
-            reward_logger=[]
+
+            vertex_list = self.cfg.asset.vertex_list
+
+            # Compute raw OCB for each agent (dot product with target direction)
+            # Positive = correct side (behind box), Negative = wrong side (in front)
+            raw_ocb_list = []
             for i in range(self.num_agents):
-                gf_pos=base_pos[:, i, :2] - box_pos[:,:2]
-                rotation_matrix=rotation_matrix_2D( - box_rpy[:, 2])
-                box_relative_pos=torch.bmm(rotation_matrix,gf_pos.unsqueeze(2)).squeeze(2)
-                normal_vector=self.calc_normal_vector_for_obc_reward(vertex_list,box_relative_pos)
-                rotation_matrix=rotation_matrix_2D( box_rpy[:, 2])
-                normal_vector=torch.bmm(rotation_matrix,normal_vector.to(rotation_matrix.device).unsqueeze(2)).squeeze(2)
-                ocb_reward = torch.sum( target_direction * normal_vector, dim=1) * self.ocb_reward_scale
-                # Iter8: Apply gating if enabled
-                if self.shared_gated_rewards:
-                    ocb_reward = ocb_reward * gating_factor
-                reward[:, i] += ocb_reward
-                reward_logger.append(torch.sum(ocb_reward).cpu())
-            self.reward_buffer["ocb_reward"] += np.sum(np.array(reward_logger))
+                gf_pos = base_pos[:, i, :2] - box_pos[:, :2]
+                rotation_matrix = rotation_matrix_2D(-box_rpy[:, 2])
+                box_relative_pos = torch.bmm(rotation_matrix, gf_pos.unsqueeze(2)).squeeze(2)
+                normal_vector = self.calc_normal_vector_for_obc_reward(vertex_list, box_relative_pos)
+                rotation_matrix = rotation_matrix_2D(box_rpy[:, 2])
+                normal_vector = torch.bmm(rotation_matrix, normal_vector.to(rotation_matrix.device).unsqueeze(2)).squeeze(2)
+                raw_ocb = torch.sum(target_direction * normal_vector, dim=1)
+                raw_ocb_list.append(raw_ocb)
+
+            # Joint OCB: both agents must be on correct side for positive reward
+            both_correct = (raw_ocb_list[0] > 0) & (raw_ocb_list[1] > 0)
+
+            # v5d: Asymmetric joint OCB - strong positive, weak negative
+            # Strong reward (+0.01) encourages finding correct positions
+            # Weak penalty (-0.004) doesn't discourage exploration/approaching
+            joint_ocb_reward = torch.where(
+                both_correct,
+                torch.full_like(raw_ocb_list[0], self.ocb_reward_scale),   # Both correct: +0.01
+                torch.full_like(raw_ocb_list[0], -0.004)                   # Any wrong: -0.004 (fixed)
+            )
+
+            # Iter8: Apply gating if enabled
+            if self.shared_gated_rewards:
+                joint_ocb_reward = joint_ocb_reward * gating_factor
+
+            # Add as TEAM reward (same for both agents)
+            reward[:, :] += joint_ocb_reward.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["ocb_reward"] += torch.sum(joint_ocb_reward).cpu().item()
+
+        # =================================================================
+        # CRITIC12: Two-Tier Cooperation Bonuses (v6)
+        # Positive reward shaping to encourage both agents to work together
+        # All bonuses are SHARED (same reward for both agents)
+        # Dual Engagement REMOVED - redundant with approach_reward, too loose
+        # =================================================================
+        if self.cooperation_rewards:
+            # Calculate distances from each agent to box
+            dist_agent0 = torch.norm(box_pos[:, :2] - base_pos[:, 0, :2], dim=1)  # (num_envs,)
+            dist_agent1 = torch.norm(box_pos[:, :2] - base_pos[:, 1, :2], dim=1)  # (num_envs,)
+
+            # Bonus 1: Synchronized Contact - Both agents touching box (+0.008/step)
+            both_in_contact = (dist_agent0 < self.contact_threshold_sync) & (dist_agent1 < self.contact_threshold_sync)
+            synchronized_contact_bonus = torch.zeros(self.num_envs, device=self.device)
+            synchronized_contact_bonus[both_in_contact] = 0.008
+            reward[:, :] += synchronized_contact_bonus.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["synchronized_contact_bonus"] += torch.sum(synchronized_contact_bonus).cpu().item()
+
+            # Bonus 2: Bilateral Push - Both agents pushing in useful directions (+0.01/step)
+            # Direction from box to goal
+            box_to_goal = target_pos[:, :2] - box_pos[:, :2]  # (num_envs, 2)
+            box_to_goal_norm = box_to_goal / (torch.norm(box_to_goal, dim=1, keepdim=True) + 1e-6)  # normalized
+
+            # For each agent, compute push contribution (velocity projected onto goal direction)
+            # We use agent velocity as a proxy for push force
+            agent0_vel_toward_goal = torch.sum(base_vel[:, 0, :2] * box_to_goal_norm, dim=1)  # (num_envs,)
+            agent1_vel_toward_goal = torch.sum(base_vel[:, 1, :2] * box_to_goal_norm, dim=1)  # (num_envs,)
+
+            # Both pushing if both have velocity toward goal above threshold
+            both_pushing = (agent0_vel_toward_goal > self.push_force_threshold) & \
+                           (agent1_vel_toward_goal > self.push_force_threshold) & \
+                           both_in_contact  # Must also be in contact
+            bilateral_push_bonus = torch.zeros(self.num_envs, device=self.device)
+            bilateral_push_bonus[both_pushing] = 0.01
+            reward[:, :] += bilateral_push_bonus.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["bilateral_push_bonus"] += torch.sum(bilateral_push_bonus).cpu().item()
 
         self.last_box_state = deepcopy(box_state)
 
