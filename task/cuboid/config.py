@@ -109,6 +109,7 @@ class Go1PushMidCfg(Go1Cfg):
             ocb_reward_scale = 0.01  # v5b: 2.5x increase for stronger positioning signal (joint binary OCB)
             reach_target_reward_scale = 10
             exception_punishment_scale = -5
+            proximity_penalty_scale = 0.002  # CRITIC13 v3: quadratic penalty for agents being too far apart
 
     # goal setting
     class goal:

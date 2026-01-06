@@ -67,6 +67,7 @@ class Go1PushMidWrapper(EmptyWrapper):
         self.push_reward_scale = self.cfg.rewards.scales.push_reward_scale
         self.ocb_reward_scale = self.cfg.rewards.scales.ocb_reward_scale
         self.exception_punishment_scale = self.cfg.rewards.scales.exception_punishment_scale
+        self.proximity_penalty_scale = getattr(self.cfg.rewards.scales, "proximity_penalty_scale", 0.002)
 
         self.reward_buffer = {
             "distance_to_target_reward": 0,
@@ -88,6 +89,7 @@ class Go1PushMidWrapper(EmptyWrapper):
             "dual_engagement_bonus": 0,
             "synchronized_contact_bonus": 0,
             "bilateral_push_bonus": 0,
+            "proximity_penalty": 0,
             "step_count": 0,
         }
 
@@ -368,6 +370,22 @@ class Go1PushMidWrapper(EmptyWrapper):
         else:
             gating_factor = None
 
+        # =================================================================
+        # CRITIC13 v3: MINIMAL ESSENTIALS + PROXIMITY
+        # Philosophy: Remove redundancy, use curriculum learning, encourage proximity
+        # Active Rewards (8):
+        #   1. reach_target_reward (10) - sparse success
+        #   2. approach_to_box_reward (0.00075) - individual engagement
+        #   3. push_reward (0.0015) - initial: just push (curriculum)
+        #   4. goal_push_bonus (0.01) - advanced: push toward goal (6.7x stronger)
+        #   5. ocb_reward (+0.01/-0.004) - positioning (asymmetric)
+        #   6. proximity_penalty (0.002) - quadratic penalty when agents > 1.2m apart
+        #   7. collision_punishment (-0.0025) - safety
+        #   8. exception_punishment (-5) - safety
+        # Disabled: distance_to_target (redundant with goal_push_bonus)
+        # Disabled: dual_engagement, sync_contact, bilateral_push (cooperation bonuses)
+        # =================================================================
+
         # calculate reach target reward and set finish task termination
         # Iter5: INDIVIDUAL - only agents near box get credit for completion
         # Iter8: GATED - reward multiplied by min engagement (both must be near)
@@ -396,14 +414,16 @@ class Go1PushMidWrapper(EmptyWrapper):
             self.reward_buffer["exception_punishment"] += self.exception_punishment_scale * \
                     (self.exception_buf.sum().item()+self.value_exception_buf.sum().item())
 
+        # CRITIC13 v2: Disabled distance_to_target - redundant with goal_push_bonus
         # calculate distance from current_box_pos to target_box_pos reward
         # Iter9: Always use this (shared team reward for box progress)
-        if self.target_reward_scale != 0:
+        if False and self.target_reward_scale != 0:
             if self.last_box_state is None:
                 self.last_box_state = copy(box_state)
             past_distance = self.env.dist_calculator.cal_dist(self.last_box_state, target_state)
             distance = self.env.dist_calculator.cal_dist(box_state, target_state)
-            distance_reward = self.target_reward_scale * 100 * (2 * (past_distance - distance) - 0.01 * distance)
+            # CRITIC13: Remove distance penalty term - purely reward progress
+            distance_reward = self.target_reward_scale * 100 * 2 * (past_distance - distance)
             # Iter8: Apply gating if enabled
             if self.shared_gated_rewards:
                 distance_reward = distance_reward * gating_factor
@@ -434,6 +454,7 @@ class Go1PushMidWrapper(EmptyWrapper):
                     reward[:, j] += collsion_punishment.squeeze(-1)
             self.reward_buffer["collision_punishment"] += np.sum(np.array(punishment_logger))
 
+        # CRITIC13 v2: Re-enabled push_reward - curriculum learning (weak signal, then directional takes over)
         # calculate push reward for each agent
         # Iter9: Contact-weighted - only agents near box get push credit
         if self.push_reward_scale != 0:
@@ -542,12 +563,39 @@ class Go1PushMidWrapper(EmptyWrapper):
             self.reward_buffer["ocb_reward"] += torch.sum(joint_ocb_reward).cpu().item()
 
         # =================================================================
+        # CRITIC13 v3: Robot Proximity Penalty (quadratic)
+        # Encourages agents to stay within optimal distance (~1.2m = box side length)
+        # Penalty is 0 when within range, grows quadratically when too far apart
+        # =================================================================
+        if self.proximity_penalty_scale != 0:
+            # Distance between the two agents (XY plane)
+            agent_distance = torch.norm(base_pos[:, 0, :2] - base_pos[:, 1, :2], dim=1)  # (num_envs,)
+
+            # Optimal distance = box side length (1.2m)
+            optimal_distance = 1.2
+
+            # Excess distance beyond optimal (clamped to 0 if within range)
+            excess_distance = torch.clamp(agent_distance - optimal_distance, min=0)
+
+            # Quadratic penalty: grows slowly near optimal, faster when very far
+            proximity_penalty = -self.proximity_penalty_scale * (excess_distance ** 2)  # (num_envs,)
+
+            # Iter8: Apply gating if enabled
+            if self.shared_gated_rewards:
+                proximity_penalty = proximity_penalty * gating_factor
+
+            # Add as TEAM reward (same for both agents)
+            reward[:, :] += proximity_penalty.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["proximity_penalty"] += torch.sum(proximity_penalty).cpu().item()
+
+        # =================================================================
+        # CRITIC13: Cooperation bonuses DISABLED - redundant with other signals
         # CRITIC12: Two-Tier Cooperation Bonuses (v6)
         # Positive reward shaping to encourage both agents to work together
         # All bonuses are SHARED (same reward for both agents)
         # Dual Engagement REMOVED - redundant with approach_reward, too loose
         # =================================================================
-        if self.cooperation_rewards:
+        if False and self.cooperation_rewards:
             # Calculate distances from each agent to box
             dist_agent0 = torch.norm(box_pos[:, :2] - base_pos[:, 0, :2], dim=1)  # (num_envs,)
             dist_agent1 = torch.norm(box_pos[:, :2] - base_pos[:, 1, :2], dim=1)  # (num_envs,)
