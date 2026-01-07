@@ -371,19 +371,20 @@ class Go1PushMidWrapper(EmptyWrapper):
             gating_factor = None
 
         # =================================================================
-        # CRITIC13 v3: MINIMAL ESSENTIALS + PROXIMITY
-        # Philosophy: Remove redundancy, use curriculum learning, encourage proximity
-        # Active Rewards (8):
-        #   1. reach_target_reward (10) - sparse success
-        #   2. approach_to_box_reward (0.00075) - individual engagement
-        #   3. push_reward (0.0015) - initial: just push (curriculum)
-        #   4. goal_push_bonus (0.01) - advanced: push toward goal (6.7x stronger)
-        #   5. ocb_reward (+0.01/-0.004) - positioning (asymmetric)
-        #   6. proximity_penalty (0.002) - quadratic penalty when agents > 1.2m apart
-        #   7. collision_punishment (-0.0025) - safety
-        #   8. exception_punishment (-5) - safety
-        # Disabled: distance_to_target (redundant with goal_push_bonus)
-        # Disabled: dual_engagement, sync_contact, bilateral_push (cooperation bonuses)
+        # CRITIC14: ALL TEAM REWARDS (centralized critic compatibility)
+        # Key Change: Converted ALL rewards to team rewards for centralized critic
+        # Previously approach_to_box was individual → caused V(s) mismatch
+        #
+        # Active Rewards (8) - ALL TEAM:
+        #   1. reach_target_reward (10) - sparse success [TEAM]
+        #   2. approach_to_box_reward (0.00075) - sum of both agents' penalties [TEAM - FIXED]
+        #   3. push_reward (0.0015) - curriculum learning [TEAM]
+        #   4. goal_push_bonus (0.01) - directional velocity [TEAM]
+        #   5. ocb_reward (+0.01/-0.004) - positioning (asymmetric) [TEAM]
+        #   6. proximity_penalty (0.002) - quadratic distance penalty [TEAM]
+        #   7. collision_punishment (-0.0025) - safety [TEAM - FIXED]
+        #   8. exception_punishment (-5) - safety [TEAM]
+        # Disabled: distance_to_target, cooperation bonuses
         # =================================================================
 
         # calculate reach target reward and set finish task termination
@@ -432,27 +433,27 @@ class Go1PushMidWrapper(EmptyWrapper):
             self.reward_buffer["distance_to_target_reward"] += torch.sum(distance_reward).cpu()
 
         # calculate distance from each robot to box reward (NEGATIVE - penalty for being far)
-        # Iter9: Always use this (individual penalty per agent)
+        # CRITIC14: Converted to TEAM reward for centralized critic compatibility
+        # Sum of both agents' penalties → given to both agents
         if self.approach_reward_scale != 0:
-            reward_logger=[]
+            total_approach_penalty = torch.zeros(self.num_envs, device=self.device)
             for i in range(self.num_agents):
-                distance = torch.norm(box_pos - base_pos[:, i, :], dim=1, keepdim=True)
-                distance_reward = (-(distance+0.5)**2) * self.approach_reward_scale
-                reward_logger.append(torch.sum(distance_reward).cpu())
-                reward[:, i] += distance_reward.squeeze(-1)
-            self.reward_buffer["approach_to_box_reward"] += np.sum(np.array(reward_logger)) 
+                distance = torch.norm(box_pos - base_pos[:, i, :], dim=1)
+                distance_penalty = (-(distance + 0.5)**2) * self.approach_reward_scale
+                total_approach_penalty += distance_penalty
+            # Team reward: both agents get the sum of penalties
+            reward[:, :] += total_approach_penalty.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["approach_to_box_reward"] += torch.sum(total_approach_penalty).cpu().item() 
 
         # calculate collision punishment
+        # CRITIC14: Explicit TEAM reward for centralized critic compatibility
         if self.collision_punishment_scale != 0:
-            punishment_logger=[]
-            for i in range(self.num_agents):
-                for j in range(i+1, self.num_agents):
-                    distance = torch.norm(base_pos[:, i, :] - base_pos[:, j, :], dim=1, keepdim=True)
-                    collsion_punishment = (1 / (0.02 + distance/3)) * self.collision_punishment_scale
-                    punishment_logger.append(torch.sum(collsion_punishment).cpu())
-                    reward[:, i] += collsion_punishment.squeeze(-1)
-                    reward[:, j] += collsion_punishment.squeeze(-1)
-            self.reward_buffer["collision_punishment"] += np.sum(np.array(punishment_logger))
+            # Distance between agents (only 2 agents, so single pair)
+            agent_distance = torch.norm(base_pos[:, 0, :] - base_pos[:, 1, :], dim=1)
+            collision_punishment = (1 / (0.02 + agent_distance / 3)) * self.collision_punishment_scale
+            # Team reward: both agents get the same punishment
+            reward[:, :] += collision_punishment.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["collision_punishment"] += torch.sum(collision_punishment).cpu().item()
 
         # CRITIC13 v2: Re-enabled push_reward - curriculum learning (weak signal, then directional takes over)
         # calculate push reward for each agent
