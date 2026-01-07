@@ -91,7 +91,7 @@ push_reward[box_moving] = 0.0015
 reward[:, :] += push_reward  # TEAM
 ```
 
-### 6. `ocb_reward` (scale: ±0.004) - SYMMETRIC
+### 6. `ocb_reward` (scale: ±0.004) - SYMMETRIC (JOINT BINARY)
 ```python
 # Joint binary: both must be on correct side
 both_correct = (raw_ocb_0 > 0) & (raw_ocb_1 > 0)
@@ -102,7 +102,16 @@ joint_ocb_reward = torch.where(
 )
 reward[:, :] += joint_ocb_reward  # TEAM
 ```
-**Why symmetric:** Original MAPush used 0.004. Asymmetric +0.01/-0.004 was experimental.
+**Why symmetric:** Original MAPush used 0.004 scale. Asymmetric +0.01/-0.004 was experimental.
+
+**IMPORTANT NOTE:** This is **joint binary** OCB (from CRITIC12 v5), NOT the original continuous per-agent OCB. The original was:
+```python
+# Original MAPush (per-agent continuous):
+for i in range(num_agents):
+    ocb_reward = dot(target_direction, normal_vector) * 0.004
+    reward[:, i] += ocb_reward  # Each agent gets their own continuous value
+```
+See v2 proposal below for restoring continuous OCB.
 
 ### 7. `exception_punishment` (scale: -5) - UNCHANGED
 ```python
@@ -220,3 +229,61 @@ Possible issues:
 1. No velocity signal → agents push slowly → add back `goal_push_bonus`
 2. Agents drift apart → no cooperation → add back `proximity_penalty`
 3. Symmetric OCB too weak → restore asymmetric +0.01/-0.004
+4. Joint binary OCB too coarse → restore continuous OCB (v2 proposal)
+
+---
+
+## v2 Proposal: Restore Continuous OCB (RECOMMENDED)
+
+**Motivation:** Current v1 uses joint binary OCB (from CRITIC12 v5), not the original continuous per-agent OCB. Joint binary only gives feedback when BOTH agents are positioned correctly, which may be too sparse.
+
+**Why Averaged Continuous is Better:**
+1. **Consistent with other rewards:** Like `approach_to_box_reward`, we average to preserve scale
+2. **More robust:** Doesn't rely solely on critic for credit assignment - each agent gets partial immediate feedback
+3. **Simpler:** No complex hybrid schemes or minimum operations
+4. **Closer to original:** Matches original MAPush formula, just teamified
+
+**Change:**
+```python
+# v2: Restore continuous OCB (original formula) and average for team reward
+total_ocb = torch.zeros(self.num_envs, device=self.device)
+for i in range(self.num_agents):
+    gf_pos = base_pos[:, i, :2] - box_pos[:, :2]
+    rotation_matrix = rotation_matrix_2D(-box_rpy[:, 2])
+    box_relative_pos = torch.bmm(rotation_matrix, gf_pos.unsqueeze(2)).squeeze(2)
+    normal_vector = self.calc_normal_vector_for_obc_reward(vertex_list, box_relative_pos)
+    rotation_matrix = rotation_matrix_2D(box_rpy[:, 2])
+    normal_vector = torch.bmm(rotation_matrix, normal_vector.to(rotation_matrix.device).unsqueeze(2)).squeeze(2)
+
+    # Continuous OCB: dot product can range from -1 to +1
+    raw_ocb = torch.sum(target_direction * normal_vector, dim=1)
+    ocb_reward = raw_ocb * 0.004  # Original scale
+    total_ocb += ocb_reward
+
+# Team reward: AVERAGE to preserve scale magnitude
+avg_ocb = total_ocb / self.num_agents  # Average (not sum) to preserve designed scale
+reward[:, :] += avg_ocb.unsqueeze(1).repeat(1, self.num_agents)
+```
+
+**Behavior Examples:**
+
+| Agent 0 OCB | Agent 1 OCB | Avg OCB | Reward (×0.004) | Interpretation |
+|-------------|-------------|---------|-----------------|----------------|
+| +1.0 | +1.0 | +1.0 | **+0.004** | Both perfectly positioned |
+| +1.0 | +0.5 | +0.75 | **+0.003** | One perfect, one good |
+| +1.0 | 0.0 | +0.5 | **+0.002** | One perfect, one neutral |
+| +1.0 | -0.5 | +0.25 | **+0.001** | One perfect, one wrong (still positive!) |
+| +0.5 | -0.5 | 0.0 | **0.0** | Balanced |
+| -0.5 | -0.5 | -0.5 | **-0.002** | Both wrong |
+| -1.0 | -1.0 | -1.0 | **-0.004** | Both maximally wrong |
+
+**Key Advantage:** Agent 0's good action (+1.0) still gives positive team reward even if Agent 1 is wrong (-0.5). This provides **immediate partial credit** and doesn't rely solely on the critic for credit assignment.
+
+**Expected difference:**
+- **v1 (joint binary):** Only two reward values: +0.004 or -0.004, depends on critic for all credit assignment
+- **v2 (continuous averaged):** Smooth gradient from -0.004 to +0.004, each agent gets partial immediate credit
+
+**When to use v2:**
+- If v1 shows poor OCB learning (agents don't learn positioning)
+- If you want more robust credit assignment (less critic-dependent)
+- To truly match original MAPush behavior (continuous OCB)
