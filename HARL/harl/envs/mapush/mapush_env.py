@@ -62,12 +62,14 @@ class MAPushEnv:
         individualized_rewards = env_args.get("individualized_rewards", False)
         shared_gated_rewards = env_args.get("shared_gated_rewards", False)
         cooperation_rewards = env_args.get("cooperation_rewards", False)
+        mapush_og_rewards_teamified = env_args.get("mapush_og_rewards_teamified", False)
         self.env, self.env_cfg = make_mqe_env(
             args.task,
             args,
             custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards,
                                   shared_gated_rewards=shared_gated_rewards,
-                                  cooperation_rewards=cooperation_rewards)
+                                  cooperation_rewards=cooperation_rewards,
+                                  mapush_og_rewards_teamified=mapush_og_rewards_teamified)
         )
 
         self.n_envs = self.env.num_envs

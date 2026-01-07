@@ -50,7 +50,7 @@ model:
   # Actor network hidden sizes (if not set, falls back to hidden_sizes)
   actor_hidden_sizes: [256, 256]
   # Critic network hidden sizes (if not set, falls back to hidden_sizes)
-  critic_hidden_sizes: [256, 256, 128, 64]
+  critic_hidden_sizes: [256, 256, 128]
   # activation function, choose from sigmoid, tanh, relu, leaky_relu, selu
   activation_func: relu
   # whether to use feature normalization

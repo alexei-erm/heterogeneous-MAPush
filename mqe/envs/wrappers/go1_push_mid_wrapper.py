@@ -114,6 +114,11 @@ class Go1PushMidWrapper(EmptyWrapper):
         # Increased from 0.003 to 0.01 to strongly discourage pushing in wrong direction
         self.goal_push_bonus_scale = getattr(self.cfg.rewards, "goal_push_bonus_scale", 0.01)
 
+        # Original MAPush rewards (teamified) - uses vanilla reward structure
+        # When enabled: 7 original rewards, goal_push_bonus and proximity_penalty disabled
+        # approach_to_box uses AVERAGE (not sum), collision uses -0.0025, OCB uses ±0.004
+        self.mapush_og_rewards_teamified = getattr(self.cfg.rewards, "mapush_og_rewards_teamified", False)
+
         # Iter6: New reward scales - scaled down to match codebase (old rewards are ~0.001-0.004)
         self.engagement_bonus_scale = getattr(self.cfg.rewards, "engagement_bonus_scale", 0.0004)  # Near box
         self.cooperation_bonus_scale = getattr(self.cfg.rewards, "cooperation_bonus_scale", 0.0002)  # Both near box
@@ -415,16 +420,16 @@ class Go1PushMidWrapper(EmptyWrapper):
             self.reward_buffer["exception_punishment"] += self.exception_punishment_scale * \
                     (self.exception_buf.sum().item()+self.value_exception_buf.sum().item())
 
-        # CRITIC13 v2: Disabled distance_to_target - redundant with goal_push_bonus
-        # calculate distance from current_box_pos to target_box_pos reward
-        # Iter9: Always use this (shared team reward for box progress)
-        if False and self.target_reward_scale != 0:
+        # distance_to_target_reward: Progress shaping based on box-to-goal distance
+        # CRITIC13 v2: Disabled (redundant with goal_push_bonus)
+        # mapush_og_rewards_teamified: RE-ENABLED with original formula
+        if self.mapush_og_rewards_teamified and self.target_reward_scale != 0:
             if self.last_box_state is None:
                 self.last_box_state = copy(box_state)
             past_distance = self.env.dist_calculator.cal_dist(self.last_box_state, target_state)
             distance = self.env.dist_calculator.cal_dist(box_state, target_state)
-            # CRITIC13: Remove distance penalty term - purely reward progress
-            distance_reward = self.target_reward_scale * 100 * 2 * (past_distance - distance)
+            # Original MAPush formula: progress shaping + distance penalty
+            distance_reward = self.target_reward_scale * 100 * (2 * (past_distance - distance) - 0.01 * distance)
             # Iter8: Apply gating if enabled
             if self.shared_gated_rewards:
                 distance_reward = distance_reward * gating_factor
@@ -434,23 +439,30 @@ class Go1PushMidWrapper(EmptyWrapper):
 
         # calculate distance from each robot to box reward (NEGATIVE - penalty for being far)
         # CRITIC14: Converted to TEAM reward for centralized critic compatibility
-        # Sum of both agents' penalties → given to both agents
+        # mapush_og_rewards_teamified: AVERAGE of both penalties (preserves original magnitude)
+        # Default (CRITIC14): SUM of both penalties (2x magnitude)
         if self.approach_reward_scale != 0:
             total_approach_penalty = torch.zeros(self.num_envs, device=self.device)
             for i in range(self.num_agents):
                 distance = torch.norm(box_pos - base_pos[:, i, :], dim=1)
                 distance_penalty = (-(distance + 0.5)**2) * self.approach_reward_scale
                 total_approach_penalty += distance_penalty
-            # Team reward: both agents get the sum of penalties
+            # mapush_og_rewards_teamified: AVERAGE to preserve designed scale magnitude
+            if self.mapush_og_rewards_teamified:
+                total_approach_penalty = total_approach_penalty / self.num_agents
+            # Team reward: both agents get the (avg or sum) of penalties
             reward[:, :] += total_approach_penalty.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["approach_to_box_reward"] += torch.sum(total_approach_penalty).cpu().item() 
 
         # calculate collision punishment
         # CRITIC14: Explicit TEAM reward for centralized critic compatibility
+        # mapush_og_rewards_teamified: Uses original scale -0.0025 (hardcoded)
         if self.collision_punishment_scale != 0:
             # Distance between agents (only 2 agents, so single pair)
             agent_distance = torch.norm(base_pos[:, 0, :] - base_pos[:, 1, :], dim=1)
-            collision_punishment = (1 / (0.02 + agent_distance / 3)) * self.collision_punishment_scale
+            # mapush_og_rewards_teamified: Use original scale -0.0025
+            collision_scale = -0.0025 if self.mapush_og_rewards_teamified else self.collision_punishment_scale
+            collision_punishment = (1 / (0.02 + agent_distance / 3)) * collision_scale
             # Team reward: both agents get the same punishment
             reward[:, :] += collision_punishment.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["collision_punishment"] += torch.sum(collision_punishment).cpu().item()
@@ -486,8 +498,9 @@ class Go1PushMidWrapper(EmptyWrapper):
         # CRITIC12 v7: Directional Push Reward
         # Rewards box velocity TOWARD goal, penalizes velocity away from goal
         # This directly incentivizes pushing in the correct direction
+        # mapush_og_rewards_teamified: DISABLED (not in original MAPush)
         # =================================================================
-        if self.goal_push_bonus_scale != 0:
+        if self.goal_push_bonus_scale != 0 and not self.mapush_og_rewards_teamified:
             # Get box velocity (linear velocity from root states)
             box_velocity = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 0, 7:9]  # (num_envs, 2)
 
@@ -549,11 +562,21 @@ class Go1PushMidWrapper(EmptyWrapper):
             # v5d: Asymmetric joint OCB - strong positive, weak negative
             # Strong reward (+0.01) encourages finding correct positions
             # Weak penalty (-0.004) doesn't discourage exploration/approaching
-            joint_ocb_reward = torch.where(
-                both_correct,
-                torch.full_like(raw_ocb_list[0], self.ocb_reward_scale),   # Both correct: +0.01
-                torch.full_like(raw_ocb_list[0], -0.004)                   # Any wrong: -0.004 (fixed)
-            )
+            # mapush_og_rewards_teamified: SYMMETRIC ±0.004 (original scale)
+            if self.mapush_og_rewards_teamified:
+                # Original MAPush: symmetric ±0.004
+                joint_ocb_reward = torch.where(
+                    both_correct,
+                    torch.full_like(raw_ocb_list[0], 0.004),   # Both correct: +0.004
+                    torch.full_like(raw_ocb_list[0], -0.004)   # Any wrong: -0.004
+                )
+            else:
+                # CRITIC14: asymmetric +0.01/-0.004
+                joint_ocb_reward = torch.where(
+                    both_correct,
+                    torch.full_like(raw_ocb_list[0], self.ocb_reward_scale),   # Both correct: +0.01
+                    torch.full_like(raw_ocb_list[0], -0.004)                   # Any wrong: -0.004 (fixed)
+                )
 
             # Iter8: Apply gating if enabled
             if self.shared_gated_rewards:
@@ -567,8 +590,9 @@ class Go1PushMidWrapper(EmptyWrapper):
         # CRITIC13 v3: Robot Proximity Penalty (quadratic)
         # Encourages agents to stay within optimal distance (~1.2m = box side length)
         # Penalty is 0 when within range, grows quadratically when too far apart
+        # mapush_og_rewards_teamified: DISABLED (not in original MAPush)
         # =================================================================
-        if self.proximity_penalty_scale != 0:
+        if self.proximity_penalty_scale != 0 and not self.mapush_og_rewards_teamified:
             # Distance between the two agents (XY plane)
             agent_distance = torch.norm(base_pos[:, 0, :2] - base_pos[:, 1, :2], dim=1)  # (num_envs,)
 

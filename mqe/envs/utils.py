@@ -43,7 +43,7 @@ def make_mqe_env(env_name: str, args=None, custom_cfg=None) -> Tuple[LeggedRobot
 
     return env, env_cfg
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -63,6 +63,10 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
         # CRITIC12: Enable three-tier cooperation bonuses
         if cooperation_rewards and hasattr(cfg, 'rewards'):
             cfg.rewards.cooperation_rewards = True
+
+        # Original MAPush rewards (teamified) - 7 original rewards converted to team rewards
+        if mapush_og_rewards_teamified and hasattr(cfg, 'rewards'):
+            cfg.rewards.mapush_og_rewards_teamified = True
 
         return cfg
 

@@ -51,6 +51,8 @@ def main():
                        help="Use relative observations for critic (CRITIC11): [robot1_to_box, robot2_to_box, inter_robot_dist, goal_to_box]. Takes highest priority. DEFAULT: False")
     parser.add_argument("--cooperation_rewards", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="CRITIC12: Enable three-tier cooperation bonuses (dual_engagement, synchronized_contact, bilateral_push). DEFAULT: False")
+    parser.add_argument("--mapush_og_rewards_teamified", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="Use original MAPush rewards (7 total) converted to team rewards. Disables goal_push_bonus, proximity_penalty. Uses symmetric OCB ±0.004, original collision scale -0.0025. DEFAULT: False")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -95,6 +97,7 @@ def main():
     use_concat_obs = args.get("use_concat_agent_observations_critic", False)
     use_relative_obs = args.get("use_relative_obs_critic", False)
     use_cooperation = args.get("cooperation_rewards", False)
+    use_og_rewards = args.get("mapush_og_rewards_teamified", False)
     # n_threads defaults to YAML config value if not specified on command line
     n_threads = args.get("n_rollout_threads") or algo_args["train"]["n_rollout_threads"]
     env_args = {
@@ -107,6 +110,7 @@ def main():
         "use_concat_agent_observations_critic": use_concat_obs,  # CRITIC10: Concatenated agent observations
         "use_relative_obs_critic": use_relative_obs,  # CRITIC11: Relative observations with inter-robot distance (highest priority)
         "cooperation_rewards": use_cooperation,  # CRITIC12: Three-tier cooperation bonuses
+        "mapush_og_rewards_teamified": use_og_rewards,  # Original MAPush rewards converted to team rewards
     }
 
     # Override training parameters only if specified on command line
@@ -135,6 +139,11 @@ def main():
     print(f"Individualized rewards: {env_args['individualized_rewards']}")
     if env_args['individualized_rewards']:
         print(f"  → Contact-weighted rewards averaged to team reward for stable critic")
+    print(f"Original MAPush rewards (teamified): {env_args['mapush_og_rewards_teamified']}")
+    if env_args['mapush_og_rewards_teamified']:
+        print(f"  → 7 rewards: reach_target, distance_to_target, approach_to_box (avg),")
+        print(f"               collision (-0.0025), push, ocb (±0.004), exception")
+        print(f"  → Disabled: goal_push_bonus, proximity_penalty")
     print(f"Seed: {algo_args['seed']['seed']}")
     print(f"Parallel envs: {algo_args['train']['n_rollout_threads']}")
     print(f"Total steps: {algo_args['train']['num_env_steps']:,}")
