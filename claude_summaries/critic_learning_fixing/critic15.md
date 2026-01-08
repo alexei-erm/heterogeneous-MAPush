@@ -91,27 +91,33 @@ push_reward[box_moving] = 0.0015
 reward[:, :] += push_reward  # TEAM
 ```
 
-### 6. `ocb_reward` (scale: ±0.004) - SYMMETRIC (JOINT BINARY)
+### 6. `ocb_reward` (scale: ±0.004) - CONTINUOUS AVERAGED (v2 IMPLEMENTED)
 ```python
-# Joint binary: both must be on correct side
-both_correct = (raw_ocb_0 > 0) & (raw_ocb_1 > 0)
-joint_ocb_reward = torch.where(
-    both_correct,
-    +0.004,  # Both correct (was +0.01)
-    -0.004   # Any wrong (unchanged)
-)
-reward[:, :] += joint_ocb_reward  # TEAM
-```
-**Why symmetric:** Original MAPush used 0.004 scale. Asymmetric +0.01/-0.004 was experimental.
+# v2: Continuous OCB - average both agents' continuous values
+total_ocb = torch.zeros(self.num_envs, device=self.device)
+for i in range(self.num_agents):
+    # raw_ocb ranges from -1 (maximally wrong) to +1 (perfectly positioned)
+    ocb_reward = raw_ocb_list[i] * 0.004  # Original scale
+    total_ocb += ocb_reward
 
-**IMPORTANT NOTE:** This is **joint binary** OCB (from CRITIC12 v5), NOT the original continuous per-agent OCB. The original was:
+# Average to preserve scale magnitude (like approach_to_box_reward)
+avg_ocb = total_ocb / self.num_agents
+reward[:, :] += avg_ocb  # TEAM
+```
+**Why continuous averaged:**
+- Matches original MAPush formula (continuous OCB)
+- Averages to preserve scale magnitude
+- Each agent gets partial immediate credit
+- More robust than joint binary (doesn't rely solely on critic)
+
+**Original MAPush was:**
 ```python
 # Original MAPush (per-agent continuous):
 for i in range(num_agents):
     ocb_reward = dot(target_direction, normal_vector) * 0.004
     reward[:, i] += ocb_reward  # Each agent gets their own continuous value
 ```
-See v2 proposal below for restoring continuous OCB.
+CRITIC15 v2 restores this but averages for team reward.
 
 ### 7. `exception_punishment` (scale: -5) - UNCHANGED
 ```python
@@ -212,7 +218,9 @@ if self.proximity_penalty_scale != 0 and not self.mapush_og_rewards_teamified:
 
 | Run Directory | Version | Key Config |
 |---------------|---------|------------|
-| TBD | v1 | Original MAPush rewards teamified: 7 rewards, symmetric OCB, -0.0025 collision |
+| TBD (65M steps, ABANDONED) | v1 | Original MAPush rewards teamified: 7 rewards, joint binary OCB ±0.004, -0.0025 collision |
+| `seed-00007-2026-01-07-19-02-01` | v2 | **Continuous averaged OCB** (closer to original MAPush). 85% SR but inefficient (200 steps), OCB ~0, values all negative |
+| TBD | **v3** | **v2 + reduced collision punishment** (-0.001 vs -0.0025, 60% weaker). Allow aggressive maneuvering. Flag: `--reward_scale_testing True` |
 
 ---
 
@@ -223,19 +231,20 @@ This establishes a clean baseline. Future iterations can:
 2. Add back `proximity_penalty` if agents drift apart
 3. Tune individual scales with clear understanding of baseline
 
-## If This Fails
+## If v2 Fails
 
 Possible issues:
 1. No velocity signal → agents push slowly → add back `goal_push_bonus`
 2. Agents drift apart → no cooperation → add back `proximity_penalty`
-3. Symmetric OCB too weak → restore asymmetric +0.01/-0.004
-4. Joint binary OCB too coarse → restore continuous OCB (v2 proposal)
+3. Continuous OCB not enough signal → try asymmetric scaling or add back joint binary bonus
 
 ---
 
-## v2 Proposal: Restore Continuous OCB (RECOMMENDED)
+## v2: Continuous Averaged OCB (IMPLEMENTED)
 
-**Motivation:** Current v1 uses joint binary OCB (from CRITIC12 v5), not the original continuous per-agent OCB. Joint binary only gives feedback when BOTH agents are positioned correctly, which may be too sparse.
+**Status:** ✅ Implemented as default when `--mapush_og_rewards_teamified True`
+
+**Motivation:** v1 used joint binary OCB (from CRITIC12 v5), not the original continuous per-agent OCB. Joint binary only gives feedback when BOTH agents are positioned correctly, which may be too sparse.
 
 **Why Averaged Continuous is Better:**
 1. **Consistent with other rewards:** Like `approach_to_box_reward`, we average to preserve scale
@@ -243,21 +252,14 @@ Possible issues:
 3. **Simpler:** No complex hybrid schemes or minimum operations
 4. **Closer to original:** Matches original MAPush formula, just teamified
 
-**Change:**
+**Implementation:**
 ```python
 # v2: Restore continuous OCB (original formula) and average for team reward
 total_ocb = torch.zeros(self.num_envs, device=self.device)
 for i in range(self.num_agents):
-    gf_pos = base_pos[:, i, :2] - box_pos[:, :2]
-    rotation_matrix = rotation_matrix_2D(-box_rpy[:, 2])
-    box_relative_pos = torch.bmm(rotation_matrix, gf_pos.unsqueeze(2)).squeeze(2)
-    normal_vector = self.calc_normal_vector_for_obc_reward(vertex_list, box_relative_pos)
-    rotation_matrix = rotation_matrix_2D(box_rpy[:, 2])
-    normal_vector = torch.bmm(rotation_matrix, normal_vector.to(rotation_matrix.device).unsqueeze(2)).squeeze(2)
-
+    # raw_ocb already calculated in raw_ocb_list
     # Continuous OCB: dot product can range from -1 to +1
-    raw_ocb = torch.sum(target_direction * normal_vector, dim=1)
-    ocb_reward = raw_ocb * 0.004  # Original scale
+    ocb_reward = raw_ocb_list[i] * 0.004  # Original scale
     total_ocb += ocb_reward
 
 # Team reward: AVERAGE to preserve scale magnitude
@@ -279,11 +281,116 @@ reward[:, :] += avg_ocb.unsqueeze(1).repeat(1, self.num_agents)
 
 **Key Advantage:** Agent 0's good action (+1.0) still gives positive team reward even if Agent 1 is wrong (-0.5). This provides **immediate partial credit** and doesn't rely solely on the critic for credit assignment.
 
-**Expected difference:**
+**Difference from v1:**
 - **v1 (joint binary):** Only two reward values: +0.004 or -0.004, depends on critic for all credit assignment
 - **v2 (continuous averaged):** Smooth gradient from -0.004 to +0.004, each agent gets partial immediate credit
 
-**When to use v2:**
-- If v1 shows poor OCB learning (agents don't learn positioning)
-- If you want more robust credit assignment (less critic-dependent)
-- To truly match original MAPush behavior (continuous OCB)
+**Why v2 is default:**
+- v1 showed poor OCB learning at 65M steps (9.3% success rate)
+- v2 provides more robust credit assignment (less critic-dependent)
+- Truly matches original MAPush behavior (continuous OCB, just averaged for team reward)
+
+---
+
+## v3: Reduced Collision Punishment (IMPLEMENTED)
+
+**Status:** ✅ Implemented via `--reward_scale_testing True` flag
+
+**Motivation:** v2 achieved 85% SR but with **inefficient strategy**:
+- Episodes ~200 steps (near max length)
+- OCB ~0 (no positioning learning)
+- Critic values all negative (-0.5 to -2)
+- Far-from-box looked better than near-box in value heatmap
+- **Root cause:** Overly cautious behavior due to strong collision punishment
+
+### Problem Diagnosis
+
+**Collision punishment impact at -0.0025:**
+```python
+# Agents 0.8m apart (typical during pushing):
+punishment = 1 / (0.02 + 0.8/3) * -0.0025 = -0.0089/step
+
+# Over 200 steps:
+total_penalty = -0.0089 × 200 = -1.78 per episode
+
+# That's 18% of reach_target reward (10)!
+```
+
+**Behavioral consequence:**
+- Agents avoid getting close to box (high collision risk)
+- Wide approach arcs (cautious)
+- Slow, inefficient pushing
+- Critic learned: "far from box = safer" vs "near box = risky"
+
+### The Fix
+
+**Reduce collision scale from -0.0025 to -0.001 (60% reduction):**
+
+```python
+# Agents 0.8m apart:
+punishment = 1 / (0.02 + 0.8/3) * -0.001 = -0.0036/step
+
+# Over 200 steps:
+total_penalty = -0.0036 × 200 = -0.72 per episode
+
+# Reduction: -1.78 → -0.72 (60% less)
+```
+
+### Expected Behavioral Changes
+
+1. **More aggressive maneuvering** → tighter approach angles
+2. **Better dual pushing** → agents can push side-by-side without huge penalty
+3. **Shorter episodes** → direct approaches (150 vs 200 steps)
+4. **Positive critic values** → near-box states become preferable
+5. **OCB may improve** → agents spend more time near box exploring positions
+
+### Implementation
+
+**Flag:** `--reward_scale_testing True`
+
+**Priority system:**
+```python
+if reward_scale_testing:
+    collision_scale = -0.001  # CRITIC15 v3
+elif mapush_og_rewards_teamified:
+    collision_scale = -0.0025  # Original
+else:
+    collision_scale = config_value
+```
+
+**Training command:**
+```bash
+./run_training.sh --algo happo --env mapush --exp_name critic15_v3 \
+    --use_concat_agent_observations_critic True \
+    --mapush_og_rewards_teamified True \
+    --reward_scale_testing True \
+    --seed 7
+```
+
+### Success Metrics (vs v2)
+
+| Metric | v2 (200M) | v3 Target |
+|--------|-----------|-----------|
+| Success Rate | 85% | 85%+ (maintain) |
+| Avg Episode Length | ~200 steps | <170 steps |
+| OCB Reward | ~0 (hovering) | >0 (positive positioning) |
+| Critic Values | All negative | Some positive near-box |
+| Collision Rate | Low | Slightly higher (acceptable) |
+
+### If This Works
+
+This validates that collision punishment was **too strong**, causing:
+- Overly cautious behavior
+- Inefficient strategy
+- Poor value function learning
+
+Next iterations can explore:
+- Further reducing to -0.0005 (if still too cautious)
+- Adding dual pushing bonus (now that agents can be closer)
+
+### If This Fails
+
+Possible issues:
+1. **Too many collisions** → agents crash frequently → restore to -0.0015 (middle ground)
+2. **Still inefficient** → problem is elsewhere (lack of directional signal, need goal_push_bonus)
+3. **SR drops** → collision avoidance was necessary for success → add spatial coordination reward

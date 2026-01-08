@@ -112,6 +112,9 @@ class Go1PushMidWrapper(EmptyWrapper):
 
         # CRITIC12 v7b: Directional push reward - rewards box velocity toward goal, punishes away
         # Increased from 0.003 to 0.01 to strongly discourage pushing in wrong direction
+
+        # CRITIC15 v3: Reward scale testing - reduced collision punishment
+        self.reward_scale_testing = getattr(self.cfg.rewards, "reward_scale_testing", False)
         self.goal_push_bonus_scale = getattr(self.cfg.rewards, "goal_push_bonus_scale", 0.01)
 
         # Original MAPush rewards (teamified) - uses vanilla reward structure
@@ -457,11 +460,17 @@ class Go1PushMidWrapper(EmptyWrapper):
         # calculate collision punishment
         # CRITIC14: Explicit TEAM reward for centralized critic compatibility
         # mapush_og_rewards_teamified: Uses original scale -0.0025 (hardcoded)
+        # CRITIC15 v3: reward_scale_testing uses reduced scale -0.001 (60% reduction)
         if self.collision_punishment_scale != 0:
             # Distance between agents (only 2 agents, so single pair)
             agent_distance = torch.norm(base_pos[:, 0, :] - base_pos[:, 1, :], dim=1)
-            # mapush_og_rewards_teamified: Use original scale -0.0025
-            collision_scale = -0.0025 if self.mapush_og_rewards_teamified else self.collision_punishment_scale
+            # Priority: reward_scale_testing > mapush_og_rewards_teamified > config
+            if self.reward_scale_testing:
+                collision_scale = -0.001  # CRITIC15 v3: Reduced for more aggressive maneuvering
+            elif self.mapush_og_rewards_teamified:
+                collision_scale = -0.0025  # Original MAPush scale
+            else:
+                collision_scale = self.collision_punishment_scale  # From config
             collision_punishment = (1 / (0.02 + agent_distance / 3)) * collision_scale
             # Team reward: both agents get the same punishment
             reward[:, :] += collision_punishment.unsqueeze(1).repeat(1, self.num_agents)
@@ -556,22 +565,23 @@ class Go1PushMidWrapper(EmptyWrapper):
                 raw_ocb = torch.sum(target_direction * normal_vector, dim=1)
                 raw_ocb_list.append(raw_ocb)
 
-            # Joint OCB: both agents must be on correct side for positive reward
-            both_correct = (raw_ocb_list[0] > 0) & (raw_ocb_list[1] > 0)
-
-            # v5d: Asymmetric joint OCB - strong positive, weak negative
-            # Strong reward (+0.01) encourages finding correct positions
-            # Weak penalty (-0.004) doesn't discourage exploration/approaching
-            # mapush_og_rewards_teamified: SYMMETRIC ±0.004 (original scale)
+            # CRITIC15 v2: Continuous averaged OCB (original MAPush formula, teamified)
+            # Restores continuous OCB and averages to preserve scale magnitude
             if self.mapush_og_rewards_teamified:
-                # Original MAPush: symmetric ±0.004
-                joint_ocb_reward = torch.where(
-                    both_correct,
-                    torch.full_like(raw_ocb_list[0], 0.004),   # Both correct: +0.004
-                    torch.full_like(raw_ocb_list[0], -0.004)   # Any wrong: -0.004
-                )
+                # v2: Continuous OCB - average both agents' continuous values
+                # Each agent gets partial immediate credit, doesn't rely solely on critic
+                total_ocb = torch.zeros(self.num_envs, device=self.device)
+                for i in range(self.num_agents):
+                    # raw_ocb ranges from -1 (maximally wrong) to +1 (perfectly positioned)
+                    ocb_reward = raw_ocb_list[i] * 0.004  # Original scale
+                    total_ocb += ocb_reward
+
+                # Average to preserve scale magnitude (like approach_to_box_reward)
+                joint_ocb_reward = total_ocb / self.num_agents
             else:
-                # CRITIC14: asymmetric +0.01/-0.004
+                # CRITIC14: Joint binary OCB - both agents must be on correct side
+                both_correct = (raw_ocb_list[0] > 0) & (raw_ocb_list[1] > 0)
+                # Asymmetric +0.01/-0.004
                 joint_ocb_reward = torch.where(
                     both_correct,
                     torch.full_like(raw_ocb_list[0], self.ocb_reward_scale),   # Both correct: +0.01

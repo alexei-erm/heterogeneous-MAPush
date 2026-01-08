@@ -43,7 +43,7 @@ def make_mqe_env(env_name: str, args=None, custom_cfg=None) -> Tuple[LeggedRobot
 
     return env, env_cfg
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -67,6 +67,10 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
         # Original MAPush rewards (teamified) - 7 original rewards converted to team rewards
         if mapush_og_rewards_teamified and hasattr(cfg, 'rewards'):
             cfg.rewards.mapush_og_rewards_teamified = True
+
+        # CRITIC15 v3: Reduced collision punishment scale for testing
+        if reward_scale_testing and hasattr(cfg, 'rewards'):
+            cfg.rewards.reward_scale_testing = True
 
         return cfg
 

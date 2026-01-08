@@ -53,6 +53,8 @@ def main():
                        help="CRITIC12: Enable three-tier cooperation bonuses (dual_engagement, synchronized_contact, bilateral_push). DEFAULT: False")
     parser.add_argument("--mapush_og_rewards_teamified", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="Use original MAPush rewards (7 total) converted to team rewards. Disables goal_push_bonus, proximity_penalty. Uses symmetric OCB ±0.004, original collision scale -0.0025. DEFAULT: False")
+    parser.add_argument("--reward_scale_testing", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="CRITIC15 v3: Reduce collision punishment to -0.001 (from -0.0025) to allow more aggressive maneuvering. DEFAULT: False")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -98,6 +100,7 @@ def main():
     use_relative_obs = args.get("use_relative_obs_critic", False)
     use_cooperation = args.get("cooperation_rewards", False)
     use_og_rewards = args.get("mapush_og_rewards_teamified", False)
+    use_reward_testing = args.get("reward_scale_testing", False)
     # n_threads defaults to YAML config value if not specified on command line
     n_threads = args.get("n_rollout_threads") or algo_args["train"]["n_rollout_threads"]
     env_args = {
@@ -111,6 +114,7 @@ def main():
         "use_relative_obs_critic": use_relative_obs,  # CRITIC11: Relative observations with inter-robot distance (highest priority)
         "cooperation_rewards": use_cooperation,  # CRITIC12: Three-tier cooperation bonuses
         "mapush_og_rewards_teamified": use_og_rewards,  # Original MAPush rewards converted to team rewards
+        "reward_scale_testing": use_reward_testing,  # CRITIC15 v3: Reduced collision punishment for aggressive maneuvering
     }
 
     # Override training parameters only if specified on command line
