@@ -42,7 +42,18 @@ class BaseTask():
 
         self.sim_params = sim_params
         # Reduced from *5 to *1 to avoid CUDA OOM on 8GB VRAM GPUs
+        # Attempted *2 but still crashed - must stay at *1 for this hardware
         self.sim_params.physx.max_gpu_contact_pairs *= 1
+
+        # Increase PhysX GPU dynamics memory capacity to handle 500 parallel envs
+        # Warning: "The application needs to increase PxgDynamicsMemoryConfig::foundLostAggregatePairsCapacity buffers to 8984828"
+        # Setting to 10M for headroom
+        if hasattr(self.sim_params.physx, 'max_gpu_found_lost_aggregate_pairs_capacity'):
+            self.sim_params.physx.max_gpu_found_lost_aggregate_pairs_capacity = 10000000
+        # Older Isaac Gym versions may use different attribute name
+        elif hasattr(self.sim_params.physx, 'found_lost_aggregate_pairs_capacity'):
+            self.sim_params.physx.found_lost_aggregate_pairs_capacity = 10000000
+
         self.physics_engine = physics_engine
         self.sim_device = sim_device
         sim_device_type, self.sim_device_id = gymutil.parse_device_str(self.sim_device)

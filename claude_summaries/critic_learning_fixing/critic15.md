@@ -220,7 +220,8 @@ if self.proximity_penalty_scale != 0 and not self.mapush_og_rewards_teamified:
 |---------------|---------|------------|
 | TBD (65M steps, ABANDONED) | v1 | Original MAPush rewards teamified: 7 rewards, joint binary OCB ±0.004, -0.0025 collision |
 | `seed-00007-2026-01-07-19-02-01` | v2 | **Continuous averaged OCB** (closer to original MAPush). 85% SR but inefficient (200 steps), OCB ~0, values all negative |
-| TBD | **v3** | **v2 + reduced collision punishment** (-0.001 vs -0.0025, 60% weaker). Allow aggressive maneuvering. Flag: `--reward_scale_testing True` |
+| TBD (ABANDONED) | v3 | v2 + reduced collision punishment (-0.001). **NO EFFECT - collision not the issue** |
+| TBD | **v4** | **v2 + dual pushing bonus** (0.005/step when both push toward goal). Flag: `--collaboration_rewards True` |
 
 ---
 
@@ -394,3 +395,133 @@ Possible issues:
 1. **Too many collisions** → agents crash frequently → restore to -0.0015 (middle ground)
 2. **Still inefficient** → problem is elsewhere (lack of directional signal, need goal_push_bonus)
 3. **SR drops** → collision avoidance was necessary for success → add spatial coordination reward
+
+---
+
+## v4: Dual Pushing Bonus (IMPLEMENTED)
+
+**Status:** ✅ Implemented via `--collaboration_rewards True` flag
+
+**Motivation:** v3 showed reduced collision punishment had **no useful effect**. The real issue is lack of **dual pushing incentive**. User observed dual pushing happens occasionally in viewer - want to reinforce this specific behavior.
+
+### Problem Diagnosis
+
+**v2 behavior:**
+- 85% success but inefficient (~200 steps)
+- Agents learned solo/sequential pushing strategy
+- OCB ~0 (no positioning learning)
+- **Dual pushing seen occasionally but not reinforced**
+
+### The Solution: Reward Dual Pushing Directly
+
+**Add bonus when both agents push toward goal simultaneously:**
+
+```python
+# Check both agents have velocity toward goal
+agent0_vel_toward_goal = dot(agent0_velocity, goal_direction)
+agent1_vel_toward_goal = dot(agent1_velocity, goal_direction)
+
+# Both must be pushing toward goal (prevents opposite-side exploit)
+both_pushing = (agent0_vel_toward_goal > 0.05) & (agent1_vel_toward_goal > 0.05)
+
+dual_push_bonus = 0.005 if both_pushing else 0  # per step
+reward[:, :] += dual_push_bonus  # team reward
+```
+
+### Scale Justification
+
+**Dual push bonus: 0.005/step**
+
+Compared to other rewards:
+```
+push_reward: 0.0015/step (any box movement)
+dual_push: 0.005/step (both pushing toward goal)
+Ratio: 3.3x bonus for cooperation
+```
+
+**Per-episode impact (assuming 40 steps of dual pushing):**
+```
+Solo pushing 200 steps: 0.0015 × 200 = +0.3
+Dual pushing 40 steps: 0.005 × 40 = +0.2
+Efficiency: 5x fewer steps for 67% of the reward
+```
+
+**Prevents exploit:**
+- Both agents must push **toward goal** (not opposite sides)
+- Agent behind box → velocity toward goal ✓
+- Agent in front pushing back → velocity **away from goal** ✗
+- Bonus only when both velocities toward goal
+
+### Active Rewards in v4
+
+| Reward | Scale | Notes |
+|--------|-------|-------|
+| `reach_target_reward` | 10 | Sparse success |
+| `distance_to_target_reward` | 0.00325 | Progress shaping |
+| `approach_to_box_reward` | 0.00075 (avg) | Individual engagement |
+| `collision_punishment` | -0.0025 | Safety |
+| `push_reward` | 0.0015 | Any box movement |
+| `ocb_reward` | ±0.004 (avg) | Positioning signal |
+| `exception_punishment` | -5 | Safety |
+| **`dual_push_bonus`** | **0.005** | **NEW: Both push toward goal** |
+
+**Total: 8 rewards (7 original + 1 collaboration bonus)**
+
+### Implementation
+
+**Flag:** `--collaboration_rewards True` (use with `--mapush_og_rewards_teamified True`)
+
+**Training command:**
+```bash
+./run_training.sh --algo happo --env mapush --exp_name critic15_v4 \
+    --use_concat_agent_observations_critic True \
+    --mapush_og_rewards_teamified True \
+    --collaboration_rewards True \
+    --seed 7
+```
+
+### Expected Behavioral Changes
+
+1. **More frequent dual pushing** → agents learn it's more rewarding
+2. **Shorter episodes** → efficient cooperation (150 vs 200 steps)
+3. **Better OCB learning** → proper positioning enables dual pushing
+4. **Positive critic values** → successful cooperation states valued higher
+5. **Higher quality success** → coordinated pushing, not solo grinding
+
+### Success Metrics (vs v2)
+
+| Metric | v2 (200M) | v4 Target |
+|--------|-----------|-----------|
+| Success Rate | 85% | 85%+ (maintain or improve) |
+| Avg Episode Length | ~200 steps | **~150 steps** (25% faster) |
+| Dual Push Frequency | Rare (~5% steps) | **~20-30% steps** |
+| Dual Push Bonus | 0 (disabled) | **>0.1/episode** |
+| OCB Reward | ~0 (hovering) | >0 (better positioning) |
+| Critic Values | All negative | Some positive (dual push states) |
+
+### Why This Should Work
+
+1. **Directly targets observed behavior** - dual pushing already happens occasionally
+2. **No exploit possible** - both must push toward goal (directionally correct)
+3. **Moderate scale** - 0.005 is meaningful but not dominant (50% of reach_target per episode at 20% frequency)
+4. **Synergy with OCB** - proper positioning makes dual pushing easier → OCB may improve
+5. **Sparse enough** - won't dominate training, but provides clear signal when achieved
+
+### If This Works
+
+This validates that **lack of dual pushing incentive** was the issue:
+- v2 learned "solo is good enough"
+- v4 learns "dual is better"
+- OCB may improve as side effect (positioning for dual pushing)
+
+Next steps:
+- Increase scale if dual pushing still rare (0.005 → 0.008)
+- Add contact requirement if agents "air push" from afar
+
+### If This Fails
+
+Possible issues:
+1. **Still rare dual pushing** → scale too weak, increase to 0.008
+2. **Agents "gaming" by brief touches** → add minimum duration requirement (3+ consecutive steps)
+3. **SR drops** → cooperation disrupts working solo strategy → reduce scale to 0.003
+4. **No change at all** → agents physically can't dual push with current positioning → add proximity bonus first

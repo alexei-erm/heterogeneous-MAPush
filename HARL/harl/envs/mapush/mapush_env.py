@@ -64,6 +64,8 @@ class MAPushEnv:
         cooperation_rewards = env_args.get("cooperation_rewards", False)
         mapush_og_rewards_teamified = env_args.get("mapush_og_rewards_teamified", False)
         reward_scale_testing = env_args.get("reward_scale_testing", False)
+        collaboration_rewards = env_args.get("collaboration_rewards", False)
+        positive_approachtobox_reward = env_args.get("positive_approachtobox_reward", False)
         self.env, self.env_cfg = make_mqe_env(
             args.task,
             args,
@@ -71,7 +73,9 @@ class MAPushEnv:
                                   shared_gated_rewards=shared_gated_rewards,
                                   cooperation_rewards=cooperation_rewards,
                                   mapush_og_rewards_teamified=mapush_og_rewards_teamified,
-                                  reward_scale_testing=reward_scale_testing)
+                                  reward_scale_testing=reward_scale_testing,
+                                  collaboration_rewards=collaboration_rewards,
+                                  positive_approachtobox_reward=positive_approachtobox_reward)
         )
 
         self.n_envs = self.env.num_envs
@@ -83,14 +87,16 @@ class MAPushEnv:
         self.action_space = [self.env.action_space] * self.n_agents
 
         # Flags to control critic input coordinate system
-        # Priority: relative_obs > concat_observations > box_centered > absolute
+        # Priority: relative_obs > concat_observations > goal_centered > box_centered > absolute
         # use_relative_obs_critic: CRITIC11 (9 dims) - Relative observations with inter-robot distance
         # use_concat_agent_observations_critic: CRITIC10 (16 dims) - Concatenated agent local observations
+        # use_goal_centered_critic: CRITIC16 (9 dims) - Goal-centered coordinates (stationary reference frame)
         # use_box_centered_critic: CRITIC9 (9 dims) - Box-centered coordinates (translation invariant)
         # None: CRITIC7 (11 dims) - Absolute world frame coordinates
         # DEFAULT: All False (absolute coordinates)
         self.use_relative_obs_critic = env_args.get("use_relative_obs_critic", False)
         self.use_concat_agent_observations_critic = env_args.get("use_concat_agent_observations_critic", False)
+        self.use_goal_centered_critic = env_args.get("use_goal_centered_critic", False)
         self.use_box_centered_critic = env_args.get("use_box_centered_critic", False)
 
         # Share observation space (for centralized critic)
@@ -119,6 +125,24 @@ class MAPushEnv:
             # Global state = [agent0_obs, agent1_obs] = 8 * n_agents = 16 dims (for 2 agents)
             obs_dim = self.env.observation_space.shape[0]  # 8 dims per agent
             global_state_dim = obs_dim * self.n_agents     # 8 * 2 = 16 dims
+        elif self.use_goal_centered_critic:
+            # CRITIC16: Goal-centered global state
+            # Express everything relative to the goal (the stationary target)
+            # This provides:
+            # 1. Translation invariance (goal at different world positions = same state)
+            # 2. True global view (not just concatenated local perspectives)
+            # 3. Task-centric representation (value depends on box-goal distance and agent-goal positions)
+            # 4. Stationary reference frame (goal never moves, unlike box which moves during episode)
+            #
+            # Global state structure (9 dims for 2 agents):
+            #   [box_rel_x, box_rel_y,                = 2 dims (box relative to goal)
+            #    box_rel_yaw,                         = 1 dim  (box yaw relative to goal)
+            #    agent0_rel_x, agent0_rel_y,          = 2 dims (agent0 relative to goal)
+            #    agent0_rel_yaw,                      = 1 dim  (agent0 yaw relative to goal)
+            #    agent1_rel_x, agent1_rel_y,          = 2 dims (agent1 relative to goal)
+            #    agent1_rel_yaw]                      = 1 dim  (agent1 yaw relative to goal)
+            # Total: 3 + 3*n_agents = 9 dims (for 2 agents)
+            global_state_dim = 3 + 3 * self.n_agents  # box(3) + agents(3 each)
         elif self.use_box_centered_critic:
             # CRITIC9: Box-centered global state
             # Express everything relative to the box (the object being pushed)
@@ -227,13 +251,40 @@ class MAPushEnv:
             raise
 
         # Construct global state based on coordinate system flag
-        # Priority: relative_obs > concat_observations > box_centered > absolute
+        # Priority: relative_obs > concat_observations > goal_centered > box_centered > absolute
         # NOTE: This method is NOT called when use_concat_agent_observations_critic=True or use_relative_obs_critic=True
         # For CRITIC10 and CRITIC11, global state is constructed directly in step() and reset()
         if self.use_relative_obs_critic:
             # CRITIC11: Relative observations with inter-robot distance
             # This should not be reached as CRITIC11 constructs state directly in step()/reset()
             raise RuntimeError("CRITIC11 should construct state directly in step()/reset(), not call _construct_global_state()")
+        elif self.use_goal_centered_critic:
+            # CRITIC16: Goal-centered (relative) global state
+            # Express everything relative to the goal (stationary reference frame)
+            # Structure: [box_rel(3), agent0_rel(3), agent1_rel(3), ...]
+
+            # Goal relative to... nothing! Goal is the origin (0, 0)
+            # But we need goal position and orientation for transformation
+
+            # Box relative to goal
+            box_rel = box_pos_global[:, :2] - target_pos_global[:, :2]  # [n_envs, 2]
+            box_yaw_rel = box_rpy[:, 2:3] - target_rpy[:, 2:3]  # [n_envs, 1]
+
+            # Start with box relative position and yaw
+            global_state_list = [box_rel, box_yaw_rel]
+
+            # Add each agent's position and orientation relative to goal
+            for agent_id in range(self.n_agents):
+                # Agent position relative to goal
+                agent_pos_rel = base_pos[:, agent_id, :2] - target_pos_global[:, :2]  # [n_envs, 2]
+                # Agent yaw relative to goal yaw
+                agent_yaw_rel = base_rpy[:, agent_id, 2:3] - target_rpy[:, 2:3]  # [n_envs, 1]
+
+                global_state_list.append(agent_pos_rel)
+                global_state_list.append(agent_yaw_rel)
+
+            # Concatenate into single tensor
+            global_state_torch = torch.cat(global_state_list, dim=1)  # [n_envs, 3 + 3*n_agents]
         elif self.use_box_centered_critic:
             # CRITIC9: Box-centered (relative) global state
             # Express everything relative to the box (translation invariant)
@@ -300,6 +351,16 @@ class MAPushEnv:
                 print(f"  - Box (x, y) relative to agent: 2 dims")
                 print(f"  - Box yaw relative to agent: 1 dim")
                 print(f"  - Other agent (x, y, yaw) relative to this agent: 3 dims")
+            elif self.use_goal_centered_critic:
+                print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC16: Goal-centered")
+                print("="*80)
+                print(f"Global state shape: {global_state_np.shape}")
+                print(f"Expected: [{self.n_envs}, 9] for 2 agents (goal-centered coordinates)")
+                print(f"\nEnvironment 0 global state (9 dims):")
+                print(f"  Box rel to goal:    x={global_state_np[0,0]:.3f}, y={global_state_np[0,1]:.3f}, yaw={global_state_np[0,2]:.3f}")
+                print(f"  Agent0 rel to goal: x={global_state_np[0,3]:.3f}, y={global_state_np[0,4]:.3f}, yaw={global_state_np[0,5]:.3f}")
+                print(f"  Agent1 rel to goal: x={global_state_np[0,6]:.3f}, y={global_state_np[0,7]:.3f}, yaw={global_state_np[0,8]:.3f}")
+                print(f"\nNote: Goal is at origin (0, 0) in this frame. Box at (0, 0) = SUCCESS!")
             elif self.use_box_centered_critic:
                 print("GLOBAL STATE DIAGNOSTIC (First Step) - CRITIC9: Box-centered")
                 print("="*80)
@@ -495,8 +556,8 @@ class MAPushEnv:
             # obs_np is [n_envs, n_agents, obs_dim], flatten to [n_envs, n_agents * obs_dim]
             global_state_np = obs_np.reshape(self.n_envs, -1)
         else:
-            # CRITIC9 or CRITIC7: Use box-centered or absolute global state
-            # Construct global state with everything relative to the box (or absolute)
+            # CRITIC16/CRITIC9/CRITIC7: Use goal-centered, box-centered, or absolute global state
+            # Construct global state with everything relative to goal, box, or in world frame
             global_state_np = self._construct_global_state()
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]
@@ -553,8 +614,8 @@ class MAPushEnv:
             # obs_np is [n_envs, n_agents, obs_dim], flatten to [n_envs, n_agents * obs_dim]
             global_state_np = obs_np.reshape(self.n_envs, -1)
         else:
-            # CRITIC9 or CRITIC7: Use box-centered or absolute global state
-            # Construct global state with everything relative to the box (or absolute)
+            # CRITIC16/CRITIC9/CRITIC7: Use goal-centered, box-centered, or absolute global state
+            # Construct global state with everything relative to goal, box, or in world frame
             global_state_np = self._construct_global_state()
 
         # For HARL EP mode compatibility, broadcast to [n_envs, n_agents, global_state_dim]

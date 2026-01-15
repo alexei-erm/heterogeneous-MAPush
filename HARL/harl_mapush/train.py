@@ -43,6 +43,8 @@ def main():
                        help="Enable individualized rewards for HAPPO (prevents freeloading)")
     parser.add_argument("--shared_gated_rewards", action="store_true", default=False,
                        help="Iter8: Gate all shared rewards by min agent engagement (prevents freeloading)")
+    parser.add_argument("--use_goal_centered_critic", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="Use goal-centered coordinates for critic (CRITIC16): Everything relative to goal (stationary reference frame). 9 dims: [box_rel(3), agent0_rel(3), agent1_rel(3)]. DEFAULT: False")
     parser.add_argument("--use_box_centered_critic", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="Use box-centered (relative) coordinates for critic (CRITIC9). Set to False for absolute coordinates (CRITIC7). DEFAULT: False (absolute)")
     parser.add_argument("--use_concat_agent_observations_critic", type=lambda x: (str(x).lower() == 'true'), default=False,
@@ -54,7 +56,9 @@ def main():
     parser.add_argument("--mapush_og_rewards_teamified", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="Use original MAPush rewards (7 total) converted to team rewards. Disables goal_push_bonus, proximity_penalty. Uses symmetric OCB ±0.004, original collision scale -0.0025. DEFAULT: False")
     parser.add_argument("--reward_scale_testing", type=lambda x: (str(x).lower() == 'true'), default=False,
-                       help="CRITIC15 v3: Reduce collision punishment to -0.001 (from -0.0025) to allow more aggressive maneuvering. DEFAULT: False")
+                       help="Reserved for future reward scale experiments. Currently has no effect. DEFAULT: False")
+    parser.add_argument("--collaboration_rewards", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="CRITIC15 v4: Add dual pushing bonus. Rewards when both agents push toward goal simultaneously. Use with --mapush_og_rewards_teamified True. DEFAULT: False")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -95,12 +99,15 @@ def main():
     # Individualized rewards only affects reward shaping, NOT critic mode
     use_individual = args.get("individualized_rewards", False)
     use_shared_gated = args.get("shared_gated_rewards", False)
+    use_goal_centered = args.get("use_goal_centered_critic", False)
     use_box_centered = args.get("use_box_centered_critic", False)
     use_concat_obs = args.get("use_concat_agent_observations_critic", False)
     use_relative_obs = args.get("use_relative_obs_critic", False)
     use_cooperation = args.get("cooperation_rewards", False)
     use_og_rewards = args.get("mapush_og_rewards_teamified", False)
     use_reward_testing = args.get("reward_scale_testing", False)
+    use_collaboration = args.get("collaboration_rewards", False)
+    use_positive_approach = args.get("positive_approachtobox_reward", False)
     # n_threads defaults to YAML config value if not specified on command line
     n_threads = args.get("n_rollout_threads") or algo_args["train"]["n_rollout_threads"]
     env_args = {
@@ -109,12 +116,15 @@ def main():
         "state_type": "EP",  # ALWAYS EP - HAPPO uses single global critic per documentation
         "individualized_rewards": use_individual,  # For reward shaping only
         "shared_gated_rewards": use_shared_gated,  # Iter8: Gate shared rewards by min engagement
+        "use_goal_centered_critic": use_goal_centered,  # CRITIC16: Goal-centered coordinates (stationary reference frame)
         "use_box_centered_critic": use_box_centered,  # CRITIC9: Box-centered (True) vs CRITIC7: Absolute (False)
         "use_concat_agent_observations_critic": use_concat_obs,  # CRITIC10: Concatenated agent observations
         "use_relative_obs_critic": use_relative_obs,  # CRITIC11: Relative observations with inter-robot distance (highest priority)
         "cooperation_rewards": use_cooperation,  # CRITIC12: Three-tier cooperation bonuses
         "mapush_og_rewards_teamified": use_og_rewards,  # Original MAPush rewards converted to team rewards
-        "reward_scale_testing": use_reward_testing,  # CRITIC15 v3: Reduced collision punishment for aggressive maneuvering
+        "reward_scale_testing": use_reward_testing,  # Reserved for future experiments
+        "collaboration_rewards": use_collaboration,  # CRITIC15 v4: Dual pushing bonus (use with mapush_og_rewards_teamified)
+        "positive_approachtobox_reward": use_positive_approach,  # CRITIC17: Positive inverse distance reward instead of negative penalty
     }
 
     # Override training parameters only if specified on command line

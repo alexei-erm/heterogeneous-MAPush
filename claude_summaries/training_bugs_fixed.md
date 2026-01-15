@@ -379,6 +379,51 @@ Some episodes done, average episode reward is -6.5947160790208725.
 
 ---
 
+---
+
+## Bug 9: PhysX Aggregate Pairs Capacity Warning
+
+### Symptom
+```
+/buildAgent/work/99bede84aa0a52c2/source/gpubroadphase/src/PxgAABBManager.cpp (1056) :
+invalid parameter : The application needs to increase
+PxgDynamicsMemoryConfig::foundLostAggregatePairsCapacity buffers to 8984828,
+otherwise, the simulation will miss interactions
+```
+
+### Root Cause
+With **500 parallel environments**, each containing multiple objects (2 agents + 1 box + 2 obstacles = 5 objects), the PhysX GPU broad-phase collision detection runs out of buffer space for tracking "found/lost" collision pairs during initialization.
+
+**Calculation:**
+- 500 envs × 5 objects = 2,500 total objects
+- Potential collision pairs: ~3 million
+- During initialization, all pairs are "found" simultaneously
+- Default buffer capacity: insufficient for this scale
+
+### Context from Bug 1
+In Bug 1, we **reduced** `max_gpu_contact_pairs` from `*5` to `*1` to avoid CUDA OOM on 8GB VRAM GPUs. That fixed memory exhaustion but left this separate buffer undersized.
+
+**These are different buffers:**
+- `max_gpu_contact_pairs`: Total contact memory pool (reduced for VRAM)
+- `foundLostAggregatePairsCapacity`: Tracking buffer for new/removed collision pairs (needs increase)
+
+### Fix
+**File:** `mqe/envs/base/base_task.py` (lines 47-54)
+
+```python
+# Increase PhysX GPU dynamics memory capacity to handle 500 parallel envs
+# Warning requested 8984828, setting to 10M for headroom
+if hasattr(self.sim_params.physx, 'max_gpu_found_lost_aggregate_pairs_capacity'):
+    self.sim_params.physx.max_gpu_found_lost_aggregate_pairs_capacity = 10000000
+# Older Isaac Gym versions may use different attribute name
+elif hasattr(self.sim_params.physx, 'found_lost_aggregate_pairs_capacity'):
+    self.sim_params.physx.found_lost_aggregate_pairs_capacity = 10000000
+```
+
+**Impact:** PhysX can properly track collision pair changes across 500 parallel environments without missing interactions.
+
+---
+
 ## Next Steps
 
 **Phase 4: Testing Framework** (Remaining)

@@ -90,6 +90,10 @@ class Go1PushMidWrapper(EmptyWrapper):
             "synchronized_contact_bonus": 0,
             "bilateral_push_bonus": 0,
             "proximity_penalty": 0,
+            # CRITIC15 v4: Collaboration rewards
+            "dual_push_bonus": 0,
+            # CRITIC17 v2: Gaussian proximity bonus
+            "gaussian_proximity_bonus": 0,
             "step_count": 0,
         }
 
@@ -113,14 +117,37 @@ class Go1PushMidWrapper(EmptyWrapper):
         # CRITIC12 v7b: Directional push reward - rewards box velocity toward goal, punishes away
         # Increased from 0.003 to 0.01 to strongly discourage pushing in wrong direction
 
-        # CRITIC15 v3: Reward scale testing - reduced collision punishment
+        # CRITIC15 v3: Reward scale testing (currently unused - placeholder for future experiments)
         self.reward_scale_testing = getattr(self.cfg.rewards, "reward_scale_testing", False)
         self.goal_push_bonus_scale = getattr(self.cfg.rewards, "goal_push_bonus_scale", 0.01)
+
+        # CRITIC16: When reward_scale_testing enabled, increase approach_to_box penalty
+        # This amplifies the gradient for agents to stay near the box
+        if self.reward_scale_testing:
+            # Increase from 0.00075 to 0.003 (4x multiplier)
+            # This makes being far from box much more costly
+            self.approach_reward_scale = 0.003
+            print(f"[REWARD_SCALE_TESTING] approach_reward_scale increased to {self.approach_reward_scale}")
+
+        # CRITIC15 v4: Collaboration rewards - dual pushing bonus
+        # Works in conjunction with mapush_og_rewards_teamified
+        self.collaboration_rewards = getattr(self.cfg.rewards, "collaboration_rewards", False)
+        self.dual_push_velocity_threshold = 0.05  # m/s - minimum velocity toward goal to count as "pushing"
+        self.dual_push_bonus_scale = 0.005  # per step when both agents pushing toward goal
 
         # Original MAPush rewards (teamified) - uses vanilla reward structure
         # When enabled: 7 original rewards, goal_push_bonus and proximity_penalty disabled
         # approach_to_box uses AVERAGE (not sum), collision uses -0.0025, OCB uses ±0.004
         self.mapush_og_rewards_teamified = getattr(self.cfg.rewards, "mapush_og_rewards_teamified", False)
+
+        # CRITIC17: Positive approach_to_box bonus (Gaussian with steep falloff)
+        # When enabled: ADDS positive Gaussian bonus on top of original negative penalty
+        # Net reward = negative penalty + positive bonus
+        # Bonus has VERY STEEP falloff after 1.5m (essentially 0 beyond that)
+        self.positive_approachtobox_reward = getattr(self.cfg.rewards, "positive_approachtobox_reward", False)
+        # Gaussian parameters: bonus = amplitude * exp(-(distance/sigma)^2)
+        self.gaussian_proximity_sigma = 0.4  # Steepness (smaller = steeper falloff)
+        self.gaussian_proximity_amplitude = 0.006  # Max bonus at distance=0
 
         # Iter6: New reward scales - scaled down to match codebase (old rewards are ~0.001-0.004)
         self.engagement_bonus_scale = getattr(self.cfg.rewards, "engagement_bonus_scale", 0.0004)  # Near box
@@ -440,34 +467,58 @@ class Go1PushMidWrapper(EmptyWrapper):
             reward[:, :] += distance_reward.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["distance_to_target_reward"] += torch.sum(distance_reward).cpu()
 
-        # calculate distance from each robot to box reward (NEGATIVE - penalty for being far)
+        # calculate distance from each robot to box reward
         # CRITIC14: Converted to TEAM reward for centralized critic compatibility
-        # mapush_og_rewards_teamified: AVERAGE of both penalties (preserves original magnitude)
-        # Default (CRITIC14): SUM of both penalties (2x magnitude)
+        # CRITIC17 v2: Original negative penalty + Gaussian positive bonus (when flag enabled)
+        # mapush_og_rewards_teamified: AVERAGE of both rewards (preserves original magnitude)
+        # Default (CRITIC14): SUM of both rewards (2x magnitude)
         if self.approach_reward_scale != 0:
-            total_approach_penalty = torch.zeros(self.num_envs, device=self.device)
+            total_approach_reward = torch.zeros(self.num_envs, device=self.device)
+            total_gaussian_bonus = torch.zeros(self.num_envs, device=self.device)
+
             for i in range(self.num_agents):
                 distance = torch.norm(box_pos - base_pos[:, i, :], dim=1)
+
+                # Always compute original negative quadratic penalty
                 distance_penalty = (-(distance + 0.5)**2) * self.approach_reward_scale
-                total_approach_penalty += distance_penalty
+                total_approach_reward += distance_penalty
+
+                # CRITIC17 v2: ADD Gaussian bonus on top (steep falloff after 1.5m)
+                if self.positive_approachtobox_reward:
+                    # Gaussian: bonus = amplitude * exp(-(distance/sigma)^2)
+                    # sigma=0.4 gives ULTRA STEEP falloff
+                    # At d=0m: bonus=0.006, at d=1.5m: bonus~0 (0.00001)
+                    gaussian_bonus = self.gaussian_proximity_amplitude * torch.exp(
+                        -(distance / self.gaussian_proximity_sigma)**2
+                    )
+                    total_gaussian_bonus += gaussian_bonus
+
             # mapush_og_rewards_teamified: AVERAGE to preserve designed scale magnitude
             if self.mapush_og_rewards_teamified:
-                total_approach_penalty = total_approach_penalty / self.num_agents
-            # Team reward: both agents get the (avg or sum) of penalties
-            reward[:, :] += total_approach_penalty.unsqueeze(1).repeat(1, self.num_agents)
-            self.reward_buffer["approach_to_box_reward"] += torch.sum(total_approach_penalty).cpu().item() 
+                total_approach_reward = total_approach_reward / self.num_agents
+                if self.positive_approachtobox_reward:
+                    total_gaussian_bonus = total_gaussian_bonus / self.num_agents
+
+            # Add Gaussian bonus to the penalty (net reward)
+            if self.positive_approachtobox_reward:
+                total_approach_reward = total_approach_reward + total_gaussian_bonus
+
+            # Team reward: both agents get the (avg or sum) of rewards
+            reward[:, :] += total_approach_reward.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["approach_to_box_reward"] += torch.sum(total_approach_reward).cpu().item()
+
+            # Track Gaussian bonus separately for monitoring
+            if self.positive_approachtobox_reward:
+                self.reward_buffer["gaussian_proximity_bonus"] += torch.sum(total_gaussian_bonus).cpu().item() 
 
         # calculate collision punishment
         # CRITIC14: Explicit TEAM reward for centralized critic compatibility
         # mapush_og_rewards_teamified: Uses original scale -0.0025 (hardcoded)
-        # CRITIC15 v3: reward_scale_testing uses reduced scale -0.001 (60% reduction)
         if self.collision_punishment_scale != 0:
             # Distance between agents (only 2 agents, so single pair)
             agent_distance = torch.norm(base_pos[:, 0, :] - base_pos[:, 1, :], dim=1)
-            # Priority: reward_scale_testing > mapush_og_rewards_teamified > config
-            if self.reward_scale_testing:
-                collision_scale = -0.001  # CRITIC15 v3: Reduced for more aggressive maneuvering
-            elif self.mapush_og_rewards_teamified:
+            # Use original scale when mapush_og_rewards_teamified, otherwise from config
+            if self.mapush_og_rewards_teamified:
                 collision_scale = -0.0025  # Original MAPush scale
             else:
                 collision_scale = self.collision_punishment_scale  # From config
@@ -502,6 +553,37 @@ class Go1PushMidWrapper(EmptyWrapper):
                     push_reward = push_reward * gating_factor
                 reward[:, :] += push_reward.unsqueeze(1).repeat(1, self.num_agents)
                 self.reward_buffer["push_reward"] += torch.sum(push_reward).cpu()
+
+        # =================================================================
+        # CRITIC15 v4: Dual Pushing Bonus (Collaboration Rewards)
+        # Rewards when BOTH agents are pushing toward goal simultaneously
+        # Use with mapush_og_rewards_teamified for clean baseline + collaboration signal
+        # Prevents exploit: both agents must move TOWARD goal (not opposite sides)
+        # =================================================================
+        if self.collaboration_rewards:
+            # Direction from box to goal (normalized)
+            box_to_goal = target_pos[:, :2] - box_pos[:, :2]  # (num_envs, 2)
+            box_to_goal_norm = box_to_goal / (torch.norm(box_to_goal, dim=1, keepdim=True) + 1e-6)
+
+            # Project each agent's velocity onto goal direction
+            agent0_vel_toward_goal = torch.sum(base_vel[:, 0, :2] * box_to_goal_norm, dim=1)  # (num_envs,)
+            agent1_vel_toward_goal = torch.sum(base_vel[:, 1, :2] * box_to_goal_norm, dim=1)  # (num_envs,)
+
+            # Both agents must be pushing toward goal (prevents opposite-side pushing exploit)
+            both_pushing = (agent0_vel_toward_goal > self.dual_push_velocity_threshold) & \
+                          (agent1_vel_toward_goal > self.dual_push_velocity_threshold)
+
+            # Binary bonus: either 0.005 or 0
+            dual_push_bonus = torch.zeros(self.num_envs, device=self.device)
+            dual_push_bonus[both_pushing] = self.dual_push_bonus_scale
+
+            # Iter8: Apply gating if enabled (for consistency with other rewards)
+            if self.shared_gated_rewards:
+                dual_push_bonus = dual_push_bonus * gating_factor
+
+            # Add as shared team reward (both agents get same bonus)
+            reward[:, :] += dual_push_bonus.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["dual_push_bonus"] += torch.sum(dual_push_bonus).cpu().item()
 
         # =================================================================
         # CRITIC12 v7: Directional Push Reward

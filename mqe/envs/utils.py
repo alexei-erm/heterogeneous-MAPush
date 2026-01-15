@@ -43,7 +43,7 @@ def make_mqe_env(env_name: str, args=None, custom_cfg=None) -> Tuple[LeggedRobot
 
     return env, env_cfg
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -68,9 +68,17 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
         if mapush_og_rewards_teamified and hasattr(cfg, 'rewards'):
             cfg.rewards.mapush_og_rewards_teamified = True
 
-        # CRITIC15 v3: Reduced collision punishment scale for testing
+        # CRITIC15 v3: Reward scale testing (currently unused)
         if reward_scale_testing and hasattr(cfg, 'rewards'):
             cfg.rewards.reward_scale_testing = True
+
+        # CRITIC15 v4: Collaboration rewards - dual pushing bonus
+        if collaboration_rewards and hasattr(cfg, 'rewards'):
+            cfg.rewards.collaboration_rewards = True
+
+        # CRITIC17: Positive approach_to_box reward (inverse distance instead of quadratic penalty)
+        if positive_approachtobox_reward and hasattr(cfg, 'rewards'):
+            cfg.rewards.positive_approachtobox_reward = True
 
         return cfg
 
