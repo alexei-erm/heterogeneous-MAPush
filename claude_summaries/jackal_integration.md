@@ -312,6 +312,25 @@ Before deploying for full training:
 
 ---
 
-**Status:** ✅ **Ready for testing!**
+**Status:** 🔄 **90% Complete - Buffer Initialization Fix Needed**
 
-The Jackal robot is fully integrated and ready to be used with the `--hetero_agent jackal` flag in both MAPPO and HAPPO pipelines.
+## Current Status (2026-01-15 Session 2)
+
+### ✅ Completed
+- Differential drive controller implementation
+- Unified 3 DOF action space [vx, vy, vyaw]
+- Terrain configuration fix
+- Per-agent torque limits
+- Dynamic HeteroTask class creation
+- Config inheritance preservation
+
+### 🔄 In Progress
+- Buffer initialization for heterogeneous DOF counts
+- **Current Error:** IndexError in `_init_buffers()` when initializing `default_dof_pos`
+- **Cause:** Buffers assume homogeneous DOF count
+- **Solution:** Override `_init_buffers()` in `HeteroRobot` to handle mixed DOFs
+
+### Next Session
+Fix buffer initialization and complete integration testing.
+
+See `hetero_implementation_progress.md` for detailed status and next steps.
