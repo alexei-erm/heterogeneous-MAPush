@@ -66,6 +66,7 @@ def make_hetero_env(env_name: str, agent_types: list, args=None, custom_cfg=None
 
     env_dict = ENV_DICT[env_name]
     base_config = env_dict["config"]
+    base_task_class = env_dict["class"]
 
     # Create heterogeneous configuration
     hetero_config = create_hetero_config(base_config, agent_types)
@@ -74,8 +75,15 @@ def make_hetero_env(env_name: str, agent_types: list, args=None, custom_cfg=None
     if callable(custom_cfg):
         hetero_config = custom_cfg(hetero_config)
 
-    # Use HeteroRobot instead of the standard robot class
-    env, env_cfg = make_env(HeteroRobot, hetero_config, args)
+    # Create a dynamic class that inherits from both the base task class and HeteroRobot
+    # This ensures we get task-specific methods like _create_npc() while adding hetero support
+    # MRO (Method Resolution Order): HeteroTask → HeteroRobot → base_task_class → ...
+    class HeteroTask(HeteroRobot, base_task_class):
+        """Dynamically created heterogeneous task class combining HeteroRobot with task-specific functionality."""
+        pass
+
+    # Use the dynamic HeteroTask class
+    env, env_cfg = make_env(HeteroTask, hetero_config, args)
 
     # Apply wrapper (wrapper will detect hetero mode automatically)
     env = env_dict["wrapper"](env)
@@ -83,6 +91,7 @@ def make_hetero_env(env_name: str, agent_types: list, args=None, custom_cfg=None
     print(f"[make_hetero_env] Created heterogeneous environment:")
     print(f"  Task: {env_name}")
     print(f"  Agents: {agent_types}")
+    print(f"  Combined: HeteroRobot + {base_task_class.__name__}")
 
     return env, env_cfg
 

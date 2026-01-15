@@ -121,6 +121,7 @@ class HeteroRobot(LeggedRobotField):
         robot_rigid_shape_props_list = []
         robot_num_dofs = []
         robot_num_bodies = []
+        robot_torque_limits = []  # Store per-robot torque limits
 
         for i, asset_path_template in enumerate(asset_paths):
             asset_path = asset_path_template.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
@@ -158,6 +159,15 @@ class HeteroRobot(LeggedRobotField):
             robot_dof_props_list.append(dof_props)
             robot_rigid_shape_props_list.append(rigid_shape_props)
 
+            # Get torque limits for this robot type
+            from mqe.envs.robot_registry import get_robot_config
+            robot_config = get_robot_config(self.hetero_agent_types[i])
+            if hasattr(robot_config.control, 'torque_limits'):
+                robot_torque_limits.append(robot_config.control.torque_limits)
+            else:
+                # Default: no torque limits (will use None)
+                robot_torque_limits.append(None)
+
             print(f"[HeteroRobot] Loaded {self.hetero_agent_types[i]}: {num_dof} DOF, {num_bodies} bodies")
 
         # Store for later use
@@ -166,6 +176,7 @@ class HeteroRobot(LeggedRobotField):
         self.robot_num_bodies = robot_num_bodies
         self.robot_dof_props_list = robot_dof_props_list
         self.robot_rigid_shape_props_list = robot_rigid_shape_props_list
+        self.robot_torque_limits = robot_torque_limits
 
         # For compatibility, use first robot as "primary"
         self.dof_names = self.gym.get_asset_dof_names(robot_assets[0])
@@ -261,6 +272,8 @@ class HeteroRobot(LeggedRobotField):
                 )
 
                 # Set DOF properties
+                # Track current agent for _process_dof_props
+                self._current_agent_idx = j
                 dof_props = self._process_dof_props(dof_props_asset, i)
                 self.gym.set_actor_dof_properties(env_handle, agent_handle, dof_props)
 
@@ -327,3 +340,58 @@ class HeteroRobot(LeggedRobotField):
         # Call parent implementation
         clip_actions = self.cfg.normalization.clip_actions
         self.actions = torch.clip(actions_masked, -clip_actions, clip_actions).to(self.device)
+
+    def _process_dof_props(self, props, env_id):
+        """
+        Override to handle per-agent torque limits for heterogeneous robots.
+
+        This method is called during environment creation for each agent.
+        We use self._current_agent_idx to determine which robot's torque limits to use.
+
+        Args:
+            props: DOF properties from asset
+            env_id: Environment ID
+
+        Returns:
+            Processed DOF properties
+        """
+        # Call parent's parent (LeggedRobot._process_dof_props) to skip LeggedRobotField's assertion
+        from mqe.envs.base.legged_robot import LeggedRobot
+        props = LeggedRobot._process_dof_props(self, props, env_id)
+
+        # Only process on first environment to set up torque limits
+        if env_id == 0 and hasattr(self, '_current_agent_idx'):
+            agent_idx = self._current_agent_idx
+            torque_limits_cfg = self.robot_torque_limits[agent_idx]
+            num_dof_this_agent = self.robot_num_dofs[agent_idx]
+
+            if torque_limits_cfg is not None:
+                if not isinstance(torque_limits_cfg, (tuple, list)):
+                    # Scalar torque limit - apply to all DOFs of this robot
+                    torque_limits_agent = torch.ones(num_dof_this_agent, dtype=torch.float, device=self.device) * torque_limits_cfg
+                else:
+                    # List of torque limits - repeat pattern to match DOF count
+                    if num_dof_this_agent % len(torque_limits_cfg) == 0:
+                        torque_limits_agent = torch.tensor(
+                            torque_limits_cfg * (num_dof_this_agent // len(torque_limits_cfg)),
+                            dtype=torch.float, device=self.device
+                        )
+                    else:
+                        # DOF doesn't divide evenly, just use the first values
+                        torque_limits_agent = torch.tensor(
+                            torque_limits_cfg[:num_dof_this_agent],
+                            dtype=torch.float, device=self.device
+                        )
+
+                # Initialize or extend torque_limits tensor
+                if not hasattr(self, 'torque_limits'):
+                    # First agent - initialize
+                    self.torque_limits = torque_limits_agent
+                else:
+                    # Subsequent agents - concatenate
+                    self.torque_limits = torch.cat([self.torque_limits, torque_limits_agent])
+
+                print(f"[HeteroRobot] Agent {agent_idx} ({self.hetero_agent_types[agent_idx]}): "
+                      f"{num_dof_this_agent} DOF, torque_limits: {torque_limits_agent.tolist()}")
+
+        return props
