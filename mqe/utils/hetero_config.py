@@ -9,6 +9,7 @@ Date: 2026-01-15
 """
 
 import os
+import copy
 from typing import List, Dict, Any, Tuple
 from copy import deepcopy
 from mqe import LEGGED_GYM_ROOT_DIR
@@ -156,47 +157,43 @@ def merge_hetero_configs(base_config_class, agent_types: List[str]) -> Any:
     action_dims = get_hetero_action_dims(agent_types)
     control_types = get_hetero_control_types(agent_types)
 
-    # IMPORTANT: We need to modify the base config IN PLACE to preserve all nested classes
-    # Create new nested classes that inherit from base
+    # Create a new config class that inherits from base
+    # This preserves all nested classes without modifying the original
+    class HeteroConfig(base_config_class):
+        pass
 
-    # Update asset configuration (inherit from base to preserve all attributes)
+    # Create NEW nested classes that inherit from base nested classes
+    # This prevents modifying the original config
     class HeteroAsset(base_config_class.asset):
-        # Store original file as primary agent's file
         file_agent0 = base_config_class.asset.file
-        # Add files for all agents
         hetero_files = asset_paths
-        # Flag to indicate heterogeneous mode
         is_hetero = True
 
-    base_config_class.asset = HeteroAsset
-
-    # Update env configuration (inherit from base)
     class HeteroEnv(base_config_class.env):
         hetero_action_dims = action_dims
         max_action_dim = max(action_dims)
-        # Store original num_actions for reference
         num_actions_per_agent = action_dims
 
-    base_config_class.env = HeteroEnv
-
-    # Update control configuration (inherit from base)
     class HeteroControl(base_config_class.control):
         hetero_control_types = control_types
 
-    base_config_class.control = HeteroControl
+    # Assign the new nested classes to HeteroConfig
+    HeteroConfig.asset = HeteroAsset
+    HeteroConfig.env = HeteroEnv
+    HeteroConfig.control = HeteroControl
 
     # Add hetero configuration class
     class Hetero:
         use_hetero = True
         hetero_agent_types = agent_types
 
-    base_config_class.hetero = Hetero
+    HeteroConfig.hetero = Hetero
 
     # Add hetero-specific attributes at class level
-    base_config_class.hetero_agent_types = agent_types
-    base_config_class.hetero_num_agents = len(agent_types)
+    HeteroConfig.hetero_agent_types = agent_types
+    HeteroConfig.hetero_num_agents = len(agent_types)
 
-    return base_config_class
+    return HeteroConfig
 
 
 def create_hetero_config(base_config_class,

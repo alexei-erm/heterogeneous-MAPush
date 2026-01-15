@@ -1,7 +1,7 @@
 """
 Heterogeneous Robot Base Class
 
-This class extends LeggedRobot to support heterogeneous agents
+This class extends LeggedRobotField to support heterogeneous agents
 (multiple robot types in the same environment).
 
 Author: Claude
@@ -17,7 +17,7 @@ from isaacgym.torch_utils import *
 from isaacgym import gymtorch, gymapi
 
 from mqe import LEGGED_GYM_ROOT_DIR
-from mqe.envs.base.legged_robot import LeggedRobot
+from mqe.envs.field.legged_robot_field import LeggedRobotField
 from mqe.envs.robot_registry import get_robot_class, get_robot_info
 from mqe.utils.hetero_config import (
     get_hetero_asset_paths,
@@ -27,11 +27,11 @@ from mqe.utils.hetero_config import (
 )
 
 
-class HeteroRobot(LeggedRobot):
+class HeteroRobot(LeggedRobotField):
     """
     Heterogeneous robot environment that supports multiple robot types.
 
-    This class extends LeggedRobot to handle:
+    This class extends LeggedRobotField to handle:
     - Loading different URDF files per agent
     - Different DOF counts per agent
     - Different action dimensions per agent
