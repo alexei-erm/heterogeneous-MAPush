@@ -264,6 +264,7 @@ def get_args():
         {"name": "--exp_name", "type": str, "default": "default"},
         {"name": "--record_video", "action": "store_true", "default": False},
         {"name": "--hie",  "type": bool, "action": "store_true", "default": False},
+        {"name": "--hetero_agent", "type": str, "default": None, "help": "Enable heterogeneous agents. Specify second robot type (e.g., 'wheeled_bot'). Agent0 will be Go1, Agent1 will be the specified robot."},
     ]
     # parse arguments
     args = parse_arguments(

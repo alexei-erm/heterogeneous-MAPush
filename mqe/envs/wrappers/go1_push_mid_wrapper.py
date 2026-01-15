@@ -50,13 +50,44 @@ class Go1PushMidWrapper(EmptyWrapper):
     def __init__(self, env):
         super().__init__(env)
 
+        # Check if heterogeneous mode is enabled
+        self.is_hetero = getattr(self.cfg.hetero, 'use_hetero', False) if hasattr(self.cfg, 'hetero') else False
+
+        if self.is_hetero:
+            # Heterogeneous mode: different action dimensions per agent
+            self.hetero_agent_types = self.cfg.hetero.hetero_agent_types
+
+            # Get action dimensions for each agent type
+            from mqe.utils.hetero_config import get_hetero_action_dims, get_max_action_dim
+            self.hetero_action_dims = get_hetero_action_dims(self.hetero_agent_types)
+            self.max_action_dim = get_max_action_dim(self.hetero_agent_types)
+
+            # Action space uses max dimension (will be padded for smaller agents)
+            self.action_space = spaces.Box(low=-1, high=1, shape=(self.max_action_dim,), dtype=float)
+
+            # Create per-agent action scales (padded to max dim)
+            action_scales_per_agent = []
+            for i, action_dim in enumerate(self.hetero_action_dims):
+                scale = torch.zeros(self.max_action_dim, device="cuda")
+                scale[:action_dim] = 0.5  # Set scale for active dimensions
+                action_scales_per_agent.append(scale)
+            self.action_scale = torch.stack(action_scales_per_agent, dim=0).unsqueeze(0).repeat(self.num_envs, 1, 1)
+
+            print(f"[Go1PushMidWrapper] Heterogeneous mode enabled:")
+            print(f"  Agent types: {self.hetero_agent_types}")
+            print(f"  Action dims: {self.hetero_action_dims}")
+            print(f"  Max action dim: {self.max_action_dim}")
+        else:
+            # Homogeneous mode: all agents have same action space (original behavior)
+            self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=float)
+            self.action_scale = torch.tensor([[[0.5, 0.5, 0.5],],], device="cuda").repeat(self.num_envs, self.num_agents, 1)
+
+        # Observation space remains same for both modes
         if getattr(self.cfg.goal, "general_dist",False):
             self.observation_space = spaces.Box(low=-float('inf'), high=float('inf'), shape=(3 + 3 * self.num_agents,), dtype=float)
             pass
         else:
             self.observation_space = spaces.Box(low=-float('inf'), high=float('inf'), shape=(2 + 3 * self.num_agents,), dtype=float)
-        self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=float)
-        self.action_scale = torch.tensor([[[0.5, 0.5, 0.5],],], device="cuda").repeat(self.num_envs, self.num_agents, 1)
         
         # for hard setting of reward scales (not recommended)
         

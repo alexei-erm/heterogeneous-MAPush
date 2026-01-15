@@ -209,16 +209,19 @@ def test_calculator_mode(actors, env, num_episodes, seed):
     return stats
 
 
-def test_viewer_mode(checkpoint_dir, num_episodes, seed):
+def test_viewer_mode(checkpoint_dir, num_episodes, seed, hetero_agent=None):
     """Run viewer mode to visualize episodes sequentially.
 
     Args:
         checkpoint_dir: Path to checkpoint directory
         num_episodes: Number of episodes to visualize
         seed: Random seed
+        hetero_agent: Second robot type for hetero mode (None for homogeneous)
     """
     print(f"\n{'='*70}")
     print(f"Viewer Mode - Visualizing {num_episodes} episodes")
+    if hetero_agent:
+        print(f"Heterogeneous mode: agent0=go1, agent1={hetero_agent}")
     print(f"{'='*70}\n")
 
     # Create single-environment version for visualization
@@ -248,7 +251,7 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed):
 
     # Create environment
     print("Creating visualization environment...")
-    env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args))
+    env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, hetero_agent=hetero_agent))
 
     n_agents = env_raw.num_agents
 
@@ -372,6 +375,8 @@ def main():
     # Other
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
+    parser.add_argument("--hetero_agent", type=str, default=None,
+                       help="Enable heterogeneous agents. Specify second robot type (e.g., 'wheeled_bot'). Agent0 will be Go1, Agent1 will be the specified robot.")
 
     args = parser.parse_args()
 
@@ -457,7 +462,10 @@ def main():
                     "task": "go1push_mid",
                     "n_threads": args.num_envs,
                     "headless": True,
+                    "hetero_agent": args.hetero_agent,  # Add hetero support
                 }
+                if args.hetero_agent:
+                    print(f"\n[HAPPO Testing] Heterogeneous mode: agent0=go1, agent1={args.hetero_agent}")
                 print("\nInitializing calculator mode environment...")
                 env = MAPushEnv(env_args)
 
@@ -487,7 +495,7 @@ def main():
                 print("This may take a long time. Consider using calculator mode instead.\n")
 
             # Run viewer mode (creates its own single-env environment)
-            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed)
+            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.hetero_agent)
 
     # Clean up
     if args.mode == "calculator":

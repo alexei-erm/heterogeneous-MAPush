@@ -59,6 +59,8 @@ def main():
                        help="Reserved for future reward scale experiments. Currently has no effect. DEFAULT: False")
     parser.add_argument("--collaboration_rewards", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="CRITIC15 v4: Add dual pushing bonus. Rewards when both agents push toward goal simultaneously. Use with --mapush_og_rewards_teamified True. DEFAULT: False")
+    parser.add_argument("--hetero_agent", type=str, default=None,
+                       help="Enable heterogeneous agents. Specify second robot type (e.g., 'wheeled_bot'). Agent0 will be Go1, Agent1 will be the specified robot. DEFAULT: None (homogeneous Go1)")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -108,6 +110,7 @@ def main():
     use_reward_testing = args.get("reward_scale_testing", False)
     use_collaboration = args.get("collaboration_rewards", False)
     use_positive_approach = args.get("positive_approachtobox_reward", False)
+    hetero_agent = args.get("hetero_agent", None)
     # n_threads defaults to YAML config value if not specified on command line
     n_threads = args.get("n_rollout_threads") or algo_args["train"]["n_rollout_threads"]
     env_args = {
@@ -125,6 +128,7 @@ def main():
         "reward_scale_testing": use_reward_testing,  # Reserved for future experiments
         "collaboration_rewards": use_collaboration,  # CRITIC15 v4: Dual pushing bonus (use with mapush_og_rewards_teamified)
         "positive_approachtobox_reward": use_positive_approach,  # CRITIC17: Positive inverse distance reward instead of negative penalty
+        "hetero_agent": hetero_agent,  # Heterogeneous agent (None for homogeneous)
     }
 
     # Override training parameters only if specified on command line
@@ -149,6 +153,10 @@ def main():
     print(f"Algorithm: {args['algo']}")
     print(f"Environment: {env_args['task']}")
     print(f"Experiment: {args['exp_name']}")
+    if hetero_agent:
+        print(f"Agent types: HETEROGENEOUS (agent0=go1, agent1={hetero_agent})")
+    else:
+        print(f"Agent types: HOMOGENEOUS (both Go1)")
     print(f"Critic mode: {env_args['state_type']} (EP = single global critic)")
     print(f"Individualized rewards: {env_args['individualized_rewards']}")
     if env_args['individualized_rewards']:

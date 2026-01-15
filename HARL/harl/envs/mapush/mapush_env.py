@@ -58,6 +58,10 @@ class MAPushEnv:
         args.subscenes = 0  # Number of PhysX subscenes
         args.num_threads = 0  # Number of cores used by PhysX
 
+        # Check for heterogeneous agent mode
+        hetero_agent = env_args.get("hetero_agent", None)
+        self.is_hetero = hetero_agent is not None
+
         # Create MQE environment with custom config
         individualized_rewards = env_args.get("individualized_rewards", False)
         shared_gated_rewards = env_args.get("shared_gated_rewards", False)
@@ -66,17 +70,39 @@ class MAPushEnv:
         reward_scale_testing = env_args.get("reward_scale_testing", False)
         collaboration_rewards = env_args.get("collaboration_rewards", False)
         positive_approachtobox_reward = env_args.get("positive_approachtobox_reward", False)
-        self.env, self.env_cfg = make_mqe_env(
-            args.task,
-            args,
-            custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards,
-                                  shared_gated_rewards=shared_gated_rewards,
-                                  cooperation_rewards=cooperation_rewards,
-                                  mapush_og_rewards_teamified=mapush_og_rewards_teamified,
-                                  reward_scale_testing=reward_scale_testing,
-                                  collaboration_rewards=collaboration_rewards,
-                                  positive_approachtobox_reward=positive_approachtobox_reward)
-        )
+
+        if self.is_hetero:
+            # Use make_hetero_env for heterogeneous agents
+            from mqe.envs.utils import make_hetero_env
+            agent_types = ['go1', hetero_agent]
+            print(f"[HARL MAPushEnv] Creating heterogeneous environment: {agent_types}")
+
+            self.env, self.env_cfg = make_hetero_env(
+                args.task,
+                agent_types,
+                args,
+                custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards,
+                                      shared_gated_rewards=shared_gated_rewards,
+                                      cooperation_rewards=cooperation_rewards,
+                                      mapush_og_rewards_teamified=mapush_og_rewards_teamified,
+                                      reward_scale_testing=reward_scale_testing,
+                                      collaboration_rewards=collaboration_rewards,
+                                      positive_approachtobox_reward=positive_approachtobox_reward,
+                                      hetero_agent=hetero_agent)
+            )
+        else:
+            # Standard homogeneous environment
+            self.env, self.env_cfg = make_mqe_env(
+                args.task,
+                args,
+                custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards,
+                                      shared_gated_rewards=shared_gated_rewards,
+                                      cooperation_rewards=cooperation_rewards,
+                                      mapush_og_rewards_teamified=mapush_og_rewards_teamified,
+                                      reward_scale_testing=reward_scale_testing,
+                                      collaboration_rewards=collaboration_rewards,
+                                      positive_approachtobox_reward=positive_approachtobox_reward)
+            )
 
         self.n_envs = self.env.num_envs
         self.n_agents = self.env.num_agents

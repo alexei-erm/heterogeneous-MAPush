@@ -4,6 +4,19 @@ from mqe.envs.go1.go1 import Go1Cfg
 
 class Go1PushMidCfg(Go1Cfg):
 
+    # ========================================================================
+    # Heterogeneous Agent Configuration
+    # ========================================================================
+    # By default, hetero mode is disabled (use_hetero=False)
+    # To enable hetero mode, set use_hetero=True and specify hetero_agent_types
+    # This will be used when --hetero_agent flag is passed to training scripts
+    # ========================================================================
+    class hetero:
+        use_hetero = False  # Set to True to enable heterogeneous agents
+        hetero_agent_types = ['go1', 'go1']  # Default: homogeneous (both Go1)
+        # When use_hetero=True, agent0 uses hetero_agent_types[0], agent1 uses hetero_agent_types[1]
+        # Example for hetero mode: hetero_agent_types = ['go1', 'wheeled_bot']
+
     class env(Go1Cfg.env):
         env_name = "go1push"
         num_envs = 10 # the number of environments, which is overriden, so it is not used

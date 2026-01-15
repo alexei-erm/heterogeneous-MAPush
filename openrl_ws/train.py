@@ -20,8 +20,13 @@ def train(args):
         single_agent = True
     else:
         single_agent = False
-    
-    env, env_cfg = make_env(args, custom_cfg(args), single_agent)
+
+    # Pass hetero_agent parameter to custom_cfg
+    hetero_agent = getattr(args, 'hetero_agent', None)
+    if hetero_agent:
+        print(f"[MAPPO Training] Heterogeneous mode enabled: agent0=go1, agent1={hetero_agent}")
+
+    env, env_cfg = make_env(args, custom_cfg(args, hetero_agent=hetero_agent), single_agent)
     
     if args.algo == "ppo":
         # or use --config ./openrl_ws/cfgs/ppo.yaml in terminal
