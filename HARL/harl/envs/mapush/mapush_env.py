@@ -108,9 +108,29 @@ class MAPushEnv:
         self.n_agents = self.env.num_agents
 
         # HARL expects list of spaces (one per agent)
-        # For homogeneous case (both agents have same spaces), duplicate
         self.observation_space = [self.env.observation_space] * self.n_agents
-        self.action_space = [self.env.action_space] * self.n_agents
+
+        # Action spaces: Per-agent dimensions for heterogeneous, shared for homogeneous
+        if self.is_hetero:
+            # Heterogeneous: Different action dimensions per agent
+            # HAPPO uses separate actor networks, so each can have its own output dimension
+            from gym import spaces
+            from mqe.utils.hetero_config import get_hetero_action_dims
+
+            self.hetero_agent_types = ['go1', hetero_agent]
+            action_dims = get_hetero_action_dims(self.hetero_agent_types)
+
+            self.action_space = [
+                spaces.Box(low=-1, high=1, shape=(action_dims[i],), dtype=np.float32)
+                for i in range(self.n_agents)
+            ]
+
+            print(f"[MAPushEnv] Heterogeneous action spaces:")
+            for i, (agent_type, action_dim) in enumerate(zip(self.hetero_agent_types, action_dims)):
+                print(f"  Agent {i} ({agent_type}): {action_dim} DOF")
+        else:
+            # Homogeneous: Same action space for all agents
+            self.action_space = [self.env.action_space] * self.n_agents
 
         # Flags to control critic input coordinate system
         # Priority: relative_obs > concat_observations > goal_centered > box_centered > absolute
@@ -542,6 +562,8 @@ class MAPushEnv:
 
         Args:
             actions: [n_envs, n_agents, action_dim]
+                     For hetero mode: action_dim varies per agent (e.g., [3, 2])
+                     HARL may pad to max_dim, which we'll handle here
 
         Returns:
             obs: [n_envs, n_agents, obs_dim]
@@ -553,6 +575,15 @@ class MAPushEnv:
         """
         # Convert to torch: actions already in [n_envs, n_agents, action_dim] format
         actions_torch = torch.from_numpy(actions).cuda()
+
+        # For heterogeneous mode: If actions are padded to max_dim, extract per-agent dims
+        # HAPPO's separate actor networks output correct dimensions per agent
+        # but they may be padded when batched. The environment wrapper handles this.
+        if self.is_hetero:
+            # Actions shape: [n_envs, n_agents, max_action_dim]
+            # Each agent uses only its actual action dimensions
+            # The Go1PushMidWrapper will handle masking/extraction
+            pass  # Wrapper handles it automatically
 
         # CRITIC6 REVERTED (Dec 21, 2025): Action scaling BROKE learning!
         # Evidence: critic3 (no scaling) achieved 20% success in 100M steps

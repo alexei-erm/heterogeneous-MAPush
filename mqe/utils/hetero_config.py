@@ -195,6 +195,13 @@ def merge_hetero_configs(base_config_class, agent_types: List[str]) -> Any:
 
     HeteroConfig.control = HeteroControl
 
+    # Add hetero configuration class
+    class Hetero:
+        use_hetero = True
+        hetero_agent_types = agent_types
+
+    HeteroConfig.hetero = Hetero
+
     return HeteroConfig
 
 
