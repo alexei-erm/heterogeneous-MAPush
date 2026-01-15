@@ -36,8 +36,8 @@ ROBOT_REGISTRY = {
     'jackal': {
         'class_path': 'mqe.envs.jackal.jackal.Jackal',
         'config_path': 'mqe.envs.jackal.jackal_config.JackalCfg',
-        'default_control': 'P',  # Direct wheel velocity control
-        'num_actions': 2,  # [left_wheel_vel, right_wheel_vel]
+        'default_control': 'P',  # Differential drive controller (kinematic)
+        'num_actions': 3,  # [vx, vy, vyaw] - same as Go1
         'description': 'Clearpath Robotics Jackal differential drive wheeled robot'
     },
     # Add more robots here as they are implemented

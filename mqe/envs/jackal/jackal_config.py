@@ -2,7 +2,8 @@
 Jackal Robot Configuration
 
 Configuration for Clearpath Robotics Jackal differential drive robot.
-2 DOF: [left_wheel_velocity, right_wheel_velocity]
+High-level action space: [vx, vy, vyaw] (same as Go1)
+Low-level differential drive controller converts to wheel velocities
 
 Author: Claude
 Date: 2026-01-15
@@ -20,7 +21,7 @@ class JackalCfg(LeggedRobotFieldCfg):
         num_envs = 256
         num_observations = 235  # Will match Go1 for now
         num_privileged_obs = None
-        num_actions = 2  # [left_wheel_vel, right_wheel_vel]
+        num_actions = 3  # [vx, vy, vyaw] - same as Go1 for unified action space
         env_spacing = 3.0
         send_timeouts = True
         episode_length_s = 5

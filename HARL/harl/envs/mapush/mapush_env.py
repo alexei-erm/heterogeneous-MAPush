@@ -110,27 +110,14 @@ class MAPushEnv:
         # HARL expects list of spaces (one per agent)
         self.observation_space = [self.env.observation_space] * self.n_agents
 
-        # Action spaces: Per-agent dimensions for heterogeneous, shared for homogeneous
+        # Action space: Both Go1 and Jackal use [vx, vy, vyaw] (3 DOF)
+        # Jackal's differential drive controller internally converts to wheel velocities
+        self.action_space = [self.env.action_space] * self.n_agents
+
         if self.is_hetero:
-            # Heterogeneous: Different action dimensions per agent
-            # HAPPO uses separate actor networks, so each can have its own output dimension
-            from gym import spaces
-            from mqe.utils.hetero_config import get_hetero_action_dims
-
-            self.hetero_agent_types = ['go1', hetero_agent]
-            action_dims = get_hetero_action_dims(self.hetero_agent_types)
-
-            self.action_space = [
-                spaces.Box(low=-1, high=1, shape=(action_dims[i],), dtype=np.float32)
-                for i in range(self.n_agents)
-            ]
-
-            print(f"[MAPushEnv] Heterogeneous action spaces:")
-            for i, (agent_type, action_dim) in enumerate(zip(self.hetero_agent_types, action_dims)):
-                print(f"  Agent {i} ({agent_type}): {action_dim} DOF")
-        else:
-            # Homogeneous: Same action space for all agents
-            self.action_space = [self.env.action_space] * self.n_agents
+            print(f"[MAPushEnv] Heterogeneous agents with unified action space:")
+            print(f"  Agent 0 (Go1): 3 DOF [vx, vy, vyaw] → Locomotion policy")
+            print(f"  Agent 1 ({hetero_agent}): 3 DOF [vx, vy, vyaw] → Differential drive controller")
 
         # Flags to control critic input coordinate system
         # Priority: relative_obs > concat_observations > goal_centered > box_centered > absolute

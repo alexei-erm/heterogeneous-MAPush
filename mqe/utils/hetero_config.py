@@ -151,19 +151,15 @@ def merge_hetero_configs(base_config_class, agent_types: List[str]) -> Any:
     if not is_valid:
         raise ValueError(f"Invalid hetero agents: {message}")
 
-    # Create a new config class that inherits from base
-    class HeteroConfig(base_config_class):
-        """Dynamically generated heterogeneous config"""
-        pass
-
-    # Add hetero-specific attributes
-    HeteroConfig.hetero_agent_types = agent_types
-    HeteroConfig.hetero_num_agents = len(agent_types)
-
-    # Get asset paths for each agent
+    # Get asset paths and action dimensions first
     asset_paths = get_hetero_asset_paths(agent_types)
+    action_dims = get_hetero_action_dims(agent_types)
+    control_types = get_hetero_control_types(agent_types)
 
-    # Update asset configuration
+    # IMPORTANT: We need to modify the base config IN PLACE to preserve all nested classes
+    # Create new nested classes that inherit from base
+
+    # Update asset configuration (inherit from base to preserve all attributes)
     class HeteroAsset(base_config_class.asset):
         # Store original file as primary agent's file
         file_agent0 = base_config_class.asset.file
@@ -172,37 +168,35 @@ def merge_hetero_configs(base_config_class, agent_types: List[str]) -> Any:
         # Flag to indicate heterogeneous mode
         is_hetero = True
 
-    HeteroConfig.asset = HeteroAsset
+    base_config_class.asset = HeteroAsset
 
-    # Get action dimensions
-    action_dims = get_hetero_action_dims(agent_types)
-
-    # Update env configuration
+    # Update env configuration (inherit from base)
     class HeteroEnv(base_config_class.env):
         hetero_action_dims = action_dims
         max_action_dim = max(action_dims)
         # Store original num_actions for reference
         num_actions_per_agent = action_dims
 
-    HeteroConfig.env = HeteroEnv
+    base_config_class.env = HeteroEnv
 
-    # Get control types
-    control_types = get_hetero_control_types(agent_types)
-
-    # Update control configuration
+    # Update control configuration (inherit from base)
     class HeteroControl(base_config_class.control):
         hetero_control_types = control_types
 
-    HeteroConfig.control = HeteroControl
+    base_config_class.control = HeteroControl
 
     # Add hetero configuration class
     class Hetero:
         use_hetero = True
         hetero_agent_types = agent_types
 
-    HeteroConfig.hetero = Hetero
+    base_config_class.hetero = Hetero
 
-    return HeteroConfig
+    # Add hetero-specific attributes at class level
+    base_config_class.hetero_agent_types = agent_types
+    base_config_class.hetero_num_agents = len(agent_types)
+
+    return base_config_class
 
 
 def create_hetero_config(base_config_class,

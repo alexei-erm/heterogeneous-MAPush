@@ -96,22 +96,24 @@ new-universal-MAPush/
 - **Base Height:** ~0.15m
 
 ### Control Specifications
-- **DOF:** 2 (left_wheel, right_wheel)
-- **Control Type:** Direct velocity control
-- **Action Space:** `[left_wheel_velocity, right_wheel_velocity]`
-- **Action Range:** [-1, 1] (scaled to ±10 rad/s)
+- **High-level DOF:** 3 (vx, vy, vyaw) - same as Go1
+- **Low-level DOF:** 2 (left_wheel, right_wheel)
+- **Control Type:** Differential drive controller (kinematic)
+- **Action Space:** `[vx, vy, vyaw]` - high-level velocity commands
+- **Low-level Conversion:** Differential drive kinematics → wheel velocities
+- **Action Range:** [-1, 1] (scaled to appropriate units)
 - **Max Wheel Speed:** 20 rad/s (~2 m/s linear)
 
 ### Comparison with Go1
 | Property | Go1 | Jackal |
 |----------|-----|--------|
 | Type | Quadruped legged | Wheeled differential drive |
-| DOF | 12 (3 per leg) | 2 (left/right wheels) |
-| Action Space (MAPush) | 3 [vx, vy, w] | 2 [left_vel, right_vel] |
-| Control Type | Hierarchical ('C') | Direct ('P') |
-| Locomotion Policy | Required | Not needed |
+| Low-level DOF | 12 (3 per leg) | 2 (left/right wheels) |
+| High-level Action Space | 3 [vx, vy, vyaw] | 3 [vx, vy, vyaw] |
+| Low-level Controller | Learned locomotion policy | Differential drive kinematics |
+| Control Type | Hierarchical ('C') | Kinematic ('P') |
 | Terrain | Rough terrain capable | Flat terrain preferred |
-| Mobility | Omnidirectional | Non-holonomic |
+| Mobility | Omnidirectional | Non-holonomic (vyaw crucial!) |
 
 ---
 
@@ -182,19 +184,24 @@ python test.py \
 ## Expected Behavior
 
 ### Agent Roles in MAPush
-- **Agent 0 (Go1):** Quadruped with 3-DOF mid-level control [vx, vy, w]
-- **Agent 1 (Jackal):** Wheeled with 2-DOF wheel control [left_vel, right_vel]
+- **Agent 0 (Go1):** Quadruped with 3-DOF mid-level control [vx, vy, vyaw]
+- **Agent 1 (Jackal):** Wheeled robot with 3-DOF mid-level control [vx, vy, vyaw]
 
-### Action Space Handling
-- Network outputs max_dim=3 actions for both agents
-- Jackal's 3rd dimension is masked out (ignored)
-- Go1 uses all 3 dimensions
-- Done automatically by the hetero wrapper
+### Action Space Handling (Simplified Design!)
+- **Both agents use the same 3 DOF action space:** [vx, vy, vyaw]
+- **No masking or padding needed** - unified action space
+- **Difference is in the low-level controller:**
+  - Go1: Neural network locomotion policy converts [vx, vy, vyaw] → joint torques
+  - Jackal: Kinematic differential drive converts [vx, vy, vyaw] → wheel velocities
+- **Benefits:**
+  - Simpler training (no per-agent network dimensions)
+  - Same abstraction level for all agents
+  - vyaw is crucial for both agents (orientation control)
 
 ### Observations
 - Both agents receive same observation format (box, target, other agent positions)
 - Observation space remains unchanged
-- Action space is padded to accommodate both
+- Action space is identical (3 DOF for both)
 
 ---
 
