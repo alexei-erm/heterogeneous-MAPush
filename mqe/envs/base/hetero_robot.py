@@ -324,6 +324,15 @@ class HeteroRobot(LeggedRobotField):
         for i in range(len(termination_contact_names)):
             self.termination_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0][0], termination_contact_names[i])
 
+        # Initialize video recording attributes
+        if self.cfg.env.record_video:
+            from mqe.utils.helpers import FloatingCameraSensor
+            self.rendering_camera = FloatingCameraSensor(self)
+
+        self.video_writer = None
+        self.video_frames = []
+        self.complete_video_frames = []
+
         print(f"[HeteroRobot] Created {self.num_envs} environments with {self.num_agents} heterogeneous agents each")
 
     def pre_physics_step(self, actions):
@@ -395,3 +404,268 @@ class HeteroRobot(LeggedRobotField):
                       f"{num_dof_this_agent} DOF, torque_limits: {torque_limits_agent.tolist()}")
 
         return props
+
+    def _init_buffers(self):
+        """
+        Override to handle heterogeneous DOF counts when initializing buffers.
+
+        We copy the entire parent _init_buffers() method but modify the section
+        that initializes default_dof_pos, p_gains, and d_gains to support
+        heterogeneous DOF counts.
+        """
+        ### get gym GPU state tensors ###
+        actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
+        dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
+        net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+        rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        self.gym.refresh_dof_state_tensor(self.sim)
+        self.gym.refresh_actor_root_state_tensor(self.sim)
+        self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        self.gym.render_all_camera_sensors(self.sim)
+
+        ### create some wrapper tensors for different slices ###
+
+        # root state
+        self.all_root_states = gymtorch.wrap_tensor(actor_root_state)
+        self.root_states = self.all_root_states.view(self.num_envs, -1, 13)[:, :self.num_agents, :].reshape(-1, 13)
+        self.base_pos = self.root_states[:, 0:3]
+        self.base_quat = self.root_states[:, 3:7]
+        self.prev_base_pos = self.base_pos.clone()
+        self.root_states_npc = self.all_root_states.view(self.num_envs, -1, 13)[:, self.num_agents:, :].reshape(-1, 13)
+        self.base_pos_npc = self.root_states_npc[:, 0:3]
+        self.base_quat_npc = self.root_states_npc[:, 3:7]
+
+        # dof state
+        self.all_dof_states = gymtorch.wrap_tensor(dof_state_tensor)
+        self.dof_state = self.all_dof_states.view(self.num_envs, -1, 2)[:, :self.num_actuated_dof, :]
+        self.dof_pos = self.dof_state[:, :, 0]
+        self.dof_vel = self.dof_state[:, :, 1]
+
+        if self.num_actions_npc > 0:
+            self.dof_state_npc = self.all_dof_states.view(self.num_envs, -1, 2)[:, self.num_actuated_dof:, :]
+            self.dof_pos_npc = self.dof_state_npc[:, :, 0]
+            self.dof_vel_npc = self.dof_state_npc[:, :, 1]
+
+        # contact force
+        self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3)
+
+        # initialize some data used later on
+        self.common_step_counter = 0
+        self.extras = {}
+
+        self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx), device=self.device).repeat((self.num_envs * self.num_agents, 1))
+        self.forward_vec = to_torch([1., 0., 0.], device=self.device).repeat((self.num_envs, 1))
+
+        self.torques = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.p_gains = torch.zeros(self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.d_gains = torch.zeros(self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+
+        self.action = torch.zeros(self.num_envs * self.num_agents, self.num_action, dtype=torch.float, device=self.device, requires_grad=False)
+        self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.last_dof_vel = torch.zeros_like(self.dof_vel)
+        self.last_root_vel = torch.zeros_like(self.root_states[:, 7:13])
+
+        self.commands = torch.zeros(self.num_envs * self.num_agents, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False)
+        self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel], device=self.device, requires_grad=False,)
+        self.desired_contact_states = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False,)
+        self.feet_air_time = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float, device=self.device, requires_grad=False)
+        self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
+        self.base_lin_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
+        self.base_ang_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
+        self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+        self.substep_torques = torch.zeros(self.num_envs, self.decimation, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.substep_dof_vel = torch.zeros(self.num_envs, self.decimation, self.num_actuated_dof, dtype=torch.float, device=self.device, requires_grad=False)
+        self.substep_exceed_dof_pos_limits = torch.zeros(self.num_envs, self.decimation, self.num_actuated_dof, dtype=torch.bool, device=self.device, requires_grad=False)
+
+        # ============================================================
+        # HETEROGENEOUS DOF HANDLING (MODIFIED SECTION)
+        # ============================================================
+        # Initialize default_dof_pos, p_gains, d_gains for heterogeneous agents
+
+        # Get robot configs for each agent type
+        from mqe.envs.robot_registry import get_robot_config
+        robot_configs = [get_robot_config(robot_name) for robot_name in self.hetero_agent_types]
+
+        # Compute DOF offsets for each agent
+        dof_offsets = [0]
+        for num_dof in self.robot_num_dofs:
+            dof_offsets.append(dof_offsets[-1] + num_dof)
+
+        # Initialize default_dof_pos tensor
+        self.default_dof_pos = torch.zeros(
+            self.num_actuated_dof,
+            dtype=torch.float,
+            device=self.device,
+            requires_grad=False
+        )
+
+        # For each agent type
+        for agent_idx in range(self.num_agents):
+            robot_config = robot_configs[agent_idx]
+            num_dof_agent = self.robot_num_dofs[agent_idx]
+            dof_offset = dof_offsets[agent_idx]
+
+            # Get DOF names for this robot
+            robot_asset = self.robot_assets[agent_idx]
+            dof_names_agent = self.gym.get_asset_dof_names(robot_asset)
+
+            # Set default positions and PD gains for each DOF of this agent
+            for i in range(num_dof_agent):
+                dof_name = dof_names_agent[i]
+                global_idx = dof_offset + i
+
+                # Set default joint angle
+                if hasattr(robot_config.init_state, 'default_joint_angles'):
+                    if dof_name in robot_config.init_state.default_joint_angles:
+                        angle = robot_config.init_state.default_joint_angles[dof_name]
+                        self.default_dof_pos[global_idx] = angle
+                    else:
+                        # Default to 0.0 if not specified
+                        self.default_dof_pos[global_idx] = 0.0
+                else:
+                    self.default_dof_pos[global_idx] = 0.0
+
+                # Set PD gains
+                found = False
+                if hasattr(robot_config.control, 'stiffness') and hasattr(robot_config.control, 'damping'):
+                    for dof_pattern in robot_config.control.stiffness.keys():
+                        if dof_pattern in dof_name:
+                            self.p_gains[global_idx] = robot_config.control.stiffness[dof_pattern]
+                            self.d_gains[global_idx] = robot_config.control.damping[dof_pattern]
+                            found = True
+                            break
+
+                if not found:
+                    self.p_gains[global_idx] = 0.0
+                    self.d_gains[global_idx] = 0.0
+
+        # Unsqueeze for batch dimension
+        self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
+
+        print(f"[HeteroRobot] Initialized buffers for {self.num_agents} heterogeneous agents:")
+        for agent_idx in range(self.num_agents):
+            dof_offset = dof_offsets[agent_idx]
+            num_dof_agent = self.robot_num_dofs[agent_idx]
+            print(f"  Agent {agent_idx} ({self.hetero_agent_types[agent_idx]}): "
+                  f"DOF {dof_offset}-{dof_offset + num_dof_agent - 1} "
+                  f"({num_dof_agent} DOFs)")
+
+    def compute_observations(self):
+        """
+        Override compute_observations to handle heterogeneous action spaces.
+
+        For heterogeneous robots with unified action space (e.g., both use 3 DOF [vx, vy, vyaw]),
+        we need to use the action dimension instead of DOF count when reshaping actions.
+        """
+        # Check if parent class has compute_observations
+        if not hasattr(super(), 'compute_observations'):
+            return
+
+        # For heterogeneous agents, we use unified action space (self.num_action per agent)
+        # instead of varying DOF counts
+
+        # First, call parent's logic but we'll need to patch the dof_num calculation
+        # Save the original assertion check
+        assert self.dof_pos.shape[1] == self.num_actuated_dof, \
+            f"DOF mismatch: dof_pos has {self.dof_pos.shape[1]} but expected {self.num_actuated_dof}"
+
+        # For heterogeneous agents, use action dimension (unified across agents)
+        # instead of per-agent DOF count
+        action_dim_per_agent = self.num_action  # This is 3 for both Go1 and Jackal
+
+        # Compute per-agent DOF positions/velocities differently for hetero
+        # We need to handle each agent's DOF separately
+        dof_offsets = [0]
+        for num_dof in self.robot_num_dofs:
+            dof_offsets.append(dof_offsets[-1] + num_dof)
+
+        # Create lists to hold per-agent observations
+        dof_pos_per_agent = []
+        dof_vel_per_agent = []
+
+        for agent_idx in range(self.num_agents):
+            start_idx = dof_offsets[agent_idx]
+            end_idx = dof_offsets[agent_idx + 1]
+            num_dof_agent = self.robot_num_dofs[agent_idx]
+
+            # Extract this agent's DOFs for all environments
+            agent_dof_pos = self.dof_pos[:, start_idx:end_idx]  # [num_envs, num_dof_agent]
+            agent_dof_vel = self.dof_vel[:, start_idx:end_idx]
+
+            # Subtract default positions for this agent
+            default_pos_agent = self.default_dof_pos[0, start_idx:end_idx]
+            agent_dof_pos = agent_dof_pos - default_pos_agent
+
+            dof_pos_per_agent.append(agent_dof_pos)
+            dof_vel_per_agent.append(agent_dof_vel)
+
+        # Stack to create [num_envs * num_agents, max_dof] tensors
+        # For now, we'll pad to the max DOF count
+        max_dof = max(self.robot_num_dofs)
+        dof_pos_padded = []
+        dof_vel_padded = []
+
+        for env_idx in range(self.num_envs):
+            for agent_idx in range(self.num_agents):
+                agent_dof_pos = dof_pos_per_agent[agent_idx][env_idx]
+                agent_dof_vel = dof_vel_per_agent[agent_idx][env_idx]
+
+                # Pad to max_dof
+                if len(agent_dof_pos) < max_dof:
+                    agent_dof_pos = torch.cat([
+                        agent_dof_pos,
+                        torch.zeros(max_dof - len(agent_dof_pos), device=self.device)
+                    ])
+                    agent_dof_vel = torch.cat([
+                        agent_dof_vel,
+                        torch.zeros(max_dof - len(agent_dof_vel), device=self.device)
+                    ])
+
+                dof_pos_padded.append(agent_dof_pos)
+                dof_vel_padded.append(agent_dof_vel)
+
+        dof_pos = torch.stack(dof_pos_padded)  # [num_envs * num_agents, max_dof]
+        dof_vel = torch.stack(dof_vel_padded)
+
+        # Now set observations using the unified action dimension
+        if self.cfg.obs.cfgs.base_pos:
+            self.obs_buf.base_pos = (self.base_pos - self.env_origins_repeat) * self.cfg.obs.scales.base_pos
+
+        if self.cfg.obs.cfgs.base_quat:
+            self.obs_buf.base_quat = self.base_quat * self.cfg.obs.scales.base_quat
+
+        if self.cfg.obs.cfgs.dof_pos or self.cfg.control.control_type == "C":
+            self.obs_buf.dof_pos = dof_pos * self.obs_scales.dof_pos
+
+        if self.cfg.obs.cfgs.dof_vel or self.cfg.control.control_type == "C":
+            self.obs_buf.dof_vel = dof_vel * self.obs_scales.dof_vel
+
+        if self.cfg.obs.cfgs.lin_vel or self.cfg.control.control_type == "C":
+            self.obs_buf.lin_vel = self.base_lin_vel * self.obs_scales.lin_vel
+
+        if self.cfg.obs.cfgs.ang_vel or self.cfg.control.control_type == "C":
+            self.obs_buf.ang_vel = self.base_ang_vel * self.obs_scales.ang_vel
+
+        # KEY FIX: Use action_dim_per_agent instead of dof_num for action reshaping
+        if self.cfg.obs.cfgs.last_action or self.cfg.control.control_type == "C":
+            self.obs_buf.last_action = self.actions.reshape(-1, action_dim_per_agent)
+
+        if self.cfg.obs.cfgs.last_last_action or self.cfg.control.control_type == "C":
+            self.obs_buf.last_last_action = self.last_actions.reshape(-1, action_dim_per_agent)
+
+        if self.cfg.obs.cfgs.projected_gravity or self.cfg.control.control_type == "C":
+            self.obs_buf.projected_gravity = self.projected_gravity
+
+        if hasattr(self.cfg.obs.cfgs, 'clock_inputs') and (self.cfg.obs.cfgs.clock_inputs or self.cfg.control.control_type == "C"):
+            if hasattr(self, 'clock_inputs'):
+                from copy import copy
+                self.obs_buf.clock_inputs = copy(self.clock_inputs)
+
+        if hasattr(self.cfg.obs.cfgs, 'base_rpy') and self.cfg.obs.cfgs.base_rpy:
+            from isaacgym.torch_utils import get_euler_xyz
+            self.obs_buf.base_rpy = torch.stack(get_euler_xyz(self.base_quat), dim=1)
+
+        if hasattr(self.cfg.obs.cfgs, 'env_info') and self.cfg.obs.cfgs.env_info and hasattr(self, "env_info"):
+            self.obs_buf.env_info = self.env_info
