@@ -65,7 +65,10 @@ class JackalCfg(LeggedRobotFieldCfg):
         restitution = 0.0
 
     class init_state(LeggedRobotFieldCfg.init_state):
-        pos = [0.0, 0.0, 0.15]  # Jackal base height ~15cm
+        # CRITICAL FIX: Proper ground clearance for wheeled robot
+        # Wheel radius = 0.098m, wheel center 0.1m above base_link
+        # For wheels to touch ground: base_link at ~0.10m (includes settling margin)
+        pos = [0.0, 0.0, 0.10]  # Jackal base height ~10cm (was 0.15, caused z-wave violations)
         rot = [0.0, 0.0, 0.0, 1.0]  # Quaternion [x, y, z, w]
         lin_vel = [0.0, 0.0, 0.0]
         ang_vel = [0.0, 0.0, 0.0]

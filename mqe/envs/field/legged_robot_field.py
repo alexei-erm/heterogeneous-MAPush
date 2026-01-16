@@ -28,6 +28,12 @@ class LeggedRobotField(LeggedRobot):
         self.collaboration_degree_buf = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
         self.init_episode_length_buf = torch.tensor(self.max_episode_length, dtype=torch.long, device=self.device, requires_grad=False).repeat(self.num_envs)
 
+        # DEBUG: Termination type tracking
+        self.debug_termination_step_counter = 0
+        self.debug_roll_term_count = 0
+        self.debug_pitch_term_count = 0
+        self.debug_z_wave_term_count = 0
+
         self.last_init_finished_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
 
     ##### adds-on with sensors #####
@@ -196,8 +202,30 @@ class LeggedRobotField(LeggedRobot):
             self.out_of_area_term_buff |= torch.sum(agent_y_relative_to_box > self.cfg.termination.out_of_area_kwargs["threshold_y"][1], dim=1).to(torch.bool)
             self.exception_buf |= self.out_of_area_term_buff
 
+        # DEBUG: Track termination type counts
+        if hasattr(self, 'debug_termination_step_counter'):
+            self.debug_termination_step_counter += 1
+            if hasattr(self, 'r_term_buff'):
+                self.debug_roll_term_count += self.r_term_buff.sum().item()
+            if hasattr(self, 'p_term_buff'):
+                self.debug_pitch_term_count += self.p_term_buff.sum().item()
+            if hasattr(self, 'z_wave_term_buff'):
+                self.debug_z_wave_term_count += self.z_wave_term_buff.sum().item()
 
-            
+            # Log every 100 steps
+            if self.debug_termination_step_counter % 100 == 0:
+                total_term = self.debug_roll_term_count + self.debug_pitch_term_count + self.debug_z_wave_term_count
+                if total_term > 0:
+                    print(f"[DEBUG Termination Step {self.debug_termination_step_counter}] Simulation exception breakdown:")
+                    print(f"  Roll violations: {self.debug_roll_term_count} ({100*self.debug_roll_term_count/total_term:.1f}%)")
+                    print(f"  Pitch violations: {self.debug_pitch_term_count} ({100*self.debug_pitch_term_count/total_term:.1f}%)")
+                    print(f"  Z-wave violations: {self.debug_z_wave_term_count} ({100*self.debug_z_wave_term_count/total_term:.1f}%)")
+                # Reset counters
+                self.debug_roll_term_count = 0
+                self.debug_pitch_term_count = 0
+                self.debug_z_wave_term_count = 0
+
+
         self.reset_buf |= self.exception_buf
 
         # calc success rate and finished time

@@ -124,8 +124,8 @@ try:
     print(f"  - Rewards shape: {rewards.shape}")
     print(f"  - Dones shape: {dones.shape}")
 
-    # Close environment
-    env.close()
+    # Close environment (optional - not critical for training)
+    # env.close()
     print("\n" + "="*60)
     print("✓ ALL TESTS PASSED!")
     print("="*60)

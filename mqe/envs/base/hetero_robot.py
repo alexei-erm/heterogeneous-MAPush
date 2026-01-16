@@ -204,6 +204,15 @@ class HeteroRobot(LeggedRobotField):
             for idx, init_state in enumerate(self.cfg.init_state.init_states):
                 base_init_state_list = init_state.pos + init_state.rot + init_state.lin_vel + init_state.ang_vel
                 base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
+
+                # HETERO FIX: Override z-position with robot-specific init height
+                # Each robot type has its own proper ground clearance
+                from mqe.envs.robot_registry import get_robot_config
+                robot_config = get_robot_config(self.hetero_agent_types[idx])
+                robot_init_height = robot_config.init_state.pos[2]
+                base_init_state[2] = robot_init_height
+                print(f"[HeteroRobot] Agent {idx} ({self.hetero_agent_types[idx]}): init height set to {robot_init_height}m")
+
                 init_state_list.append(base_init_state)
                 if idx == 0:
                     start_pose = gymapi.Transform()
@@ -457,9 +466,10 @@ class HeteroRobot(LeggedRobotField):
         self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx), device=self.device).repeat((self.num_envs * self.num_agents, 1))
         self.forward_vec = to_torch([1., 0., 0.], device=self.device).repeat((self.num_envs, 1))
 
-        self.torques = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
-        self.p_gains = torch.zeros(self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
-        self.d_gains = torch.zeros(self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        # For heterogeneous agents, torques should match actuated DOFs, not high-level actions
+        self.torques = torch.zeros(self.num_envs, self.num_actuated_dof, dtype=torch.float, device=self.device, requires_grad=False)
+        self.p_gains = torch.zeros(self.num_actuated_dof, dtype=torch.float, device=self.device, requires_grad=False)
+        self.d_gains = torch.zeros(self.num_actuated_dof, dtype=torch.float, device=self.device, requires_grad=False)
 
         self.action = torch.zeros(self.num_envs * self.num_agents, self.num_action, dtype=torch.float, device=self.device, requires_grad=False)
         self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
@@ -475,7 +485,7 @@ class HeteroRobot(LeggedRobotField):
         self.base_lin_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
-        self.substep_torques = torch.zeros(self.num_envs, self.decimation, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.substep_torques = torch.zeros(self.num_envs, self.decimation, self.num_actuated_dof, dtype=torch.float, device=self.device, requires_grad=False)
         self.substep_dof_vel = torch.zeros(self.num_envs, self.decimation, self.num_actuated_dof, dtype=torch.float, device=self.device, requires_grad=False)
         self.substep_exceed_dof_pos_limits = torch.zeros(self.num_envs, self.decimation, self.num_actuated_dof, dtype=torch.bool, device=self.device, requires_grad=False)
 
@@ -669,3 +679,143 @@ class HeteroRobot(LeggedRobotField):
 
         if hasattr(self.cfg.obs.cfgs, 'env_info') and self.cfg.obs.cfgs.env_info and hasattr(self, "env_info"):
             self.obs_buf.env_info = self.env_info
+
+    def _compute_torques(self, actions):
+        """
+        Override to handle heterogeneous DOF counts when computing torques.
+
+        For heterogeneous agents, we need to:
+        1. Process each agent's actions according to their DOF count
+        2. Handle different control types per agent (hierarchical vs direct)
+        3. Combine torques respecting the heterogeneous DOF layout
+        """
+        # Check control type
+        control_type = self.cfg.control.control_type
+
+        # For hierarchical control mode "C", we need special handling
+        if control_type == "C" or control_type == "control_net":
+            # actions shape: [num_envs, num_agents * num_action]
+            # We need to process each agent separately
+
+            # Scale actions
+            if isinstance(self.cfg.control.action_scale, (tuple, list)):
+                self.cfg.control.action_scale = torch.tensor(
+                    self.cfg.control.action_scale, device=self.sim_device
+                )
+            actions_scaled = actions * self.cfg.control.action_scale
+
+            # Compute DOF offsets for indexing
+            dof_offsets = [0]
+            for num_dof in self.robot_num_dofs:
+                dof_offsets.append(dof_offsets[-1] + num_dof)
+
+            # Process each agent's actions to get joint targets
+            all_joint_targets = []
+
+            for agent_idx in range(self.num_agents):
+                # Get this agent's robot info
+                robot_info = self.hetero_robot_info[agent_idx]
+                num_dof_agent = self.robot_num_dofs[agent_idx]
+                dof_start = dof_offsets[agent_idx]
+                dof_end = dof_offsets[agent_idx + 1]
+
+                # Extract this agent's actions for all environments
+                # actions_scaled shape: [num_envs, num_agents * action_dim]
+                action_start = agent_idx * self.num_action
+                action_end = (agent_idx + 1) * self.num_action
+                agent_actions = actions_scaled[:, action_start:action_end]  # [num_envs, action_dim]
+
+                # Get default positions for this agent
+                default_pos_agent = self.default_dof_pos[0, dof_start:dof_end]  # [num_dof_agent]
+
+                # For Go1 (hierarchical control), actions are processed by locomotion policy
+                if robot_info['default_control'] == 'C':
+                    # Go1: actions are high-level commands [vx, vy, vyaw]
+                    # The locomotion policy converts these to 12 joint positions
+                    # Reshape to per-agent for locomotion policy
+                    agent_actions_reshaped = agent_actions.reshape(-1, num_dof_agent)
+
+                    # Apply hip scale reduction for Go1
+                    if hasattr(self.cfg.control, 'hip_scale_reduction'):
+                        agent_actions_reshaped[:, [0, 3, 6, 9]] *= self.cfg.control.hip_scale_reduction
+
+                    # Flatten back
+                    agent_actions_processed = agent_actions_reshaped.reshape(self.num_envs, num_dof_agent)
+
+                    # Add to default positions to get joint targets
+                    joint_targets = agent_actions_processed + default_pos_agent
+                    all_joint_targets.append(joint_targets)
+
+                else:
+                    # Jackal (or other direct control): actions are wheel velocities
+                    # For position control, we use actions directly as position targets
+                    # Expand actions to match DOF count if needed
+                    if agent_actions.shape[1] != num_dof_agent:
+                        # Actions are high-level [vx, vy, vyaw], but we have 2 wheel DOFs
+                        # We need to convert high-level to low-level
+                        # For now, just use zero targets (differential drive handled elsewhere)
+                        joint_targets = default_pos_agent.unsqueeze(0).repeat(self.num_envs, 1)
+                    else:
+                        joint_targets = agent_actions + default_pos_agent
+
+                    all_joint_targets.append(joint_targets)
+
+            # Concatenate all joint targets
+            self.joint_pos_target = torch.cat(all_joint_targets, dim=1)  # [num_envs, total_dofs]
+
+            # Compute position errors and velocities for actuator network
+            # For Go1 agent (first agent), use actuator network
+            go1_dof_start = 0
+            go1_dof_end = self.robot_num_dofs[0]  # Should be 12 for Go1
+
+            # Extract Go1's DOFs
+            joint_pos_err_go1 = (
+                self.dof_pos[:, go1_dof_start:go1_dof_end]
+                - self.joint_pos_target[:, go1_dof_start:go1_dof_end]
+            )
+            joint_vel_go1 = self.dof_vel[:, go1_dof_start:go1_dof_end]
+
+            # Apply actuator network to Go1
+            if hasattr(self, 'actuator_network'):
+                torques_go1 = self.actuator_network(
+                    joint_pos_err_go1,
+                    self.joint_pos_err_last if hasattr(self, 'joint_pos_err_last') else joint_pos_err_go1,
+                    self.joint_pos_err_last_last if hasattr(self, 'joint_pos_err_last_last') else joint_pos_err_go1,
+                    joint_vel_go1,
+                    self.joint_vel_last if hasattr(self, 'joint_vel_last') else joint_vel_go1,
+                    self.joint_vel_last_last if hasattr(self, 'joint_vel_last_last') else joint_vel_go1
+                )
+
+                # Update history for Go1
+                self.joint_pos_err_last_last = torch.clone(self.joint_pos_err_last) if hasattr(self, 'joint_pos_err_last') else joint_pos_err_go1.clone()
+                self.joint_pos_err_last = torch.clone(joint_pos_err_go1)
+                self.joint_vel_last_last = torch.clone(self.joint_vel_last) if hasattr(self, 'joint_vel_last') else joint_vel_go1.clone()
+                self.joint_vel_last = torch.clone(joint_vel_go1)
+            else:
+                # Fallback to PD control
+                torques_go1 = self.p_gains[go1_dof_start:go1_dof_end] * joint_pos_err_go1 - self.d_gains[go1_dof_start:go1_dof_end] * joint_vel_go1
+
+            # For Jackal (second agent), use simple PD control
+            jackal_dof_start = self.robot_num_dofs[0]
+            jackal_dof_end = jackal_dof_start + self.robot_num_dofs[1]
+
+            joint_pos_err_jackal = (
+                self.dof_pos[:, jackal_dof_start:jackal_dof_end]
+                - self.joint_pos_target[:, jackal_dof_start:jackal_dof_end]
+            )
+            joint_vel_jackal = self.dof_vel[:, jackal_dof_start:jackal_dof_end]
+
+            torques_jackal = (
+                self.p_gains[jackal_dof_start:jackal_dof_end] * joint_pos_err_jackal
+                - self.d_gains[jackal_dof_start:jackal_dof_end] * joint_vel_jackal
+            )
+
+            # Concatenate torques
+            torques = torch.cat([torques_go1, torques_jackal], dim=1)
+
+            # Clip to torque limits
+            return torch.clip(torques, -self.torque_limits, self.torque_limits)
+
+        else:
+            # For non-hierarchical control, use parent implementation
+            return super()._compute_torques(actions)

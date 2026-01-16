@@ -111,6 +111,11 @@ class Go1PushMidWrapper(EmptyWrapper):
             "step_count": 0,
         }
 
+        # DEBUG: Exception tracking counters
+        self.debug_step_counter = 0
+        self.debug_sim_exception_count = 0
+        self.debug_nan_exception_count = 0
+
         # Contact threshold for individualized rewards (distance to box center)
         # Agents within this distance are considered "in contact" with box
         self.contact_threshold = getattr(self.cfg.rewards, "contact_threshold", 0.8)
@@ -458,11 +463,31 @@ class Go1PushMidWrapper(EmptyWrapper):
         
         # calculate exception punishment
         if self.exception_punishment_scale != 0:
+            # DEBUG: Track exception counts
+            num_sim_exceptions = self.exception_buf.sum().item()
+            num_nan_exceptions = self.value_exception_buf.sum().item()
+            self.debug_sim_exception_count += num_sim_exceptions
+            self.debug_nan_exception_count += num_nan_exceptions
+            self.debug_step_counter += 1
+
+            # Log every 100 steps
+            if self.debug_step_counter % 100 == 0:
+                total_exceptions = self.debug_sim_exception_count + self.debug_nan_exception_count
+                if total_exceptions > 0:
+                    print(f"[DEBUG Step {self.debug_step_counter}] Exception breakdown over last 100 steps:")
+                    print(f"  Simulation exceptions (roll/pitch/z): {self.debug_sim_exception_count} ({100*self.debug_sim_exception_count/total_exceptions:.1f}%)")
+                    print(f"  NaN/Inf exceptions: {self.debug_nan_exception_count} ({100*self.debug_nan_exception_count/total_exceptions:.1f}%)")
+                    print(f"  Total exceptions: {total_exceptions}")
+                    print(f"  Exception rate: {100*total_exceptions/(100*self.num_envs):.2f}% of environments")
+                # Reset counters
+                self.debug_sim_exception_count = 0
+                self.debug_nan_exception_count = 0
+
             reward[self.exception_buf, :] += self.exception_punishment_scale
             reward[self.value_exception_buf, :] += self.exception_punishment_scale
             # reward[self.time_out_buf, :] += self.exception_punishment_scale
             self.reward_buffer["exception_punishment"] += self.exception_punishment_scale * \
-                    (self.exception_buf.sum().item()+self.value_exception_buf.sum().item())
+                    (num_sim_exceptions + num_nan_exceptions)
 
         # distance_to_target_reward: Progress shaping based on box-to-goal distance
         # CRITIC13 v2: Disabled (redundant with goal_push_bonus)
