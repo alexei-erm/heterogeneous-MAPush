@@ -141,9 +141,27 @@ class VCritic:
             values, value_preds_batch, return_batch, value_normalizer=value_normalizer
         )
 
+        # DEBUG: Check loss and values before backward
+        if torch.isnan(value_loss) or torch.isinf(value_loss):
+            print(f"[DEBUG V-Critic] NaN/Inf detected in value_loss before backward!")
+            print(f"  value_loss: {value_loss.item()}")
+            print(f"  values stats: min={values.min()}, max={values.max()}, mean={values.mean()}")
+            print(f"  return_batch stats: min={return_batch.min()}, max={return_batch.max()}, mean={return_batch.mean()}")
+
+        if torch.isnan(values).any() or torch.isinf(values).any():
+            print(f"[DEBUG V-Critic] NaN/Inf in critic output values!")
+            print(f"  values stats: min={values.min()}, max={values.max()}, mean={values.mean()}")
+
         self.critic_optimizer.zero_grad()
 
         (value_loss * self.value_loss_coef).backward()
+
+        # DEBUG: Check gradients after backward
+        has_nan_grad = False
+        for name, param in self.critic.named_parameters():
+            if param.grad is not None and torch.isnan(param.grad).any():
+                print(f"[DEBUG V-Critic] NaN gradient in {name}")
+                has_nan_grad = True
 
         if self.use_max_grad_norm:
             critic_grad_norm = nn.utils.clip_grad_norm_(
@@ -152,7 +170,16 @@ class VCritic:
         else:
             critic_grad_norm = get_grad_norm(self.critic.parameters())
 
+        # DEBUG: Check if grad_norm is nan
+        if torch.isnan(critic_grad_norm):
+            print(f"[DEBUG V-Critic] NaN in critic grad_norm!")
+
         self.critic_optimizer.step()
+
+        # DEBUG: Check parameters after step
+        for name, param in self.critic.named_parameters():
+            if torch.isnan(param).any():
+                print(f"[DEBUG V-Critic] NaN parameter in {name} after optimizer step!")
 
         return value_loss, critic_grad_norm
 

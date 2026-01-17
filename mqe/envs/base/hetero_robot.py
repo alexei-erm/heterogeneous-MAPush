@@ -211,7 +211,7 @@ class HeteroRobot(LeggedRobotField):
                 robot_config = get_robot_config(self.hetero_agent_types[idx])
                 robot_init_height = robot_config.init_state.pos[2]
                 base_init_state[2] = robot_init_height
-                print(f"[HeteroRobot] Agent {idx} ({self.hetero_agent_types[idx]}): init height set to {robot_init_height}m")
+                # print(f"[HeteroRobot] Agent {idx} ({self.hetero_agent_types[idx]}): init height set to {robot_init_height}m")
 
                 init_state_list.append(base_init_state)
                 if idx == 0:
@@ -747,15 +747,43 @@ class HeteroRobot(LeggedRobotField):
                     all_joint_targets.append(joint_targets)
 
                 else:
-                    # Jackal (or other direct control): actions are wheel velocities
-                    # For position control, we use actions directly as position targets
-                    # Expand actions to match DOF count if needed
+                    # Jackal (or other wheeled robots): actions are [vx, vy, vyaw]
+                    # Convert to wheel velocities using differential drive controller
                     if agent_actions.shape[1] != num_dof_agent:
-                        # Actions are high-level [vx, vy, vyaw], but we have 2 wheel DOFs
-                        # We need to convert high-level to low-level
-                        # For now, just use zero targets (differential drive handled elsewhere)
+                        # Actions are high-level [vx, vy, vyaw], need to convert to wheel velocities
+                        # Extract velocity commands
+                        vx = agent_actions[:, 0]     # [num_envs]
+                        vy = agent_actions[:, 1]     # [num_envs] (ignored for diff drive)
+                        vyaw = agent_actions[:, 2]   # [num_envs]
+
+                        # Get robot-specific parameters (wheel radius and track width)
+                        # For Jackal: wheel_radius=0.098m, track_width=0.37559m
+                        if self.hetero_agent_types[agent_idx] == 'jackal':
+                            wheel_radius = 0.098
+                            track_width = 0.37559
+                        else:
+                            # Default values if other wheeled robots are added
+                            wheel_radius = 0.1
+                            track_width = 0.3
+
+                        # Differential drive kinematics:
+                        # left_wheel_vel = (vx - vyaw * track_width/2) / wheel_radius
+                        # right_wheel_vel = (vx + vyaw * track_width/2) / wheel_radius
+                        left_wheel_vel = (vx - vyaw * track_width / 2) / wheel_radius
+                        right_wheel_vel = (vx + vyaw * track_width / 2) / wheel_radius
+
+                        # Stack into [num_envs, 2] for two wheels
+                        wheel_velocities = torch.stack([left_wheel_vel, right_wheel_vel], dim=-1)
+
+                        # Store velocity targets for this agent (used in torque computation)
+                        if not hasattr(self, 'wheel_vel_targets'):
+                            self.wheel_vel_targets = {}
+                        self.wheel_vel_targets[agent_idx] = wheel_velocities
+
+                        # For position targets, use default (we'll use velocity control in torque computation)
                         joint_targets = default_pos_agent.unsqueeze(0).repeat(self.num_envs, 1)
                     else:
+                        # Actions already match DOF count
                         joint_targets = agent_actions + default_pos_agent
 
                     all_joint_targets.append(joint_targets)
@@ -795,20 +823,34 @@ class HeteroRobot(LeggedRobotField):
                 # Fallback to PD control
                 torques_go1 = self.p_gains[go1_dof_start:go1_dof_end] * joint_pos_err_go1 - self.d_gains[go1_dof_start:go1_dof_end] * joint_vel_go1
 
-            # For Jackal (second agent), use simple PD control
+            # For Jackal (second agent), use velocity-based control
             jackal_dof_start = self.robot_num_dofs[0]
             jackal_dof_end = jackal_dof_start + self.robot_num_dofs[1]
 
-            joint_pos_err_jackal = (
-                self.dof_pos[:, jackal_dof_start:jackal_dof_end]
-                - self.joint_pos_target[:, jackal_dof_start:jackal_dof_end]
-            )
+            # Get current wheel velocities
             joint_vel_jackal = self.dof_vel[:, jackal_dof_start:jackal_dof_end]
 
-            torques_jackal = (
-                self.p_gains[jackal_dof_start:jackal_dof_end] * joint_pos_err_jackal
-                - self.d_gains[jackal_dof_start:jackal_dof_end] * joint_vel_jackal
-            )
+            # Use velocity targets from differential drive controller
+            if hasattr(self, 'wheel_vel_targets') and 1 in self.wheel_vel_targets:
+                # Velocity-based PD control: torque = Kp * (vel_target - vel_current)
+                # For Jackal, use high P gain for velocity tracking
+                vel_target_jackal = self.wheel_vel_targets[1]  # Agent 1 is Jackal
+                vel_error_jackal = vel_target_jackal - joint_vel_jackal
+
+                # Use a proportional gain for velocity tracking
+                # Jackal has damping=1.0 in config, but we need P gain for tracking
+                kp_velocity = 10.0  # Proportional gain for velocity control
+                torques_jackal = kp_velocity * vel_error_jackal
+            else:
+                # Fallback to position-based PD control if velocity targets not available
+                joint_pos_err_jackal = (
+                    self.dof_pos[:, jackal_dof_start:jackal_dof_end]
+                    - self.joint_pos_target[:, jackal_dof_start:jackal_dof_end]
+                )
+                torques_jackal = (
+                    self.p_gains[jackal_dof_start:jackal_dof_end] * joint_pos_err_jackal
+                    - self.d_gains[jackal_dof_start:jackal_dof_end] * joint_vel_jackal
+                )
 
             # Concatenate torques
             torques = torch.cat([torques_go1, torques_jackal], dim=1)

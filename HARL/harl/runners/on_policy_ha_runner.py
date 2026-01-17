@@ -24,9 +24,25 @@ class OnPolicyHARunner(OnPolicyBaseRunner):
 
         # compute advantages
         if self.value_normalizer is not None:
-            advantages = self.critic_buffer.returns[
-                :-1
-            ] - self.value_normalizer.denormalize(self.critic_buffer.value_preds[:-1])
+            # DEBUG: Check value_preds and returns before computing advantages
+            if np.isnan(self.critic_buffer.value_preds[:-1]).any():
+                print(f"[DEBUG Advantages] NaN in value_preds before advantage computation!")
+                print(f"  NaN count: {np.isnan(self.critic_buffer.value_preds[:-1]).sum()}")
+            if np.isnan(self.critic_buffer.returns[:-1]).any():
+                print(f"[DEBUG Advantages] NaN in returns before advantage computation!")
+                print(f"  NaN count: {np.isnan(self.critic_buffer.returns[:-1]).sum()}")
+
+            denorm_values = self.value_normalizer.denormalize(self.critic_buffer.value_preds[:-1])
+            if np.isnan(denorm_values).any():
+                print(f"[DEBUG Advantages] NaN after denormalizing value_preds!")
+                print(f"  NaN count: {np.isnan(denorm_values).sum()}")
+                print(f"  Normalizer stats - mean: {self.value_normalizer.mean}, std: {self.value_normalizer.std}")
+
+            advantages = self.critic_buffer.returns[:-1] - denorm_values
+
+            if np.isnan(advantages).any():
+                print(f"[DEBUG Advantages] NaN in computed advantages!")
+                print(f"  NaN count: {np.isnan(advantages).sum()}/{advantages.size}")
         else:
             advantages = (
                 self.critic_buffer.returns[:-1] - self.critic_buffer.value_preds[:-1]

@@ -112,9 +112,9 @@ class Go1PushMidWrapper(EmptyWrapper):
         }
 
         # DEBUG: Exception tracking counters
-        self.debug_step_counter = 0
-        self.debug_sim_exception_count = 0
-        self.debug_nan_exception_count = 0
+        # self.debug_step_counter = 0
+        # self.debug_sim_exception_count = 0
+        # self.debug_nan_exception_count = 0
 
         # Contact threshold for individualized rewards (distance to box center)
         # Agents within this distance are considered "in contact" with box
@@ -387,6 +387,22 @@ class Go1PushMidWrapper(EmptyWrapper):
         base_vel = obs_buf.lin_vel # (env_num, agent_num, 3)
         base_rpy = obs_buf.base_rpy # (env_num, agent_num, 3)
         base_pos = base_pos.reshape([self.env.num_envs, self.env.num_agents, -1])
+
+        # CRITICAL FIX: Clean NaN/Inf from physics states before reward computation
+        # Physics simulation can produce NaN in unstable states (e.g., Jackal flipping)
+        # This prevents NaN from propagating into rewards → advantages → gradients
+        if torch.isnan(box_pos).any() or torch.isinf(box_pos).any():
+            print(f"[CRITICAL] NaN/Inf in box_pos from physics! Replacing with 0.")
+            box_pos[torch.isnan(box_pos)] = 0
+            box_pos[torch.isinf(box_pos)] = 0
+        if torch.isnan(base_pos).any() or torch.isinf(base_pos).any():
+            print(f"[CRITICAL] NaN/Inf in base_pos from physics! Replacing with 0.")
+            base_pos[torch.isnan(base_pos)] = 0
+            base_pos[torch.isinf(base_pos)] = 0
+        if torch.isnan(base_vel).any() or torch.isinf(base_vel).any():
+            print(f"[CRITICAL] NaN/Inf in base_vel from physics! Replacing with 0.")
+            base_vel[torch.isnan(base_vel)] = 0
+            base_vel[torch.isinf(base_vel)] = 0
         base_vel = base_vel.reshape([self.env.num_envs, self.env.num_agents, -1])
         base_rpy = base_rpy.reshape([self.env.num_envs, self.env.num_agents, -1])
 
@@ -463,31 +479,31 @@ class Go1PushMidWrapper(EmptyWrapper):
         
         # calculate exception punishment
         if self.exception_punishment_scale != 0:
-            # DEBUG: Track exception counts
-            num_sim_exceptions = self.exception_buf.sum().item()
-            num_nan_exceptions = self.value_exception_buf.sum().item()
-            self.debug_sim_exception_count += num_sim_exceptions
-            self.debug_nan_exception_count += num_nan_exceptions
-            self.debug_step_counter += 1
+            # # DEBUG: Track exception counts
+            # num_sim_exceptions = self.exception_buf.sum().item()
+            # num_nan_exceptions = self.value_exception_buf.sum().item()
+            # self.debug_sim_exception_count += num_sim_exceptions
+            # self.debug_nan_exception_count += num_nan_exceptions
+            # self.debug_step_counter += 1
 
-            # Log every 100 steps
-            if self.debug_step_counter % 100 == 0:
-                total_exceptions = self.debug_sim_exception_count + self.debug_nan_exception_count
-                if total_exceptions > 0:
-                    print(f"[DEBUG Step {self.debug_step_counter}] Exception breakdown over last 100 steps:")
-                    print(f"  Simulation exceptions (roll/pitch/z): {self.debug_sim_exception_count} ({100*self.debug_sim_exception_count/total_exceptions:.1f}%)")
-                    print(f"  NaN/Inf exceptions: {self.debug_nan_exception_count} ({100*self.debug_nan_exception_count/total_exceptions:.1f}%)")
-                    print(f"  Total exceptions: {total_exceptions}")
-                    print(f"  Exception rate: {100*total_exceptions/(100*self.num_envs):.2f}% of environments")
-                # Reset counters
-                self.debug_sim_exception_count = 0
-                self.debug_nan_exception_count = 0
+            # # Log every 100 steps
+            # if self.debug_step_counter % 100 == 0:
+            #     total_exceptions = self.debug_sim_exception_count + self.debug_nan_exception_count
+            #     if total_exceptions > 0:
+            #         print(f"[DEBUG Step {self.debug_step_counter}] Exception breakdown over last 100 steps:")
+            #         print(f"  Simulation exceptions (roll/pitch/z): {self.debug_sim_exception_count} ({100*self.debug_sim_exception_count/total_exceptions:.1f}%)")
+            #         print(f"  NaN/Inf exceptions: {self.debug_nan_exception_count} ({100*self.debug_nan_exception_count/total_exceptions:.1f}%)")
+            #         print(f"  Total exceptions: {total_exceptions}")
+            #         print(f"  Exception rate: {100*total_exceptions/(100*self.num_envs):.2f}% of environments")
+            #     # Reset counters
+            #     self.debug_sim_exception_count = 0
+            #     self.debug_nan_exception_count = 0
 
             reward[self.exception_buf, :] += self.exception_punishment_scale
             reward[self.value_exception_buf, :] += self.exception_punishment_scale
             # reward[self.time_out_buf, :] += self.exception_punishment_scale
             self.reward_buffer["exception_punishment"] += self.exception_punishment_scale * \
-                    (num_sim_exceptions + num_nan_exceptions)
+                    (self.exception_buf.sum().item() + self.value_exception_buf.sum().item())
 
         # distance_to_target_reward: Progress shaping based on box-to-goal distance
         # CRITIC13 v2: Disabled (redundant with goal_push_bonus)
@@ -793,5 +809,22 @@ class Go1PushMidWrapper(EmptyWrapper):
         team_reward = reward.sum(dim=1, keepdim=True)  # (num_envs, 1)
         # Give identical team reward to ALL agents
         reward = team_reward.expand(-1, self.num_agents)  # (num_envs, num_agents)
+
+        # DEBUG: Check for NaN in final reward
+        if torch.isnan(reward).any():
+            nan_count = torch.isnan(reward).sum().item()
+            print(f"[DEBUG Reward] NaN detected in final reward tensor!")
+            print(f"  NaN count: {nan_count}/{reward.numel()}")
+            valid_rewards = reward[~torch.isnan(reward)]
+            if valid_rewards.numel() > 0:
+                print(f"  Valid reward stats: min={valid_rewards.min()}, max={valid_rewards.max()}, mean={valid_rewards.mean()}")
+            print(f"  Reward buffer breakdown:")
+            for key, val in self.reward_buffer.items():
+                if isinstance(val, (int, float)) and val != 0:
+                    print(f"    {key}: {val}")
+            # Find which environments have NaN
+            nan_mask = torch.isnan(reward).any(dim=1)
+            nan_envs = torch.where(nan_mask)[0]
+            print(f"  Environments with NaN: {nan_envs.tolist()[:10]} (showing first 10)")
 
         return obs, reward, termination, info

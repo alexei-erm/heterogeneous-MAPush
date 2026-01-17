@@ -100,6 +100,24 @@ class OnPolicyCriticBufferEP:
             next_value: (np.ndarray) value predictions for the step after the last episode step.
             value_normalizer: (ValueNorm) If not None, ValueNorm value normalizer instance.
         """
+        # DEBUG: Check inputs for NaN
+        if np.isnan(next_value).any():
+            print(f"[DEBUG GAE] NaN in next_value from critic!")
+            print(f"  next_value shape: {next_value.shape}")
+            print(f"  NaN count: {np.isnan(next_value).sum()}")
+
+        if np.isnan(self.value_preds).any():
+            print(f"[DEBUG GAE] NaN in value_preds buffer!")
+            nan_count = np.isnan(self.value_preds).sum()
+            print(f"  NaN count: {nan_count}/{self.value_preds.size}")
+            print(f"  value_preds shape: {self.value_preds.shape}")
+
+        if np.isnan(self.rewards).any():
+            print(f"[DEBUG GAE] NaN in rewards buffer!")
+            nan_count = np.isnan(self.rewards).sum()
+            print(f"  NaN count: {nan_count}/{self.rewards.size}")
+            print(f"  rewards stats: min={np.nanmin(self.rewards)}, max={np.nanmax(self.rewards)}")
+
         if (
             self.use_proper_time_limits
         ):  # consider the difference between truncation and termination

@@ -88,7 +88,33 @@ class HAPPO(OnPolicyBase):
 
         self.actor_optimizer.zero_grad()
 
-        (policy_loss - dist_entropy * self.entropy_coef).backward()  # add entropy term
+        # DEBUG: Check loss before backward
+        total_loss = policy_loss - dist_entropy * self.entropy_coef
+        if torch.isnan(total_loss) or torch.isinf(total_loss):
+            print(f"[DEBUG HAPPO] NaN/Inf detected in loss before backward!")
+            print(f"  policy_loss: {policy_loss.item()}")
+            print(f"  dist_entropy: {dist_entropy.item()}")
+            print(f"  entropy_coef: {self.entropy_coef}")
+            print(f"  total_loss: {total_loss.item()}")
+
+        total_loss.backward()  # add entropy term
+
+        # DEBUG: Check gradients after backward
+        has_nan_grad = False
+        has_inf_grad = False
+        for name, param in self.actor.named_parameters():
+            if param.grad is not None:
+                if torch.isnan(param.grad).any():
+                    print(f"[DEBUG HAPPO] NaN gradient in {name}")
+                    has_nan_grad = True
+                if torch.isinf(param.grad).any():
+                    print(f"[DEBUG HAPPO] Inf gradient in {name}")
+                    has_inf_grad = True
+
+        if has_nan_grad or has_inf_grad:
+            print(f"[DEBUG HAPPO] Gradient issues detected before clipping!")
+            print(f"  advantages stats: min={adv_targ.min()}, max={adv_targ.max()}, mean={adv_targ.mean()}")
+            print(f"  imp_weights stats: min={imp_weights.min()}, max={imp_weights.max()}, mean={imp_weights.mean()}")
 
         if self.use_max_grad_norm:
             actor_grad_norm = nn.utils.clip_grad_norm_(
@@ -97,7 +123,21 @@ class HAPPO(OnPolicyBase):
         else:
             actor_grad_norm = get_grad_norm(self.actor.parameters())
 
+        # DEBUG: Check if grad_norm is nan
+        if torch.isnan(actor_grad_norm):
+            print(f"[DEBUG HAPPO] NaN in grad_norm after clipping!")
+
         self.actor_optimizer.step()
+
+        # DEBUG: Check parameters after optimizer step
+        has_nan_param = False
+        for name, param in self.actor.named_parameters():
+            if torch.isnan(param).any():
+                print(f"[DEBUG HAPPO] NaN parameter in {name} after optimizer step!")
+                has_nan_param = True
+
+        if has_nan_param:
+            print(f"[DEBUG HAPPO] Network weights became NaN after optimizer step!")
 
         return policy_loss, dist_entropy, actor_grad_norm, imp_weights
 
