@@ -108,11 +108,15 @@ class MAPushEnv:
         self.n_agents = self.env.num_agents
 
         # HARL expects list of spaces (one per agent)
-        self.observation_space = [self.env.observation_space] * self.n_agents
-
-        # Action space: Both Go1 and Jackal use [vx, vy, vyaw] (3 DOF)
-        # Jackal's differential drive controller internally converts to wheel velocities
-        self.action_space = [self.env.action_space] * self.n_agents
+        # In hetero mode, spaces are already lists; in homo mode, we need to duplicate
+        if self.is_hetero and isinstance(self.env.observation_space, list):
+            # Heterogeneous: spaces already different per agent
+            self.observation_space = self.env.observation_space
+            self.action_space = self.env.action_space
+        else:
+            # Homogeneous: same space for all agents
+            self.observation_space = [self.env.observation_space] * self.n_agents
+            self.action_space = [self.env.action_space] * self.n_agents
 
         if self.is_hetero:
             print(f"[MAPushEnv] Heterogeneous agents with unified action space:")

@@ -23,7 +23,7 @@ Simplified for MAPush heterogeneous agent training
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="jackal-base.stl" scale="1 1 1"/>
+        <mesh filename="../meshes/jackal-base.stl" scale="1 1 1"/>
       </geometry>
       <material name="dark_grey"/>
     </visual>
@@ -52,7 +52,7 @@ Simplified for MAPush heterogeneous agent training
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
       <geometry>
-        <mesh filename="jackal-wheel.stl" scale="1 1 1"/>
+        <mesh filename="../meshes/jackal-wheel.stl" scale="1 1 1"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -83,7 +83,7 @@ Simplified for MAPush heterogeneous agent training
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
       <geometry>
-        <mesh filename="jackal-wheel.stl" scale="1 1 1"/>
+        <mesh filename="../meshes/jackal-wheel.stl" scale="1 1 1"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -126,7 +126,11 @@ Simplified for MAPush heterogeneous agent training
   <joint name="front_caster_joint" type="fixed">
     <parent link="chassis_link"/>
     <child link="front_caster_link"/>
-    <origin xyz="0.131 0 -0.02" rpy="0 0 0"/>
+    <!-- CRITICAL FIX: Raised from -0.02 to 0.02 so casters are ABOVE drive wheels
+         Drive wheel bottom: 0.0345 - 0.098 = -0.0635m
+         Caster bottom (old): -0.02 - 0.05 = -0.07m (TOO LOW, caused bouncing)
+         Caster bottom (new): 0.02 - 0.05 = -0.03m (above wheels, provides stability only when tilted) -->
+    <origin xyz="0.131 0 0.02" rpy="0 0 0"/>
   </joint>
 
   <link name="rear_caster_link">
@@ -145,7 +149,8 @@ Simplified for MAPush heterogeneous agent training
   <joint name="rear_caster_joint" type="fixed">
     <parent link="chassis_link"/>
     <child link="rear_caster_link"/>
-    <origin xyz="-0.131 0 -0.02" rpy="0 0 0"/>
+    <!-- CRITICAL FIX: Raised from -0.02 to 0.02 (same as front caster) -->
+    <origin xyz="-0.131 0 0.02" rpy="0 0 0"/>
   </joint>
 
 </robot>

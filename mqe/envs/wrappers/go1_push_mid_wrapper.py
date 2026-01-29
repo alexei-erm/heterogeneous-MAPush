@@ -65,6 +65,9 @@ class Go1PushMidWrapper(EmptyWrapper):
             print(f"  Both agents use 3 DOF [vx, vy, vyaw] action space")
             print(f"  Go1: Locomotion policy, {self.hetero_agent_types[1]}: Differential drive")
 
+        # Initialize physics exception buffer for NaN detection
+        self.physics_exception_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+
         # Observation space remains same for both modes
         if getattr(self.cfg.goal, "general_dist",False):
             self.observation_space = spaces.Box(low=-float('inf'), high=float('inf'), shape=(3 + 3 * self.num_agents,), dtype=float)
@@ -364,9 +367,11 @@ class Go1PushMidWrapper(EmptyWrapper):
             else:
                 obs = torch.cat([rotated_target_pos[:,:,:2], rotated_box_pos[:,:,:2], rotated_box_rpy[:,:,2].unsqueeze(2), all_base_info], dim=2)
 
-        # get env_id which should be reseted, because of nan or inf in obs and reward
-        self.value_exception_buf = torch.isnan(obs).any(dim=2).any(dim=1) \
-                                | torch.isinf(obs).any(dim=2).any(dim=1) \
+        # get env_id which should be reseted, because of nan or inf in obs, reward, or physics states
+        obs_nan_mask = torch.isnan(obs).any(dim=2).any(dim=1) | torch.isinf(obs).any(dim=2).any(dim=1)
+
+        # Combine observation NaN with physics NaN (from earlier detection)
+        self.value_exception_buf = obs_nan_mask | self.physics_exception_buf \
                                 
         # remove nan and inf in obs and reward
         obs[torch.isnan(obs)] = 0
@@ -386,25 +391,44 @@ class Go1PushMidWrapper(EmptyWrapper):
         base_pos = obs_buf.base_pos # (env_num, agent_num, 3)
         base_vel = obs_buf.lin_vel # (env_num, agent_num, 3)
         base_rpy = obs_buf.base_rpy # (env_num, agent_num, 3)
+        # Reshape all robot states before NaN detection
         base_pos = base_pos.reshape([self.env.num_envs, self.env.num_agents, -1])
-
-        # CRITICAL FIX: Clean NaN/Inf from physics states before reward computation
-        # Physics simulation can produce NaN in unstable states (e.g., Jackal flipping)
-        # This prevents NaN from propagating into rewards → advantages → gradients
-        if torch.isnan(box_pos).any() or torch.isinf(box_pos).any():
-            print(f"[CRITICAL] NaN/Inf in box_pos from physics! Replacing with 0.")
-            box_pos[torch.isnan(box_pos)] = 0
-            box_pos[torch.isinf(box_pos)] = 0
-        if torch.isnan(base_pos).any() or torch.isinf(base_pos).any():
-            print(f"[CRITICAL] NaN/Inf in base_pos from physics! Replacing with 0.")
-            base_pos[torch.isnan(base_pos)] = 0
-            base_pos[torch.isinf(base_pos)] = 0
-        if torch.isnan(base_vel).any() or torch.isinf(base_vel).any():
-            print(f"[CRITICAL] NaN/Inf in base_vel from physics! Replacing with 0.")
-            base_vel[torch.isnan(base_vel)] = 0
-            base_vel[torch.isinf(base_vel)] = 0
         base_vel = base_vel.reshape([self.env.num_envs, self.env.num_agents, -1])
         base_rpy = base_rpy.reshape([self.env.num_envs, self.env.num_agents, -1])
+
+        # CRITICAL FIX: Detect and handle NaN/Inf from physics states
+        # Physics simulation can produce NaN in unstable states (e.g., Jackal instability)
+        # Mark environments with NaN for reset via value_exception_buf
+        # This triggers episode reset + exception punishment (-5)
+
+        # Detect which environments have NaN/Inf in physics states
+        # Use chained any() calls for PyTorch 1.13 compatibility (doesn't support dim=tuple)
+        nan_in_box = torch.isnan(box_pos).any(dim=1) | torch.isinf(box_pos).any(dim=1)
+        nan_in_base_pos = torch.isnan(base_pos).any(dim=2).any(dim=1) | torch.isinf(base_pos).any(dim=2).any(dim=1)
+        nan_in_base_vel = torch.isnan(base_vel).any(dim=2).any(dim=1) | torch.isinf(base_vel).any(dim=2).any(dim=1)
+        physics_nan_mask = nan_in_box | nan_in_base_pos | nan_in_base_vel
+
+        # Mark environments with physics NaN for reset (will be combined with obs NaN later)
+        self.physics_exception_buf = physics_nan_mask
+
+        # Log physics NaN events (less verbose than before)
+        if physics_nan_mask.any():
+            num_nan_envs = physics_nan_mask.sum().item()
+            if not hasattr(self, '_last_nan_log_step'):
+                self._last_nan_log_step = 0
+            # Log only every 100 steps to avoid spam
+            if self.reward_buffer["step_count"] - self._last_nan_log_step >= 100:
+                print(f"[Physics NaN] {num_nan_envs} environments with NaN in physics (will reset)")
+                self._last_nan_log_step = self.reward_buffer["step_count"]
+
+        # Clean NaN for current step to prevent immediate crash
+        # Environments will reset on next step via exception mechanism
+        box_pos[torch.isnan(box_pos)] = 0
+        box_pos[torch.isinf(box_pos)] = 0
+        base_pos[torch.isnan(base_pos)] = 0
+        base_pos[torch.isinf(base_pos)] = 0
+        base_vel[torch.isnan(base_vel)] = 0
+        base_vel[torch.isinf(base_vel)] = 0
 
         # occlude nan or inf
         box_pos[torch.isnan(box_pos)] = 0
@@ -807,24 +831,14 @@ class Go1PushMidWrapper(EmptyWrapper):
         # =================================================================
         # Sum across agents: team_reward = sum of all agent rewards
         team_reward = reward.sum(dim=1, keepdim=True)  # (num_envs, 1)
-        # Give identical team reward to ALL agents
-        reward = team_reward.expand(-1, self.num_agents)  # (num_envs, num_agents)
 
-        # DEBUG: Check for NaN in final reward
-        if torch.isnan(reward).any():
-            nan_count = torch.isnan(reward).sum().item()
-            print(f"[DEBUG Reward] NaN detected in final reward tensor!")
-            print(f"  NaN count: {nan_count}/{reward.numel()}")
-            valid_rewards = reward[~torch.isnan(reward)]
-            if valid_rewards.numel() > 0:
-                print(f"  Valid reward stats: min={valid_rewards.min()}, max={valid_rewards.max()}, mean={valid_rewards.mean()}")
-            print(f"  Reward buffer breakdown:")
-            for key, val in self.reward_buffer.items():
-                if isinstance(val, (int, float)) and val != 0:
-                    print(f"    {key}: {val}")
-            # Find which environments have NaN
-            nan_mask = torch.isnan(reward).any(dim=1)
-            nan_envs = torch.where(nan_mask)[0]
-            print(f"  Environments with NaN: {nan_envs.tolist()[:10]} (showing first 10)")
+        # CRITICAL: Clean NaN/Inf from team_reward BEFORE expanding
+        # Must clean before expand() because expand() creates a view (not modifiable)
+        team_reward[torch.isnan(team_reward)] = 0
+        team_reward[torch.isinf(team_reward)] = 0
+
+        # Give identical team reward to ALL agents
+        # Use repeat() instead of expand() to create a proper copy (not a view)
+        reward = team_reward.repeat(1, self.num_agents)  # (num_envs, num_agents)
 
         return obs, reward, termination, info

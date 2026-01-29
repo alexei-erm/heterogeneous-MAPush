@@ -42,7 +42,8 @@ class JackalCfg(LeggedRobotFieldCfg):
         disable_gravity = False
         collapse_fixed_joints = True
         fix_base_link = False
-        default_dof_drive_mode = 3  # Effort control
+        default_dof_drive_mode = 1  # VELOCITY control (stable for wheeled robots!)
+                                     # Was 3 (EFFORT/torque) which caused physics instability
         self_collisions = 0
 
         replace_cylinder_with_capsule = True
@@ -66,9 +67,10 @@ class JackalCfg(LeggedRobotFieldCfg):
 
     class init_state(LeggedRobotFieldCfg.init_state):
         # CRITICAL FIX: Proper ground clearance for wheeled robot
-        # Wheel radius = 0.098m, wheel center 0.1m above base_link
-        # For wheels to touch ground: base_link at ~0.10m (includes settling margin)
-        pos = [0.0, 0.0, 0.10]  # Jackal base height ~10cm (was 0.15, caused z-wave violations)
+        # Wheel radius = 0.098m, wheel center 0.10m above base_link (0.0655+0.0345)
+        # Wheel bottom = base_link + 0.10 - 0.098 = base_link + 0.002m
+        # For wheels to touch ground (bottom at z=0): base_link_z = -0.002m ≈ 0.0m
+        pos = [0.0, 0.0, 0.0]  # base_link at ground level (wheels touch ground)
         rot = [0.0, 0.0, 0.0, 1.0]  # Quaternion [x, y, z, w]
         lin_vel = [0.0, 0.0, 0.0]
         ang_vel = [0.0, 0.0, 0.0]

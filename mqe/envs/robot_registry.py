@@ -40,6 +40,13 @@ ROBOT_REGISTRY = {
         'num_actions': 3,  # [vx, vy, vyaw] - same as Go1
         'description': 'Clearpath Robotics Jackal differential drive wheeled robot'
     },
+    'anymal_c': {
+        'class_path': 'mqe.envs.anymal_c.anymal_c.AnymalC',
+        'config_path': 'mqe.envs.anymal_c.anymal_c_config.AnymalCCfg',
+        'default_control': 'C',  # Hierarchical control with locomotion policy
+        'num_actions': 3,  # [vx, vy, w] for mid-level control
+        'description': 'ANYmal C quadruped robot with trained locomotion policy'
+    },
     # Add more robots here as they are implemented
 }
 

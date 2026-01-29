@@ -226,7 +226,7 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, hetero_agent=None):
 
     # Create single-environment version for visualization
     from types import SimpleNamespace
-    from mqe.envs.utils import make_mqe_env, custom_cfg
+    from mqe.envs.utils import make_mqe_env, make_hetero_env, custom_cfg
     from task.cuboid.config import Go1PushMidCfg
 
     # Create args for visualization
@@ -249,17 +249,35 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, hetero_agent=None):
     args.subscenes = 0
     args.num_threads = 0
 
-    # Create environment
+    # Create environment - use make_hetero_env if hetero_agent specified
     print("Creating visualization environment...")
-    env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, hetero_agent=hetero_agent))
+    if hetero_agent:
+        print(f"  Using heterogeneous mode: agent0=go1, agent1={hetero_agent}")
+        env_raw, _ = make_hetero_env(
+            env_name=args.task,
+            agent_types=['go1', hetero_agent],
+            args=args
+        )
+    else:
+        print("  Using homogeneous mode: 2x go1")
+        env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, hetero_agent=hetero_agent))
 
     n_agents = env_raw.num_agents
 
     # Get observation and action spaces from env
     obs_space = env_raw.observation_space
     act_space = env_raw.action_space
-    obs_spaces = [obs_space] * n_agents
-    act_spaces = [act_space] * n_agents
+
+    # CRITICAL FIX: In hetero mode, spaces are already lists (one per agent)
+    # In homogeneous mode, they're single spaces
+    if isinstance(obs_space, list):
+        # Heterogeneous mode - use different spaces per agent
+        obs_spaces = obs_space
+        act_spaces = act_space
+    else:
+        # Homogeneous mode - same space for all agents
+        obs_spaces = [obs_space] * n_agents
+        act_spaces = [act_space] * n_agents
 
     # Load models
     actors = load_models(checkpoint_dir, n_agents, obs_spaces, act_spaces, device="cuda:0")
