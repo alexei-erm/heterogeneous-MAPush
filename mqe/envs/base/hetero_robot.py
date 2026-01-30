@@ -883,6 +883,92 @@ class HeteroRobot(LeggedRobotField):
         if hasattr(self.cfg.obs.cfgs, 'env_info') and self.cfg.obs.cfgs.env_info and hasattr(self, "env_info"):
             self.obs_buf.env_info = self.env_info
 
+    def reset_idx(self, env_ids):
+        """
+        Override reset_idx to handle heterogeneous agent buffers.
+
+        CRITICAL for training: Must reset LSTM hidden states, locomotion observation
+        buffers, and actuator history buffers when episodes terminate.
+        """
+        # Call parent reset_idx first
+        super().reset_idx(env_ids)
+
+        # Now reset heterogeneous-specific buffers
+        self._reset_hetero_buffers(env_ids)
+
+    def _reset_hetero_buffers(self, env_ids):
+        """
+        Reset heterogeneous-specific buffers when environments reset.
+
+        This handles:
+        1. LSTM hidden/cell states for Anymal C actuator network
+        2. Locomotion observation buffers (last_action, last_joint_targets, etc.)
+        3. Actuator history buffers (joint_pos_err_last, joint_vel_last, etc.)
+        4. Gait indices for Go1 clock computation
+        """
+        if len(env_ids) == 0:
+            return
+
+        # Reset per-agent buffers
+        for agent_idx, robot_type in enumerate(self.hetero_agent_types):
+            num_dof_agent = self.robot_num_dofs[agent_idx]
+
+            # ==== 1. Reset LSTM hidden states for Anymal C ====
+            if robot_type == 'anymal_c':
+                # LSTM states are shaped [2, num_envs * num_dof, 8]
+                # We need to reset specific environment indices
+                # NOTE: LSTM states may be in inference mode, so we need to clone and modify
+                if hasattr(self, f'anymal_sea_hidden_{agent_idx}'):
+                    sea_hidden = getattr(self, f'anymal_sea_hidden_{agent_idx}').clone()
+                    sea_cell = getattr(self, f'anymal_sea_cell_{agent_idx}').clone()
+
+                    # Convert env_ids to LSTM indices (each env has num_dof entries)
+                    for env_id in env_ids:
+                        start_idx = env_id * num_dof_agent
+                        end_idx = (env_id + 1) * num_dof_agent
+                        sea_hidden[:, start_idx:end_idx, :] = 0.0
+                        sea_cell[:, start_idx:end_idx, :] = 0.0
+
+                    setattr(self, f'anymal_sea_hidden_{agent_idx}', sea_hidden)
+                    setattr(self, f'anymal_sea_cell_{agent_idx}', sea_cell)
+
+            # ==== 2. Reset locomotion observation buffers ====
+            if self.locomotion_obs_buffers[agent_idx] is not None:
+                obs_buffer_dict = self.locomotion_obs_buffers[agent_idx]
+
+                # Reset obs buffer
+                if 'obs' in obs_buffer_dict:
+                    obs_buffer_dict['obs'][env_ids] = 0.0
+
+                # Reset history buffer (Go1 uses 2100-dim history)
+                if 'history' in obs_buffer_dict and obs_buffer_dict['history'] is not None:
+                    obs_buffer_dict['history'][env_ids] = 0.0
+
+                # Reset last action buffers
+                if 'last_action' in obs_buffer_dict:
+                    obs_buffer_dict['last_action'][env_ids] = 0.0
+                if 'last_two_action' in obs_buffer_dict:
+                    obs_buffer_dict['last_two_action'][env_ids] = 0.0
+                if 'last_joint_targets' in obs_buffer_dict:
+                    obs_buffer_dict['last_joint_targets'][env_ids] = 0.0
+
+            # ==== 3. Reset actuator history buffers ====
+            # These are used by Go1's feedforward actuator network
+            if hasattr(self, f'joint_pos_err_last_{agent_idx}'):
+                getattr(self, f'joint_pos_err_last_{agent_idx}')[env_ids] = 0.0
+            if hasattr(self, f'joint_pos_err_last_last_{agent_idx}'):
+                getattr(self, f'joint_pos_err_last_last_{agent_idx}')[env_ids] = 0.0
+            if hasattr(self, f'joint_vel_last_{agent_idx}'):
+                getattr(self, f'joint_vel_last_{agent_idx}')[env_ids] = 0.0
+            if hasattr(self, f'joint_vel_last_last_{agent_idx}'):
+                getattr(self, f'joint_vel_last_last_{agent_idx}')[env_ids] = 0.0
+
+        # ==== 4. Reset Go1 gait indices ====
+        if hasattr(self, 'go1_gait_indices'):
+            self.go1_gait_indices[env_ids] = 0.0
+        if hasattr(self, 'go1_clock_inputs'):
+            self.go1_clock_inputs[env_ids] = 0.0
+
     def _compute_torques(self, actions):
         """
         Override to handle heterogeneous DOF counts when computing torques.
@@ -954,15 +1040,6 @@ class HeteroRobot(LeggedRobotField):
 
             # Concatenate all joint targets
             self.joint_pos_target = torch.cat(all_joint_targets, dim=1)  # [num_envs, total_dofs]
-
-            # DEBUG: Print actual joint targets on first step
-            if not hasattr(self, '_debug_printed_targets'):
-                print(f"\n[DEBUG _compute_torques] Joint targets:")
-                print(f"  Go1 targets: {self.joint_pos_target[0, :12]}")
-                print(f"  Go1 defaults: {self.default_dof_pos[0, :12]}")
-                print(f"  Anymal C targets: {self.joint_pos_target[0, 12:24]}")
-                print(f"  Anymal C defaults: {self.default_dof_pos[0, 12:24]}")
-                self._debug_printed_targets = True
 
             # Compute torques for each agent
             all_torques = []
@@ -1183,16 +1260,6 @@ class HeteroRobot(LeggedRobotField):
                         obs_buffer_dict['last_two_action'] = obs_buffer_dict['last_action'].clone()
                     obs_buffer_dict['last_action'] = joint_positions.clone()
 
-                    # DEBUG: Print on first step only
-                    if not hasattr(self, '_debug_printed_go1'):
-                        print(f"\n[DEBUG Go1] First step:")
-                        print(f"  Commands (scaled): {loc_obs[0, 3:6]}")
-                        print(f"  Gait freq: {loc_obs[0, 7]}, Gait params: {loc_obs[0, 8:12]}")
-                        print(f"  DOF pos (scaled errors): {loc_obs[0, 18:30]}")
-                        print(f"  Policy output joint targets: {joint_positions[0]}")
-                        print(f"  Default joint angles: {self.default_dof_pos[0, :12]}")
-                        self._debug_printed_go1 = True
-
                 elif robot_type == 'anymal_c':
                     # Build 48-dim locomotion observation for Anymal C
                     # Use SAME method as Go1 - use obs_buf which is already processed!
@@ -1226,20 +1293,6 @@ class HeteroRobot(LeggedRobotField):
 
                     # Call policy
                     joint_positions = locomotion_policy(loc_obs)
-
-                    # DEBUG: Print on first step only
-                    if not hasattr(self, '_debug_printed_anymal'):
-                        print(f"\n[DEBUG Anymal C] First step:")
-                        print(f"  Lin vel (scaled): {loc_obs[0, 0:3]}")
-                        print(f"  Ang vel (scaled): {loc_obs[0, 3:6]}")
-                        print(f"  Projected gravity: {loc_obs[0, 6:9]}")
-                        print(f"  Commands (scaled): {loc_obs[0, 9:12]}")
-                        print(f"  DOF pos (scaled errors): {loc_obs[0, 12:24]}")
-                        print(f"  DOF vel (scaled): {loc_obs[0, 24:36]}")
-                        print(f"  Last actions: {loc_obs[0, 36:48]}")
-                        print(f"  Policy output joint targets: {joint_positions[0]}")
-                        print(f"  Default joint angles: {self.default_dof_pos[0, 12:24]}")
-                        self._debug_printed_anymal = True
 
                     # Store for next step
                     obs_buffer_dict['last_joint_targets'] = joint_positions.clone()

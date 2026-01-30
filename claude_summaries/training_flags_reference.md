@@ -64,10 +64,12 @@ conda run -n mapush python HARL/harl_mapush/train.py \
 **Available Robot Types:**
 - `jackal` - Clearpath Jackal (differential drive, 2 DOF wheels)
 - `go1` - Unitree Go1 (default, quadruped, 12 DOF)
+- `anymal_c` - ANYmal C (quadruped, 12 DOF, LSTM actuator network)
 
 **Example:**
 ```bash
---hetero_agent jackal  # Go1 + Jackal heterogeneous team
+--hetero_agent jackal    # Go1 + Jackal heterogeneous team
+--hetero_agent anymal_c  # Go1 + Anymal C heterogeneous team
 ```
 
 ---

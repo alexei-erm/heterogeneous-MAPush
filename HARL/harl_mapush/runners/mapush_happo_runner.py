@@ -32,7 +32,7 @@ class MAPushHAPPORunner(OnPolicyHARunner):
             self.logger.set_envs(self.envs)
 
         # Checkpoint configuration
-        self.checkpoint_interval = 1_000_000  # 1M steps (changed for testing)
+        self.checkpoint_interval = 10_000_000  # 10M steps
         self.last_checkpoint_step = 0
 
         # Create checkpoints directory

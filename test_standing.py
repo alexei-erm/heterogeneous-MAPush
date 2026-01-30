@@ -37,12 +37,14 @@ def test_standing():
     obs = env.reset()
     print(f"✅ Reset successful")
 
-    print("\n[3] Stepping with CONSTANT FORWARD velocity [1, 0, 0]...")
+    print("\n[3] Stepping with CONSTANT velocity [0, 1, 0.05] (sideways + slight turn)...")
     num_steps = 200  # 4 seconds
 
-    # Constant forward velocity for both agents
+    # Constant velocity for both agents: [vx, vy, vyaw]
     constant_actions = torch.zeros(env.num_envs, env.num_agents, 3, device='cuda')
-    constant_actions[:, :, 0] = 1.0  # vx = 1.0 m/s forward
+    constant_actions[:, :, 0] = 0.0   # vx = 0 m/s
+    constant_actions[:, :, 1] = 0.5   # vy = 1.0 m/s sideways
+    constant_actions[:, :, 2] = 0.5  # vyaw = 0.05 rad/s turn
 
     reset_count = 0
     for step in range(num_steps):
