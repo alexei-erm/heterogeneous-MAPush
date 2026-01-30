@@ -131,10 +131,9 @@ class HeteroRobot(LeggedRobotField):
                             self.go1_gait_indices = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
                             self.go1_clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device)
 
-                        # Load shared actuator network (used by both Go1 and Anymal C)
-                        # Both robots use the same unitree_go1.pt actuator network
-                        if not hasattr(self, 'actuator_network') and hasattr(robot_config.control, 'actuator_network_path'):
-                            self._load_actuator_network(robot_config.control.actuator_network_path)
+                        # Load Go1's actuator network
+                        if hasattr(robot_config.control, 'actuator_network_path'):
+                            self._load_actuator_network(robot_config.control.actuator_network_path, robot_type, agent_idx)
 
                     elif robot_type == 'anymal_c':
                         # Anymal C uses single JIT policy (48-dim obs)
@@ -150,9 +149,9 @@ class HeteroRobot(LeggedRobotField):
                         obs_buffer = torch.zeros(self.num_envs, 48, dtype=torch.float, device=self.device)
                         self.locomotion_obs_buffers.append({'obs': obs_buffer, 'history': None})
 
-                        # Load shared actuator network (used by both Go1 and Anymal C)
-                        if not hasattr(self, 'actuator_network') and hasattr(robot_config.control, 'actuator_network_path'):
-                            self._load_actuator_network(robot_config.control.actuator_network_path)
+                        # Load Anymal C's actuator network (different from Go1!)
+                        if hasattr(robot_config.control, 'actuator_network_path'):
+                            self._load_actuator_network(robot_config.control.actuator_network_path, robot_type, agent_idx)
 
                     else:
                         raise NotImplementedError(f"Locomotion policy loading for {robot_type} not implemented")
@@ -165,35 +164,88 @@ class HeteroRobot(LeggedRobotField):
                 self.locomotion_policies.append(None)
                 self.locomotion_obs_buffers.append(None)
 
-    def _load_actuator_network(self, actuator_network_path):
+    def _load_actuator_network(self, actuator_network_path, robot_type, agent_idx):
         """
-        Load the shared actuator network for torque computation.
-        Both Go1 and Anymal C use the same unitree_go1.pt actuator network.
+        Load per-robot actuator network for torque computation.
+        Different robots use different actuator networks:
+        - Go1 -> unitree_go1.pt (feedforward, input: [pos_err, vel] x 3 timesteps)
+        - Anymal C -> anydrive_v3_lstm.pt (LSTM, input: [pos_err, vel], needs hidden state)
         """
-        actuator_net = torch.jit.load(actuator_network_path + "/unitree_go1.pt", map_location=self.device)
+        # Initialize dict if needed
+        if not hasattr(self, 'actuator_networks'):
+            self.actuator_networks = {}
 
-        # Create wrapper function that handles per-agent computation
-        def eval_actuator_network(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
+        # Determine which actuator network file to use
+        if robot_type == 'go1':
+            actuator_file = actuator_network_path + "/unitree_go1.pt"
+            actuator_net = torch.jit.load(actuator_file, map_location=self.device)
+
+            # Go1 uses feedforward network with history
+            def eval_go1_actuator(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
                                   joint_vel, joint_vel_last, joint_vel_last_last):
-            # Stack inputs: [num_envs, num_dof, 6]
-            xs = torch.cat((joint_pos_err.unsqueeze(-1),
-                           joint_pos_err_last.unsqueeze(-1),
-                           joint_pos_err_last_last.unsqueeze(-1),
-                           joint_vel.unsqueeze(-1),
-                           joint_vel_last.unsqueeze(-1),
-                           joint_vel_last_last.unsqueeze(-1)), dim=-1)
-            # Reshape for network: [num_envs * num_dof, 6]
-            num_envs = joint_pos_err.shape[0]
-            num_dof = joint_pos_err.shape[1]
-            with torch.no_grad():
-                torques = actuator_net(xs.view(num_envs * num_dof, 6))
-            return torques.view(num_envs, num_dof)
+                # Stack inputs: [num_envs, num_dof, 6]
+                xs = torch.cat((joint_pos_err.unsqueeze(-1),
+                               joint_pos_err_last.unsqueeze(-1),
+                               joint_pos_err_last_last.unsqueeze(-1),
+                               joint_vel.unsqueeze(-1),
+                               joint_vel_last.unsqueeze(-1),
+                               joint_vel_last_last.unsqueeze(-1)), dim=-1)
+                # Reshape for network: [num_envs * num_dof, 6]
+                num_envs = joint_pos_err.shape[0]
+                num_dof = joint_pos_err.shape[1]
+                with torch.no_grad():
+                    torques = actuator_net(xs.view(num_envs * num_dof, 6))
+                return torques.view(num_envs, num_dof)
 
-        self.actuator_network = eval_actuator_network
+            self.actuator_networks[agent_idx] = eval_go1_actuator
 
-        # Initialize history buffers for each agent
-        # These will be set per-agent in _compute_torques on first call
-        print(f"[HeteroRobot] Loaded shared actuator network from {actuator_network_path}/unitree_go1.pt")
+        elif robot_type == 'anymal_c':
+            actuator_file = actuator_network_path + "/anydrive_v3_lstm.pt"
+            actuator_net = torch.jit.load(actuator_file, map_location=self.device)
+
+            # Anymal C uses LSTM network - initialize hidden states
+            # Shape: [2 layers, num_envs * num_dof, 8 hidden]
+            num_dof = 12  # Anymal C has 12 DOFs
+            sea_hidden = torch.zeros(2, self.num_envs * num_dof, 8, device=self.device)
+            sea_cell = torch.zeros(2, self.num_envs * num_dof, 8, device=self.device)
+
+            # Store hidden states for this agent
+            setattr(self, f'anymal_sea_hidden_{agent_idx}', sea_hidden)
+            setattr(self, f'anymal_sea_cell_{agent_idx}', sea_cell)
+
+            # Anymal C LSTM actuator - different input format!
+            # CRITICAL: legged_gym computes pos_err as (target - actual), but we compute (actual - target)
+            # So we need to NEGATE the position error for Anymal C's LSTM
+            def eval_anymal_actuator(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
+                                     joint_vel, joint_vel_last, joint_vel_last_last):
+                num_envs = joint_pos_err.shape[0]
+                num_dof = joint_pos_err.shape[1]
+
+                # Get hidden states
+                sea_hidden = getattr(self, f'anymal_sea_hidden_{agent_idx}')
+                sea_cell = getattr(self, f'anymal_sea_cell_{agent_idx}')
+
+                # Input format: [num_envs * num_dof, 1, 2] with [pos_err, vel]
+                # NEGATE pos_err because legged_gym uses (target - actual) but we pass (actual - target)
+                sea_input = torch.zeros(num_envs * num_dof, 1, 2, device=self.device)
+                sea_input[:, 0, 0] = -joint_pos_err.flatten()  # NEGATED!
+                sea_input[:, 0, 1] = joint_vel.flatten()
+
+                with torch.inference_mode():
+                    torques, (new_hidden, new_cell) = actuator_net(sea_input, (sea_hidden, sea_cell))
+
+                # Update hidden states
+                setattr(self, f'anymal_sea_hidden_{agent_idx}', new_hidden)
+                setattr(self, f'anymal_sea_cell_{agent_idx}', new_cell)
+
+                return torques.view(num_envs, num_dof)
+
+            self.actuator_networks[agent_idx] = eval_anymal_actuator
+
+        else:
+            raise ValueError(f"Unknown robot type for actuator network: {robot_type}")
+
+        print(f"[HeteroRobot] Loaded actuator network for agent {agent_idx} ({robot_type}) from {actuator_file}")
 
     def _create_action_masks(self):
         """
@@ -930,8 +982,8 @@ class HeteroRobot(LeggedRobotField):
 
                 # Compute torques based on control type
                 if robot_info['default_control'] == 'C':
-                    # Hierarchical control: use actuator network
-                    if hasattr(self, 'actuator_network'):
+                    # Hierarchical control: use per-robot actuator network
+                    if hasattr(self, 'actuator_networks') and agent_idx in self.actuator_networks:
                         # Initialize history buffers if needed
                         if not hasattr(self, f'joint_pos_err_last_{agent_idx}'):
                             setattr(self, f'joint_pos_err_last_{agent_idx}', joint_pos_err_agent.clone())
@@ -945,8 +997,8 @@ class HeteroRobot(LeggedRobotField):
                         joint_vel_last = getattr(self, f'joint_vel_last_{agent_idx}')
                         joint_vel_last_last = getattr(self, f'joint_vel_last_last_{agent_idx}')
 
-                        # Apply actuator network
-                        torques_agent = self.actuator_network(
+                        # Apply this agent's specific actuator network
+                        torques_agent = self.actuator_networks[agent_idx](
                             joint_pos_err_agent,
                             joint_pos_err_last,
                             joint_pos_err_last_last,
@@ -1165,8 +1217,8 @@ class HeteroRobot(LeggedRobotField):
                     loc_obs[:, 12:24] = self.obs_buf.dof_pos[agent_env_indices]  # Already scaled
                     loc_obs[:, 24:36] = self.obs_buf.dof_vel[agent_env_indices]  # Already scaled
 
-                    # [36:48] previous actions
-                    if hasattr(obs_buffer_dict, 'last_joint_targets'):
+                    # [36:48] previous actions (raw policy outputs from last step)
+                    if 'last_joint_targets' in obs_buffer_dict:
                         loc_obs[:, 36:48] = obs_buffer_dict['last_joint_targets']
                     else:
                         # First step - use zeros

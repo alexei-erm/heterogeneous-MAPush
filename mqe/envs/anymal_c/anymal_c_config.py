@@ -121,7 +121,7 @@ class AnymalCCfg(LeggedRobotFieldCfg):
         motor_clip_torque = False
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 4
-        hip_scale_reduction = 0.5
+        # NOTE: No hip_scale_reduction for Anymal C - it was NOT trained with this in legged_gym
 
         # Anymal C uses single policy file
         locomotion_policy_dir = "./resources/robots/anymal_c/policy_500.jit"
