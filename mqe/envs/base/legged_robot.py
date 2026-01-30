@@ -174,6 +174,12 @@ class LeggedRobot(BaseTask):
         self.reset_idx(env_ids)
         if getattr(self.cfg.goal, "sequential_goal_pos", False) or getattr(self.cfg.goal, "received_goal_pos", False):
             self._update_target_state()
+
+        # CRITICAL FIX: Refresh actor states from Isaac Gym after reset
+        # This ensures root_states tensor has updated values (especially velocities)
+        # before compute_observations() reads them
+        self.gym.refresh_actor_root_state_tensor(self.sim)
+
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
         self.last_actions[:] = self.actions[:]
@@ -449,13 +455,23 @@ class LeggedRobot(BaseTask):
 
     def _reset_dofs(self, env_ids):
         """ Resets DOF position and velocities of selected environmments
-        Positions are randomly selected within 0.5:1.5 x default positions.
+        Positions set to exact default positions (no randomization by default).
         Velocities are set to zero.
 
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        if getattr(self.cfg.domain_rand, "init_dof_pos_ratio_range", None) is not None:
+        # CRITICAL FIX: Set DOF positions to EXACT defaults
+        # Random DOF positions confuse locomotion policies
+        # For domain randomization during training, set init_dof_pos_ratio_range in config
+        # BUT only use it if explicitly configured (don't use default range)
+        if hasattr(self.cfg.domain_rand, 'init_dof_pos_ratio_range') and \
+           self.cfg.domain_rand.init_dof_pos_ratio_range is not None and \
+           self.cfg.domain_rand.init_dof_pos_ratio_range != [1.0, 1.0]:
+            # Use configured randomization range
+            if not hasattr(self, '_debug_printed_dof_rand'):
+                print(f"[DEBUG _reset_dofs] Using DOF randomization: {self.cfg.domain_rand.init_dof_pos_ratio_range}")
+                self._debug_printed_dof_rand = True
             self.dof_pos[env_ids] = self.default_dof_pos * torch_rand_float(
                 self.cfg.domain_rand.init_dof_pos_ratio_range[0],
                 self.cfg.domain_rand.init_dof_pos_ratio_range[1],
@@ -463,6 +479,10 @@ class LeggedRobot(BaseTask):
                 device=self.device,
             )
         else:
+            # Default: exact default positions (no randomization)
+            if not hasattr(self, '_debug_printed_dof_exact'):
+                print(f"[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)")
+                self._debug_printed_dof_exact = True
             self.dof_pos[env_ids] = self.default_dof_pos
         self.dof_vel[env_ids] = 0.
 
@@ -641,15 +661,20 @@ class LeggedRobot(BaseTask):
             self.root_states[agent_ids, 3:7] = absolute_init_quat
 
         # base velocities
+        # CRITICAL FIX: Set velocities to ZERO at reset
+        # Random initial velocities confuse locomotion policies
+        # For domain randomization during training, set init_base_vel_range in config
         if getattr(self.cfg.domain_rand, "init_base_vel_range", None) is None:
-            base_vel_range = (-0.1, 0.1)
+            # Default: zero velocities (not random!)
+            self.root_states[agent_ids, 7:13] = 0.0
         else:
+            # Use configured range (for training with domain randomization)
             base_vel_range = self.cfg.domain_rand.init_base_vel_range
-        self.root_states[agent_ids, 7:13] = torch_rand_float(
-            *base_vel_range,
-            (len(agent_ids), 6),
-            device=self.device, 
-        ) # [7:10]: lin vel, [10:13]: ang vel
+            self.root_states[agent_ids, 7:13] = torch_rand_float(
+                *base_vel_range,
+                (len(agent_ids), 6),
+                device=self.device,
+            ) # [7:10]: lin vel, [10:13]: ang vel
 
         agent_indices_long = self.agent_indices[env_ids].reshape(-1).long()
         npc_indices_long = self.npc_indices[env_ids].reshape(-1).long()
@@ -1207,7 +1232,6 @@ class LeggedRobot(BaseTask):
             if self.complete_video_frames is None:
                 self.complete_video_frames = []
             else:
-                print("Successfully store the video of last episode")
                 self.complete_video_frames = self.video_frames[:]
             self.video_frames = []
 

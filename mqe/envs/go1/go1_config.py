@@ -238,7 +238,7 @@ class Go1Cfg(LeggedRobotFieldCfg):
             y= [-0.1, 0.1],
         )
 
-        init_dof_pos_ratio_range = [0.7, 1.3]
+        init_dof_pos_ratio_range = None  # Set to [0.7, 1.3] for training domain randomization
 
         init_npc_base_pos_range = dict(
             x= [-0.2, 0.2],

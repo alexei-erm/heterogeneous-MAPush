@@ -29,6 +29,7 @@ def test_zero_actions():
     args.task = 'go1push_mid'
     args.headless = False  # Show viewer
     args.num_envs = 1
+    args.record_video = False  # Disable video recording
 
     # Create hetero environment (Go1 + Anymal C)
     print("\n[1] Creating heterogeneous environment...")
@@ -52,53 +53,36 @@ def test_zero_actions():
     print(f"✅ Reset successful")
     print(f"   Obs shape: {obs.shape}")
 
-    # Test with ZERO actions for multiple steps
-    print("\n[3] Stepping with ZERO actions...")
-    print("    Both robots should stand still in default pose")
+    # Test with SMALL CONSTANT velocity commands
+    print("\n[3] Stepping with SMALL CONSTANT velocity commands...")
+    print("    Testing if policies work better with non-zero commands")
 
     num_steps = 500  # ~10 seconds at 50Hz
 
-    # Zero actions: [num_envs, num_agents, action_dim]
+    # Small constant velocity: [num_envs, num_agents, action_dim]
     # action_dim = 3 for both agents [vx, vy, vyaw]
-    zero_actions = torch.zeros(env.num_envs, env.num_agents, 3, device='cuda')
+    # Try small forward velocity (0.2 m/s) instead of zero
+    constant_actions = torch.zeros(env.num_envs, env.num_agents, 3, device='cuda')
+    constant_actions[:, :, 0] = 0.2  # Small forward velocity
+
+    print(f"    Command: vx=0.2 m/s, vy=0.0 m/s, vyaw=0.0 rad/s")
 
     reset_count = 0
     step_count = 0
 
     for step in range(num_steps):
-        obs, rewards, dones, infos = env.step(zero_actions)
+        obs, rewards, dones, infos = env.step(constant_actions)
         step_count += 1
 
         if dones.any():
             reset_count += 1
-            print(f"\n⚠️  Episode reset at step {step_count}")
-            print(f"    Done flags: {dones}")
-
-            # Check termination reasons if available
-            if hasattr(env, 'reset_buf'):
-                print(f"    Reset buffer: {env.reset_buf}")
-
-            # Check heights
-            if hasattr(env, 'base_pos'):
-                for agent_idx in range(env.num_agents):
-                    agent_z = env.base_pos[agent_idx, 2].item()
-                    print(f"    Agent {agent_idx} height: {agent_z:.3f}m")
-
-            # Reset and continue
+            # Reset and continue (silent)
             obs = env.reset()
             step_count = 0
 
-        # Print progress every 50 steps (~1 second)
-        if step % 50 == 0:
+        # Print progress every 100 steps (~2 seconds) - minimal output
+        if step % 100 == 0:
             print(f"  Step {step}/{num_steps} - Resets: {reset_count}")
-
-            # Print agent heights
-            if hasattr(env, 'base_pos'):
-                heights = []
-                for agent_idx in range(env.num_agents):
-                    agent_z = env.base_pos[agent_idx, 2].item()
-                    heights.append(f"Agent{agent_idx}={agent_z:.3f}m")
-                print(f"    Heights: {', '.join(heights)}")
 
     print("\n" + "="*60)
     print("TEST RESULTS")

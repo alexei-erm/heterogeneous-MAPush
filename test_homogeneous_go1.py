@@ -59,21 +59,22 @@ def test_homogeneous_go1():
     print(f"✅ Reset successful")
     print(f"   Obs shape: {obs.shape}")
 
-    # Test with ZERO actions for multiple steps
-    print("\n[3] Stepping with ZERO actions...")
-    print("    Both Go1 robots should stand still in default pose")
+    # Test with CONSTANT FORWARD velocity for both robots
+    print("\n[3] Stepping with CONSTANT FORWARD velocity [1, 0, 0]...")
+    print("    Both Go1 robots should walk forward")
 
     num_steps = 500  # ~10 seconds at 50Hz
 
-    # Zero actions: [num_envs, num_agents, action_dim]
+    # Constant forward velocity: [num_envs, num_agents, action_dim]
     # action_dim = 3 for both agents [vx, vy, vyaw]
-    zero_actions = torch.zeros(env.num_envs, env.num_agents, 3, device='cuda')
+    constant_actions = torch.zeros(env.num_envs, env.num_agents, 3, device='cuda')
+    constant_actions[:, :, 0] = 1.0  # vx = 1.0 m/s forward
 
     reset_count = 0
     step_count = 0
 
     for step in range(num_steps):
-        obs, rewards, dones, infos = env.step(zero_actions)
+        obs, rewards, dones, infos = env.step(constant_actions)
         step_count += 1
 
         if dones.any():

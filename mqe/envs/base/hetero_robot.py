@@ -126,6 +126,16 @@ class HeteroRobot(LeggedRobotField):
                         history_buffer = torch.zeros(self.num_envs, 2100, dtype=torch.float, device=self.device)
                         self.locomotion_obs_buffers.append({'obs': obs_buffer, 'history': history_buffer})
 
+                        # Initialize gait indices for Go1 clock computation
+                        if not hasattr(self, 'go1_gait_indices'):
+                            self.go1_gait_indices = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
+                            self.go1_clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device)
+
+                        # Load shared actuator network (used by both Go1 and Anymal C)
+                        # Both robots use the same unitree_go1.pt actuator network
+                        if not hasattr(self, 'actuator_network') and hasattr(robot_config.control, 'actuator_network_path'):
+                            self._load_actuator_network(robot_config.control.actuator_network_path)
+
                     elif robot_type == 'anymal_c':
                         # Anymal C uses single JIT policy (48-dim obs)
                         policy_model = torch.jit.load(policy_dir + '/policy_1.pt', map_location=self.device)
@@ -140,6 +150,10 @@ class HeteroRobot(LeggedRobotField):
                         obs_buffer = torch.zeros(self.num_envs, 48, dtype=torch.float, device=self.device)
                         self.locomotion_obs_buffers.append({'obs': obs_buffer, 'history': None})
 
+                        # Load shared actuator network (used by both Go1 and Anymal C)
+                        if not hasattr(self, 'actuator_network') and hasattr(robot_config.control, 'actuator_network_path'):
+                            self._load_actuator_network(robot_config.control.actuator_network_path)
+
                     else:
                         raise NotImplementedError(f"Locomotion policy loading for {robot_type} not implemented")
 
@@ -150,6 +164,36 @@ class HeteroRobot(LeggedRobotField):
                 # No locomotion policy needed (direct control)
                 self.locomotion_policies.append(None)
                 self.locomotion_obs_buffers.append(None)
+
+    def _load_actuator_network(self, actuator_network_path):
+        """
+        Load the shared actuator network for torque computation.
+        Both Go1 and Anymal C use the same unitree_go1.pt actuator network.
+        """
+        actuator_net = torch.jit.load(actuator_network_path + "/unitree_go1.pt", map_location=self.device)
+
+        # Create wrapper function that handles per-agent computation
+        def eval_actuator_network(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
+                                  joint_vel, joint_vel_last, joint_vel_last_last):
+            # Stack inputs: [num_envs, num_dof, 6]
+            xs = torch.cat((joint_pos_err.unsqueeze(-1),
+                           joint_pos_err_last.unsqueeze(-1),
+                           joint_pos_err_last_last.unsqueeze(-1),
+                           joint_vel.unsqueeze(-1),
+                           joint_vel_last.unsqueeze(-1),
+                           joint_vel_last_last.unsqueeze(-1)), dim=-1)
+            # Reshape for network: [num_envs * num_dof, 6]
+            num_envs = joint_pos_err.shape[0]
+            num_dof = joint_pos_err.shape[1]
+            with torch.no_grad():
+                torques = actuator_net(xs.view(num_envs * num_dof, 6))
+            return torques.view(num_envs, num_dof)
+
+        self.actuator_network = eval_actuator_network
+
+        # Initialize history buffers for each agent
+        # These will be set per-agent in _compute_torques on first call
+        print(f"[HeteroRobot] Loaded shared actuator network from {actuator_network_path}/unitree_go1.pt")
 
     def _create_action_masks(self):
         """
@@ -730,6 +774,12 @@ class HeteroRobot(LeggedRobotField):
         dof_pos = torch.stack(dof_pos_padded)  # [num_envs * num_agents, max_dof]
         dof_vel = torch.stack(dof_vel_padded)
 
+        # CRITICAL FIX: Recompute velocities from current root_states
+        # These were only computed once during __init__ and become stale
+        self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
+        self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
+        self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+
         # Now set observations using the unified action dimension
         if self.cfg.obs.cfgs.base_pos:
             self.obs_buf.base_pos = (self.base_pos - self.env_origins_repeat) * self.cfg.obs.scales.base_pos
@@ -745,6 +795,16 @@ class HeteroRobot(LeggedRobotField):
 
         if self.cfg.obs.cfgs.lin_vel or self.cfg.control.control_type == "C":
             self.obs_buf.lin_vel = self.base_lin_vel * self.obs_scales.lin_vel
+            # DEBUG: Print velocities on first observation computation
+            if not hasattr(self, '_debug_printed_vel'):
+                print(f"\n[DEBUG compute_observations] First call:")
+                print(f"  root_states[0, 7:10] (global lin vel agent 0): {self.root_states[0, 7:10]}")
+                print(f"  root_states[1, 7:10] (global lin vel agent 1): {self.root_states[1, 7:10]}")
+                print(f"  base_lin_vel[0] (body frame agent 0): {self.base_lin_vel[0]}")
+                print(f"  base_lin_vel[1] (body frame agent 1): {self.base_lin_vel[1]}")
+                print(f"  obs_buf.lin_vel[0] (scaled agent 0): {self.obs_buf.lin_vel[0]}")
+                print(f"  obs_buf.lin_vel[1] (scaled agent 1): {self.obs_buf.lin_vel[1]}")
+                self._debug_printed_vel = True
 
         if self.cfg.obs.cfgs.ang_vel or self.cfg.control.control_type == "C":
             self.obs_buf.ang_vel = self.base_ang_vel * self.obs_scales.ang_vel
@@ -785,15 +845,8 @@ class HeteroRobot(LeggedRobotField):
 
         # For hierarchical control mode "C", we need special handling
         if control_type == "C" or control_type == "control_net":
-            # actions shape: [num_envs, num_agents * num_action]
-            # We need to process each agent separately
-
-            # Scale actions
-            if isinstance(self.cfg.control.action_scale, (tuple, list)):
-                self.cfg.control.action_scale = torch.tensor(
-                    self.cfg.control.action_scale, device=self.sim_device
-                )
-            actions_scaled = actions * self.cfg.control.action_scale
+            # actions shape: [num_envs, total_dofs] (joint positions from locomotion policies)
+            # We need to process each agent separately with their specific action_scale
 
             # Compute DOF offsets for indexing
             dof_offsets = [0]
@@ -801,91 +854,63 @@ class HeteroRobot(LeggedRobotField):
                 dof_offsets.append(dof_offsets[-1] + num_dof)
 
             # Process each agent's actions to get joint targets
+            # CRITICAL: Apply per-robot action_scale, NOT task-level action_scale
             all_joint_targets = []
+
+            # Get per-robot action scales
+            from mqe.envs.robot_registry import get_robot_config
 
             for agent_idx in range(self.num_agents):
                 # Get this agent's robot info
+                robot_type = self.hetero_agent_types[agent_idx]
                 robot_info = self.hetero_robot_info[agent_idx]
                 num_dof_agent = self.robot_num_dofs[agent_idx]
                 dof_start = dof_offsets[agent_idx]
                 dof_end = dof_offsets[agent_idx + 1]
 
-                # CRITICAL FIX: Use high-level action dim (3), NOT DOF count!
-                # In heterogeneous mode with hierarchical control, actions are [vx, vy, vyaw]
-                # self.num_action is DOF count (12), but we need high-level action dim (3)
-                high_level_action_dim = 3  # [vx, vy, vyaw] for all robots
-
-                # Extract this agent's actions for all environments
-                # actions_scaled shape: [num_envs, num_agents * action_dim]
-                action_start = agent_idx * high_level_action_dim
-                action_end = (agent_idx + 1) * high_level_action_dim
-                agent_actions = actions_scaled[:, action_start:action_end]  # [num_envs, 3]
+                # Get this robot's specific action_scale from its config
+                robot_config = get_robot_config(robot_type)
+                robot_action_scale = robot_config.control.action_scale
 
                 # Get default positions for this agent
                 default_pos_agent = self.default_dof_pos[0, dof_start:dof_end]  # [num_dof_agent]
 
                 # For robots with hierarchical control
-                # Actions are already joint positions (computed in step())
+                # Actions are joint position residuals from locomotion policy
                 if robot_info['default_control'] == 'C':
-                    # Extract this agent's joint positions from actions
+                    # Extract this agent's joint position residuals from actions
                     # actions shape: [num_envs, total_dofs]
-                    joint_positions = actions_scaled[:, dof_start:dof_end]  # [num_envs, num_dof_agent]
+                    joint_residuals = actions[:, dof_start:dof_end].clone()  # [num_envs, num_dof_agent]
+
+                    # Apply robot-specific action scale
+                    joint_residuals_scaled = joint_residuals * robot_action_scale
+
+                    # Apply hip_scale_reduction for Go1 (and Anymal C has same structure)
+                    # Hip joints are at indices 0, 3, 6, 9 for 12-DOF quadrupeds
+                    if hasattr(robot_config.control, 'hip_scale_reduction') and num_dof_agent == 12:
+                        hip_scale = robot_config.control.hip_scale_reduction
+                        joint_residuals_scaled[:, [0, 3, 6, 9]] *= hip_scale
 
                     # Add to default positions to get joint targets
-                    joint_targets = joint_positions + default_pos_agent
+                    # target = residual * scale + default
+                    joint_targets = joint_residuals_scaled + default_pos_agent
                     all_joint_targets.append(joint_targets)
 
                 else:
-                    # Jackal (or other wheeled robots): actions are [vx, vy, vyaw]
-                    # Convert to wheel velocities using differential drive controller
-                    if agent_actions.shape[1] != num_dof_agent:
-                        # Actions are high-level [vx, vy, vyaw], need to convert to wheel velocities
-                        # Extract velocity commands
-                        vx = agent_actions[:, 0]     # [num_envs]
-                        vy = agent_actions[:, 1]     # [num_envs] (ignored for diff drive)
-                        vyaw = agent_actions[:, 2]   # [num_envs]
-
-                        # Get robot-specific parameters (wheel radius and track width)
-                        # For Jackal: wheel_radius=0.098m, track_width=0.37559m
-                        if self.hetero_agent_types[agent_idx] == 'jackal':
-                            wheel_radius = 0.098
-                            track_width = 0.37559
-                        else:
-                            # Default values if other wheeled robots are added
-                            wheel_radius = 0.1
-                            track_width = 0.3
-
-                        # Differential drive kinematics:
-                        # left_wheel_vel = (vx - vyaw * track_width/2) / wheel_radius
-                        # right_wheel_vel = (vx + vyaw * track_width/2) / wheel_radius
-                        left_wheel_vel = (vx - vyaw * track_width / 2) / wheel_radius
-                        right_wheel_vel = (vx + vyaw * track_width / 2) / wheel_radius
-
-                        # CRITICAL: Limit wheel velocities to prevent physics explosions
-                        # Jackal URDF specifies velocity="20.0" rad/s, but we use conservative limit
-                        # to prevent Isaac Gym's velocity controller from generating extreme torques
-                        max_wheel_velocity = 10.0  # rad/s (conservative, URDF allows 20)
-                        left_wheel_vel = torch.clamp(left_wheel_vel, -max_wheel_velocity, max_wheel_velocity)
-                        right_wheel_vel = torch.clamp(right_wheel_vel, -max_wheel_velocity, max_wheel_velocity)
-
-                        # Stack into [num_envs, 2] for two wheels
-                        wheel_velocities = torch.stack([left_wheel_vel, right_wheel_vel], dim=-1)
-
-                        # Store velocity targets for this agent (used in torque computation)
-                        if not hasattr(self, 'wheel_vel_targets'):
-                            self.wheel_vel_targets = {}
-                        self.wheel_vel_targets[agent_idx] = wheel_velocities
-
-                        # For position targets, use default (we'll use velocity control in torque computation)
-                        joint_targets = default_pos_agent.unsqueeze(0).repeat(self.num_envs, 1)
-                    else:
-                        # Actions already match DOF count
-                        joint_targets = agent_actions + default_pos_agent
-
-                    all_joint_targets.append(joint_targets)
+                    # All robots in hetero mode should use hierarchical control
+                    raise NotImplementedError(f"Robot type {robot_type} does not use hierarchical control")
 
             # Concatenate all joint targets
             self.joint_pos_target = torch.cat(all_joint_targets, dim=1)  # [num_envs, total_dofs]
+
+            # DEBUG: Print actual joint targets on first step
+            if not hasattr(self, '_debug_printed_targets'):
+                print(f"\n[DEBUG _compute_torques] Joint targets:")
+                print(f"  Go1 targets: {self.joint_pos_target[0, :12]}")
+                print(f"  Go1 defaults: {self.default_dof_pos[0, :12]}")
+                print(f"  Anymal C targets: {self.joint_pos_target[0, 12:24]}")
+                print(f"  Anymal C defaults: {self.default_dof_pos[0, 12:24]}")
+                self._debug_printed_targets = True
 
             # Compute torques for each agent
             all_torques = []
@@ -945,19 +970,8 @@ class HeteroRobot(LeggedRobotField):
                     all_torques.append(torques_agent)
 
                 else:
-                    # Wheeled robot with velocity control (e.g., Jackal)
-                    if hasattr(self, 'wheel_vel_targets') and agent_idx in self.wheel_vel_targets:
-                        # Use velocity targets from differential drive controller
-                        torques_agent = self.wheel_vel_targets[agent_idx]
-                    else:
-                        # Fallback: zero velocity
-                        torques_agent = torch.zeros(
-                            (self.num_envs, num_dof_agent),
-                            dtype=torch.float,
-                            device=self.device
-                        )
-
-                    all_torques.append(torques_agent)
+                    # All robots in hetero mode should use hierarchical control
+                    raise NotImplementedError(f"Robot type does not use hierarchical control")
 
             # Concatenate all torques
             torques = torch.cat(all_torques, dim=1)  # [num_envs, total_dofs]
@@ -1009,23 +1023,123 @@ class HeteroRobot(LeggedRobotField):
                 agent_env_indices = torch.arange(self.num_envs, device=self.device) * self.num_agents + agent_idx
 
                 if robot_type == 'go1':
-                    # Build 70-dim locomotion observation for Go1
+                    # Build 70-dim locomotion observation for Go1 walk_these_ways policy
+                    # Structure must match go1.py _fill_command_obs() and preprocess_action()
                     loc_obs = obs_buffer_dict['obs']
                     history = obs_buffer_dict['history']
 
-                    # Fill observation
+                    # [0:3] projected_gravity
                     loc_obs[:, 0:3] = self.obs_buf.projected_gravity[agent_env_indices]
-                    loc_obs[:, 3:6] = agent_actions  # Commands [vx, vy, vyaw]
-                    loc_obs[:, 18:30] = self.obs_buf.dof_pos[agent_env_indices]
-                    loc_obs[:, 30:42] = self.obs_buf.dof_vel[agent_env_indices]
-                    # TODO: last_action, clock_inputs, etc. - leave as zeros for now
 
-                    # Update history
+                    # [3:6] velocity commands scaled by [2.0, 2.0, 0.25]
+                    loc_obs[:, 3:6] = agent_actions * self.commands_scale
+
+                    # [6] body_height (default 0.0 * 2.0 = 0.0)
+                    loc_obs[:, 6] = 0.0
+
+                    # [7] gait_freq (default 3.0 * 1.0 = 3.0)
+                    loc_obs[:, 7] = 3.0
+
+                    # [8:12] gait params for trotting: [phase=0.5, offset=0, bound=0, duration=0.5]
+                    loc_obs[:, 8] = 0.5   # phase
+                    loc_obs[:, 9] = 0.0   # offset
+                    loc_obs[:, 10] = 0.0  # bound
+                    loc_obs[:, 11] = 0.5  # duration
+
+                    # [12] footswing_height (default 0.08 * 0.15 = 0.012)
+                    loc_obs[:, 12] = 0.08 * 0.15
+
+                    # [13:15] body_pitch, body_roll (default 0.0)
+                    loc_obs[:, 13] = 0.0
+                    loc_obs[:, 14] = 0.0
+
+                    # [15] stance_width (default 0.25 * 1.0 = 0.25)
+                    loc_obs[:, 15] = 0.25
+
+                    # [16] stance_length (default 0.428 * 1.0 = 0.428)
+                    loc_obs[:, 16] = 0.428
+
+                    # [17] aux_reward (default 0.0)
+                    loc_obs[:, 17] = 0.0
+
+                    # [18:30] dof_pos (scaled errors from default)
+                    loc_obs[:, 18:30] = self.obs_buf.dof_pos[agent_env_indices]
+
+                    # [30:42] dof_vel (scaled)
+                    loc_obs[:, 30:42] = self.obs_buf.dof_vel[agent_env_indices]
+
+                    # [42:54] last_locomotion_action (t-1)
+                    if 'last_action' in obs_buffer_dict:
+                        loc_obs[:, 42:54] = obs_buffer_dict['last_action']
+                    else:
+                        loc_obs[:, 42:54] = 0.0
+
+                    # [54:66] last_two_locomotion_action (t-2)
+                    if 'last_two_action' in obs_buffer_dict:
+                        loc_obs[:, 54:66] = obs_buffer_dict['last_two_action']
+                    else:
+                        loc_obs[:, 54:66] = 0.0
+
+                    # [66:70] clock_inputs - compute from gait phase
+                    # Must match go1.py _step_contact_targets() exactly
+                    if hasattr(self, 'go1_gait_indices'):
+                        # Get gait params from locomotion_obs (same as homogeneous)
+                        frequencies = loc_obs[:, 7]   # gait_freq
+                        phases = loc_obs[:, 8]        # phase
+                        offsets = loc_obs[:, 9]       # offset
+                        bounds = loc_obs[:, 10]       # bound
+                        durations = loc_obs[:, 11]    # duration
+
+                        # Update gait index
+                        self.go1_gait_indices = torch.remainder(self.go1_gait_indices + self.dt * frequencies, 1.0)
+
+                        # Compute foot indices exactly like go1.py _step_contact_targets
+                        foot_indices = [
+                            self.go1_gait_indices + phases + offsets + bounds,  # FL
+                            self.go1_gait_indices + offsets,                     # FR
+                            self.go1_gait_indices + bounds,                      # RL
+                            self.go1_gait_indices + phases                       # RR
+                        ]
+
+                        # Apply duration warping like go1.py
+                        for idxs in foot_indices:
+                            stance_idxs = torch.remainder(idxs, 1) < durations
+                            swing_idxs = torch.remainder(idxs, 1) >= durations
+                            idxs[stance_idxs] = torch.remainder(idxs[stance_idxs], 1) * (0.5 / durations[stance_idxs])
+                            idxs[swing_idxs] = 0.5 + (torch.remainder(idxs[swing_idxs], 1) - durations[swing_idxs]) * (
+                                0.5 / (1 - durations[swing_idxs]))
+
+                        # Compute clock inputs (sinusoidal)
+                        self.go1_clock_inputs[:, 0] = torch.sin(2 * np.pi * foot_indices[0])
+                        self.go1_clock_inputs[:, 1] = torch.sin(2 * np.pi * foot_indices[1])
+                        self.go1_clock_inputs[:, 2] = torch.sin(2 * np.pi * foot_indices[2])
+                        self.go1_clock_inputs[:, 3] = torch.sin(2 * np.pi * foot_indices[3])
+
+                        loc_obs[:, 66:70] = self.go1_clock_inputs
+                    else:
+                        loc_obs[:, 66:70] = 0.0
+
+                    # Update history (rolling window of 30 observations = 2100 dims)
                     history = torch.cat((history[:, 70:], loc_obs), dim=-1)
                     obs_buffer_dict['history'] = history
 
                     # Call policy with history
                     joint_positions = locomotion_policy(history)
+
+                    # Store last actions for next step (need t-1 and t-2)
+                    if 'last_action' in obs_buffer_dict:
+                        obs_buffer_dict['last_two_action'] = obs_buffer_dict['last_action'].clone()
+                    obs_buffer_dict['last_action'] = joint_positions.clone()
+
+                    # DEBUG: Print on first step only
+                    if not hasattr(self, '_debug_printed_go1'):
+                        print(f"\n[DEBUG Go1] First step:")
+                        print(f"  Commands (scaled): {loc_obs[0, 3:6]}")
+                        print(f"  Gait freq: {loc_obs[0, 7]}, Gait params: {loc_obs[0, 8:12]}")
+                        print(f"  DOF pos (scaled errors): {loc_obs[0, 18:30]}")
+                        print(f"  Policy output joint targets: {joint_positions[0]}")
+                        print(f"  Default joint angles: {self.default_dof_pos[0, :12]}")
+                        self._debug_printed_go1 = True
 
                 elif robot_type == 'anymal_c':
                     # Build 48-dim locomotion observation for Anymal C
@@ -1046,7 +1160,8 @@ class HeteroRobot(LeggedRobotField):
                     loc_obs[:, 0:3] = self.obs_buf.lin_vel[agent_env_indices]  # Already scaled
                     loc_obs[:, 3:6] = self.obs_buf.ang_vel[agent_env_indices]  # Already scaled
                     loc_obs[:, 6:9] = self.obs_buf.projected_gravity[agent_env_indices]
-                    loc_obs[:, 9:12] = agent_actions  # Commands (will be scaled by policy)
+                    # Scale commands like legged_gym does: [lin_vel, lin_vel, ang_vel] * [2.0, 2.0, 0.25]
+                    loc_obs[:, 9:12] = agent_actions * self.commands_scale  # Commands scaled
                     loc_obs[:, 12:24] = self.obs_buf.dof_pos[agent_env_indices]  # Already scaled
                     loc_obs[:, 24:36] = self.obs_buf.dof_vel[agent_env_indices]  # Already scaled
 
@@ -1059,6 +1174,20 @@ class HeteroRobot(LeggedRobotField):
 
                     # Call policy
                     joint_positions = locomotion_policy(loc_obs)
+
+                    # DEBUG: Print on first step only
+                    if not hasattr(self, '_debug_printed_anymal'):
+                        print(f"\n[DEBUG Anymal C] First step:")
+                        print(f"  Lin vel (scaled): {loc_obs[0, 0:3]}")
+                        print(f"  Ang vel (scaled): {loc_obs[0, 3:6]}")
+                        print(f"  Projected gravity: {loc_obs[0, 6:9]}")
+                        print(f"  Commands (scaled): {loc_obs[0, 9:12]}")
+                        print(f"  DOF pos (scaled errors): {loc_obs[0, 12:24]}")
+                        print(f"  DOF vel (scaled): {loc_obs[0, 24:36]}")
+                        print(f"  Last actions: {loc_obs[0, 36:48]}")
+                        print(f"  Policy output joint targets: {joint_positions[0]}")
+                        print(f"  Default joint angles: {self.default_dof_pos[0, 12:24]}")
+                        self._debug_printed_anymal = True
 
                     # Store for next step
                     obs_buffer_dict['last_joint_targets'] = joint_positions.clone()
