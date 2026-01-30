@@ -1,0 +1,127 @@
+"""
+Test heterogeneous environment with ZERO actions.
+
+This isolates whether the problem is:
+1. Locomotion policy issues -> If works with zero actions, policy is broken
+2. Physics/spawn issues -> If fails with zero actions, spawn/physics problem
+"""
+
+import sys
+sys.path.append('/home/gvlab/new-universal-MAPush')
+
+# Import Isaac Gym FIRST
+from isaacgym import gymapi
+from isaacgym import gymutil
+
+import torch
+from mqe.envs.utils import make_hetero_env
+from mqe.utils.helpers import get_args
+
+def test_zero_actions():
+    """Test with zero actions to see if robots can stand still."""
+
+    print("\n" + "="*60)
+    print("TESTING HETERO ENV WITH ZERO ACTIONS")
+    print("="*60)
+
+    # Get proper args with defaults
+    args = get_args()
+    args.task = 'go1push_mid'
+    args.headless = False  # Show viewer
+    args.num_envs = 1
+
+    # Create hetero environment (Go1 + Anymal C)
+    print("\n[1] Creating heterogeneous environment...")
+    print("    Agent 0: Go1")
+    print("    Agent 1: Anymal C")
+
+    env, env_cfg = make_hetero_env(
+        env_name='go1push_mid',
+        agent_types=['go1', 'anymal_c'],
+        args=args
+    )
+
+    print(f"✅ Environment created")
+    print(f"   Num envs: {env.num_envs}")
+    print(f"   Num agents: {env.num_agents}")
+    print(f"   Total DOFs: {env.num_actuated_dof}")
+
+    # Reset environment
+    print("\n[2] Resetting environment...")
+    obs = env.reset()
+    print(f"✅ Reset successful")
+    print(f"   Obs shape: {obs.shape}")
+
+    # Test with ZERO actions for multiple steps
+    print("\n[3] Stepping with ZERO actions...")
+    print("    Both robots should stand still in default pose")
+
+    num_steps = 500  # ~10 seconds at 50Hz
+
+    # Zero actions: [num_envs, num_agents, action_dim]
+    # action_dim = 3 for both agents [vx, vy, vyaw]
+    zero_actions = torch.zeros(env.num_envs, env.num_agents, 3, device='cuda')
+
+    reset_count = 0
+    step_count = 0
+
+    for step in range(num_steps):
+        obs, rewards, dones, infos = env.step(zero_actions)
+        step_count += 1
+
+        if dones.any():
+            reset_count += 1
+            print(f"\n⚠️  Episode reset at step {step_count}")
+            print(f"    Done flags: {dones}")
+
+            # Check termination reasons if available
+            if hasattr(env, 'reset_buf'):
+                print(f"    Reset buffer: {env.reset_buf}")
+
+            # Check heights
+            if hasattr(env, 'base_pos'):
+                for agent_idx in range(env.num_agents):
+                    agent_z = env.base_pos[agent_idx, 2].item()
+                    print(f"    Agent {agent_idx} height: {agent_z:.3f}m")
+
+            # Reset and continue
+            obs = env.reset()
+            step_count = 0
+
+        # Print progress every 50 steps (~1 second)
+        if step % 50 == 0:
+            print(f"  Step {step}/{num_steps} - Resets: {reset_count}")
+
+            # Print agent heights
+            if hasattr(env, 'base_pos'):
+                heights = []
+                for agent_idx in range(env.num_agents):
+                    agent_z = env.base_pos[agent_idx, 2].item()
+                    heights.append(f"Agent{agent_idx}={agent_z:.3f}m")
+                print(f"    Heights: {', '.join(heights)}")
+
+    print("\n" + "="*60)
+    print("TEST RESULTS")
+    print("="*60)
+    print(f"Total steps: {num_steps}")
+    print(f"Total resets: {reset_count}")
+
+    if reset_count == 0:
+        print("\n✅ SUCCESS: Robots stood stable for entire test!")
+        print("   -> Problem is likely in locomotion policy or action processing")
+    elif reset_count < 5:
+        print(f"\n⚠️  PARTIAL SUCCESS: Only {reset_count} resets")
+        print("   -> Spawn might be slightly unstable but not catastrophic")
+    else:
+        print(f"\n❌ FAILURE: {reset_count} resets in {num_steps} steps")
+        print("   -> Physics/spawn issue - robots can't even stand still")
+
+        if reset_count > 20:
+            print("   -> CRITICAL: Immediate collapse on spawn")
+
+    print("="*60 + "\n")
+
+    env.close()
+
+if __name__ == "__main__":
+    test_zero_actions()

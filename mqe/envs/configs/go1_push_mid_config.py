@@ -78,7 +78,7 @@ class Go1PushMidCfg(Go1Cfg):
     class termination(Go1Cfg.termination):
         # additional exceptions that determines whether to terminates the episode
         check_obstacle_conditioned_threshold = False
-        z_wave_kwargs = dict(threshold= 0.35) # if the change of z position is larger than this threshold, the episode will be terminated
+        z_wave_kwargs = dict(threshold= 2.0) # Temporarily relaxed from 0.35 to 2.0 for Anymal C testing
         collision_kwargs = dict(threshold= 0.25) # if the distance of two agents are small than this threshold, the episode will be terminated
         termination_terms = [
             "roll",

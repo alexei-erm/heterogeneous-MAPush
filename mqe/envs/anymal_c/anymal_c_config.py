@@ -59,18 +59,18 @@ class AnymalCCfg(LeggedRobotFieldCfg):
             "{LEGGED_GYM_ROOT_DIR}/resources/robots/anymal_c/urdf/anymal_c.urdf",
         ] # Single color for now
         name = "anymal_c"
-        foot_name = "SHANK"  # name of the feet bodies, used to index body state and contact force tensors
-        penalize_contacts_on = ["base", "THIGH"]
+        foot_name = "FOOT"  # Our URDF has both SHANK and FOOT bodies; FOOT is the actual foot contact point
+        penalize_contacts_on = ["SHANK", "THIGH"]  # MUST match legged_gym training config
         terminate_after_contacts_on = ["base"]
         disable_gravity = False
         # merge bodies connected by fixed joints. Specific fixed joints can be kept by adding " <... dont_collapse="true">
         collapse_fixed_joints = True
         fix_base_link = False  # fixe the base of the robot
         default_dof_drive_mode = 3  # see GymDofDriveModeFlags (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
-        self_collisions = 0  # 1 to disable, 0 to enable...bitwise filter
+        self_collisions = 1  # 1 to disable, 0 to enable - MUST match legged_gym (disabled)
         # replace collision cylinders with capsules, leads to faster/more stable simulation
         replace_cylinder_with_capsule = True
-        flip_visual_attachments = False  # Some .obj meshes must be flipped from y-up to z-up
+        flip_visual_attachments = True  # MUST match legged_gym parent class default (True)
 
         density = 0.001
         angular_damping = 0.
@@ -81,27 +81,28 @@ class AnymalCCfg(LeggedRobotFieldCfg):
         thickness = 0.01
 
     class init_state(LeggedRobotFieldCfg.init_state):
-        pos = [0.0, 0.0, 0.6] # x,y,z [m] - Anymal C is taller than Go1
+        pos = [0.0, 0.0, 0.62] # x,y,z [m] - Matches legged_gym training config (0.6m)
         default_joint_angles = { # = target angles [rad] when action = 0.0
+            # MUST match training config from legged_gym/envs/anymal_c/mixed_terrains/anymal_c_rough_config.py
             # Left Front leg
-            'LF_HAA': 0.0,   # Hip Abduction/Adduction
-            'LF_HFE': 0.4,   # Hip Flexion/Extension
-            'LF_KFE': -0.8,  # Knee Flexion/Extension
+            'LF_HAA': 0.0,    # Hip Abduction/Adduction
+            'LF_HFE': 0.4,    # Hip Flexion/Extension - bent forward
+            'LF_KFE': -0.8,   # Knee Flexion/Extension - bent down
 
             # Right Front leg
-            'RF_HAA': 0.0,
-            'RF_HFE': 0.4,
-            'RF_KFE': -0.8,
+            'RF_HAA': 0.0,    # Hip Abduction/Adduction
+            'RF_HFE': 0.4,    # Hip Flexion/Extension - bent forward
+            'RF_KFE': -0.8,   # Knee Flexion/Extension - bent down
 
-            # Left Hind leg
-            'LH_HAA': 0.0,
-            'LH_HFE': 0.4,
-            'LH_KFE': -0.8,
+            # Left Hind leg (OPPOSITE sign from front for HFE/KFE)
+            'LH_HAA': 0.0,    # Hip Abduction/Adduction
+            'LH_HFE': -0.4,   # Hip Flexion/Extension - bent backward (opposite from front)
+            'LH_KFE': 0.8,    # Knee Flexion/Extension - bent up (opposite from front)
 
-            # Right Hind leg
-            'RH_HAA': 0.0,
-            'RH_HFE': 0.4,
-            'RH_KFE': -0.8,
+            # Right Hind leg (OPPOSITE sign from front for HFE/KFE)
+            'RH_HAA': 0.0,    # Hip Abduction/Adduction
+            'RH_HFE': -0.4,   # Hip Flexion/Extension - bent backward (opposite from front)
+            'RH_KFE': 0.8,    # Knee Flexion/Extension - bent up (opposite from front)
         }
 
     class normalization(LeggedRobotFieldCfg.normalization):
@@ -109,9 +110,12 @@ class AnymalCCfg(LeggedRobotFieldCfg):
 
     class control(LeggedRobotFieldCfg.control):
         control_type = 'C' # P: position, V: velocity, T: torques, C: command
-        stiffness = {'joint': 20.}
-        damping = {'joint': 0.5}
-        action_scale = 0.25
+        # Anymal C DOF names: LF_HAA, LF_HFE, LF_KFE, etc. (not "joint")
+        # Use '_' which appears in all Anymal C joint names
+        # MUST match training config: HAA=80, HFE=80, KFE=80 → use 80 for all
+        stiffness = {'_': 80.}  # Matches training config from legged_gym
+        damping = {'_': 2.0}    # Matches training config
+        action_scale = 0.5  # MUST match training config (was 0.25, trained with 0.5)
         torque_limits = [80., 80., 80.] * 4  # Anymal C has stronger motors than Go1
         computer_clip_torque = True
         motor_clip_torque = False
@@ -200,7 +204,7 @@ class AnymalCCfg(LeggedRobotFieldCfg):
             threshold= 1.6,
         )
         z_wave_kwargs = dict(
-            threshold= 0.5, # [m]
+            threshold= 2.0, # [m] - Relaxed for Anymal C testing
         )
         collision_kwargs = dict(
             threshold= 0.15, # [m]

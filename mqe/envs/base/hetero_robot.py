@@ -197,21 +197,25 @@ class HeteroRobot(LeggedRobotField):
             asset_root = os.path.dirname(asset_path)
             asset_file = os.path.basename(asset_path)
 
-            # Create asset options (use config from base or per-robot if available)
+            # Get per-robot config for this agent type
+            from mqe.envs.robot_registry import get_robot_config
+            robot_config = get_robot_config(self.hetero_agent_types[i])
+
+            # Create asset options using per-robot config
             asset_options = gymapi.AssetOptions()
-            asset_options.default_dof_drive_mode = self.cfg.asset.default_dof_drive_mode
-            asset_options.collapse_fixed_joints = self.cfg.asset.collapse_fixed_joints
-            asset_options.replace_cylinder_with_capsule = self.cfg.asset.replace_cylinder_with_capsule
-            asset_options.flip_visual_attachments = self.cfg.asset.flip_visual_attachments
-            asset_options.fix_base_link = self.cfg.asset.fix_base_link
-            asset_options.density = self.cfg.asset.density
-            asset_options.angular_damping = self.cfg.asset.angular_damping
-            asset_options.linear_damping = self.cfg.asset.linear_damping
-            asset_options.max_angular_velocity = self.cfg.asset.max_angular_velocity
-            asset_options.max_linear_velocity = self.cfg.asset.max_linear_velocity
-            asset_options.armature = self.cfg.asset.armature
-            asset_options.thickness = self.cfg.asset.thickness
-            asset_options.disable_gravity = self.cfg.asset.disable_gravity
+            asset_options.default_dof_drive_mode = robot_config.asset.default_dof_drive_mode
+            asset_options.collapse_fixed_joints = robot_config.asset.collapse_fixed_joints
+            asset_options.replace_cylinder_with_capsule = robot_config.asset.replace_cylinder_with_capsule
+            asset_options.flip_visual_attachments = robot_config.asset.flip_visual_attachments
+            asset_options.fix_base_link = robot_config.asset.fix_base_link
+            asset_options.density = robot_config.asset.density
+            asset_options.angular_damping = robot_config.asset.angular_damping
+            asset_options.linear_damping = robot_config.asset.linear_damping
+            asset_options.max_angular_velocity = robot_config.asset.max_angular_velocity
+            asset_options.max_linear_velocity = robot_config.asset.max_linear_velocity
+            asset_options.armature = robot_config.asset.armature
+            asset_options.thickness = robot_config.asset.thickness
+            asset_options.disable_gravity = robot_config.asset.disable_gravity
 
             # Load asset
             robot_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
@@ -228,9 +232,7 @@ class HeteroRobot(LeggedRobotField):
             robot_dof_props_list.append(dof_props)
             robot_rigid_shape_props_list.append(rigid_shape_props)
 
-            # Get torque limits for this robot type
-            from mqe.envs.robot_registry import get_robot_config
-            robot_config = get_robot_config(self.hetero_agent_types[i])
+            # Get torque limits for this robot type (robot_config already loaded above)
             if hasattr(robot_config.control, 'torque_limits'):
                 robot_torque_limits.append(robot_config.control.torque_limits)
             else:
@@ -340,6 +342,12 @@ class HeteroRobot(LeggedRobotField):
                 pos = self.env_origins[i].clone()
                 pos[0:1] += torch_rand_float(-self.cfg.terrain.x_init_range, self.cfg.terrain.x_init_range, (1, 1), device=self.device).squeeze(1)
                 pos[1:2] += torch_rand_float(-self.cfg.terrain.y_init_range, self.cfg.terrain.y_init_range, (1, 1), device=self.device).squeeze(1)
+
+                # CRITICAL FIX: Set agent-specific spawn height
+                from mqe.envs.robot_registry import get_robot_config
+                robot_config = get_robot_config(self.hetero_agent_types[j])
+                pos[2] = robot_config.init_state.pos[2]  # Set correct z-height for this agent
+
                 start_pose.p = gymapi.Vec3(*pos)
 
                 # Create actor with specific robot asset
@@ -1021,19 +1029,39 @@ class HeteroRobot(LeggedRobotField):
 
                 elif robot_type == 'anymal_c':
                     # Build 48-dim locomotion observation for Anymal C
+                    # Use SAME method as Go1 - use obs_buf which is already processed!
                     loc_obs = obs_buffer_dict['obs']
 
-                    # Fill 48-dim observation structure
-                    loc_obs[:, 0:3] = self.obs_buf.projected_gravity[agent_env_indices]
-                    loc_obs[:, 3:6] = agent_actions  # [vx, vy, vyaw]
-                    loc_obs[:, 6:18] = self.obs_buf.dof_pos[agent_env_indices]
-                    loc_obs[:, 18:30] = self.obs_buf.dof_vel[agent_env_indices]
-                    # [30:42] last_action - TODO
-                    loc_obs[:, 42:45] = self.obs_buf.ang_vel[agent_env_indices]
-                    # [45:48] extras (zeros for now)
+                    # Use obs_buf like Go1 does - it handles scaling and per-agent indexing
+                    # Observation structure for legged_gym:
+                    # [0:3] base_lin_vel (already scaled in obs_buf)
+                    # [3:6] base_ang_vel (already scaled in obs_buf)
+                    # [6:9] projected_gravity
+                    # [9:12] commands
+                    # [12:24] dof_pos (already scaled in obs_buf)
+                    # [24:36] dof_vel (already scaled in obs_buf)
+                    # [36:48] previous actions
 
-                    # Call policy (no history buffer)
+                    # Get values from obs_buf (already per-agent and scaled)
+                    loc_obs[:, 0:3] = self.obs_buf.lin_vel[agent_env_indices]  # Already scaled
+                    loc_obs[:, 3:6] = self.obs_buf.ang_vel[agent_env_indices]  # Already scaled
+                    loc_obs[:, 6:9] = self.obs_buf.projected_gravity[agent_env_indices]
+                    loc_obs[:, 9:12] = agent_actions  # Commands (will be scaled by policy)
+                    loc_obs[:, 12:24] = self.obs_buf.dof_pos[agent_env_indices]  # Already scaled
+                    loc_obs[:, 24:36] = self.obs_buf.dof_vel[agent_env_indices]  # Already scaled
+
+                    # [36:48] previous actions
+                    if hasattr(obs_buffer_dict, 'last_joint_targets'):
+                        loc_obs[:, 36:48] = obs_buffer_dict['last_joint_targets']
+                    else:
+                        # First step - use zeros
+                        loc_obs[:, 36:48] = torch.zeros(self.num_envs, 12, device=self.device)
+
+                    # Call policy
                     joint_positions = locomotion_policy(loc_obs)
+
+                    # Store for next step
+                    obs_buffer_dict['last_joint_targets'] = joint_positions.clone()
 
                 else:
                     raise NotImplementedError(f"Locomotion policy for {robot_type} not implemented")

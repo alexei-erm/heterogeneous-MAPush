@@ -7,13 +7,17 @@ Usage:
     python visualize_checkpoint.py --checkpoint ./results/.../checkpoints/10M
 """
 
-import torch
-import numpy as np
 import argparse
 import os
+import sys
+
+# CRITICAL: Import isaacgym-related modules BEFORE torch
 from mqe.envs.utils import make_hetero_env
 from mqe.utils.helpers import get_args
-import sys
+
+# Now safe to import torch
+import torch
+import numpy as np
 
 def load_policy(checkpoint_dir, device='cuda'):
     """Load actor model from checkpoint directory."""
@@ -42,13 +46,13 @@ def visualize_policy(checkpoint_dir, num_steps=2000):
     """Run environment with loaded policy and viewer enabled."""
 
     print("="*80)
-    print("VISUALIZING TRAINED HETEROGENEOUS POLICY")
+    print("VISUALIZING TRAINED HETEROGENEOUS POLICY (Go1 + Anymal C)")
     print("="*80)
     print(f"Checkpoint: {checkpoint_dir}")
     print(f"Running {num_steps} steps with LEARNED policy")
     print("Watch for:")
     print("  1. What actions does the policy command?")
-    print("  2. Does Jackal spin wheels too fast?")
+    print("  2. Do robots coordinate to push the box?")
     print("  3. When does physics explode?")
     print("  4. Do robots collide violently?")
     print("="*80)
@@ -64,12 +68,19 @@ def visualize_policy(checkpoint_dir, num_steps=2000):
     args.record_video = False
     args.headless = False  # Enable viewer
 
-    # Create environment
+    # Create environment with custom config to disable video recording
     print("\nCreating heterogeneous environment...")
+
+    def disable_recording_cfg(cfg):
+        """Disable video recording for faster visualization."""
+        cfg.env.record_video = False
+        return cfg
+
     env, env_cfg = make_hetero_env(
         env_name='go1push_mid',
-        agent_types=['go1', 'jackal'],
-        args=args
+        agent_types=['go1', 'anymal_c'],
+        args=args,
+        custom_cfg=disable_recording_cfg
     )
 
     # Load policy
@@ -85,24 +96,26 @@ def visualize_policy(checkpoint_dir, num_steps=2000):
     print("\n[Viewer] Environment created. Viewer should open.")
     print("[Viewer] Press 'V' to toggle viewer camera")
     print("[Viewer] Use mouse to rotate/pan camera")
-    print(f"[Viewer] Running {num_steps} steps with {'LEARNED' if actors else 'RANDOM'} actions...")
-    print("\nObserve what the robots do!\n")
+    print(f"[Viewer] Running {num_steps} steps with ZERO actions (standing still)...")
+    print("[Viewer] This tests if spawn heights are correct.")
+    print("\nExpected heights:")
+    print("  Go1: ~0.42m")
+    print("  Anymal C: ~0.6m")
+    print("\nBoth robots should stand still without falling.\n")
 
     # Reset
     obs = env.reset()
 
     # Run with learned policy
     for step in range(num_steps):
-        if actors is not None:
-            # TODO: Use loaded actors to get actions
-            # For now, use random actions as placeholder
-            # Need to understand actor model structure to properly inference
-            actions = torch.rand(1, 2, 3, device='cuda') * 2 - 1  # [-1, 1]
-            print("[WARNING] Policy loading not fully implemented, using random actions")
-            actors = None  # Don't print this warning again
-        else:
-            # Random actions
-            actions = torch.rand(1, 2, 3, device='cuda') * 2 - 1  # [-1, 1]
+        # TEMPORARY: Use ZERO actions to test spawn heights
+        # Both robots should just stand still at their spawn heights
+        actions = torch.zeros(2, 3, device='cuda')  # [num_envs * num_agents, 3] = [2, 3]
+        # actions[0, :] = Go1 actions [vx, vy, vyaw]
+        # actions[1, :] = Anymal C actions [vx, vy, vyaw]
+
+        if step == 0:
+            print("[INFO] Using ZERO actions - robots should stand still")
 
         # Step environment
         obs, reward, done, info = env.step(actions)
@@ -120,20 +133,15 @@ def visualize_policy(checkpoint_dir, num_steps=2000):
             # Check robot states
             base_pos = env.env.obs_buf.base_pos.reshape(1, 2, -1)
             go1_height = base_pos[0, 0, 2].item()
-            jackal_height = base_pos[0, 1, 2].item()
+            anymal_height = base_pos[0, 1, 2].item()
 
             print(f"  Go1 height: {go1_height:.3f}m")
-            print(f"  Jackal height: {jackal_height:.3f}m")
-
-            # Print wheel velocities if available
-            if hasattr(env.env, 'dof_vel'):
-                jackal_wheel_vels = env.env.dof_vel[0, 12:14]  # Jackal wheels (DOF 12-13)
-                print(f"  Jackal wheel velocities: L={jackal_wheel_vels[0]:.2f}, R={jackal_wheel_vels[1]:.2f} rad/s")
+            print(f"  Anymal C height: {anymal_height:.3f}m")
 
             # Check for physics breakdown
-            if go1_height < 0.1 or jackal_height < 0.0:
+            if go1_height < 0.1 or anymal_height < 0.1:
                 print("  ⚠️  Robot(s) too low - may have fallen through ground!")
-            if go1_height > 1.0 or jackal_height > 0.5:
+            if go1_height > 1.0 or anymal_height > 1.0:
                 print("  ⚠️  Robot(s) too high - physics may be unstable!")
 
         if done.any():

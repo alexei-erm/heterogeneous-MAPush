@@ -32,7 +32,7 @@ class MAPushHAPPORunner(OnPolicyHARunner):
             self.logger.set_envs(self.envs)
 
         # Checkpoint configuration
-        self.checkpoint_interval = 10_000_000  # 10M steps
+        self.checkpoint_interval = 1_000_000  # 1M steps (changed for testing)
         self.last_checkpoint_step = 0
 
         # Create checkpoints directory
@@ -134,7 +134,7 @@ class MAPushHAPPORunner(OnPolicyHARunner):
                 # Update total steps
                 self.total_steps += self.algo_args["train"]["n_rollout_threads"]
 
-                # Check if we should save checkpoint (every 10M steps)
+                # Check if we should save checkpoint
                 if self.total_steps - self.last_checkpoint_step >= self.checkpoint_interval:
                     self.save_checkpoint(self.total_steps)
                     self.last_checkpoint_step = self.total_steps

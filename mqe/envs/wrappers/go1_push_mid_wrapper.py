@@ -63,7 +63,16 @@ class Go1PushMidWrapper(EmptyWrapper):
             print(f"[Go1PushMidWrapper] Heterogeneous mode enabled:")
             print(f"  Agent types: {self.hetero_agent_types}")
             print(f"  Both agents use 3 DOF [vx, vy, vyaw] action space")
-            print(f"  Go1: Locomotion policy, {self.hetero_agent_types[1]}: Differential drive")
+            # Identify control types for each agent
+            ctrl_descriptions = []
+            for agent_type in self.hetero_agent_types:
+                if agent_type in ['go1', 'anymal_c']:  # Quadrupeds use locomotion policy
+                    ctrl_descriptions.append(f"{agent_type}: Locomotion policy")
+                elif agent_type == 'jackal':  # Wheeled robots use differential drive
+                    ctrl_descriptions.append(f"{agent_type}: Differential drive")
+                else:
+                    ctrl_descriptions.append(f"{agent_type}: Unknown")
+            print(f"  Control types: {', '.join(ctrl_descriptions)}")
 
         # Initialize physics exception buffer for NaN detection
         self.physics_exception_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
