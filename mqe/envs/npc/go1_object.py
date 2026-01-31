@@ -104,6 +104,26 @@ class Go1Object(Go1):
         for rigid_body_prop in rigid_body_props:
             rigid_body_prop.friction = friction_range[0] + torch.rand(1).item() * (friction_range[1] - friction_range[0])
         self.gym.set_actor_rigid_shape_properties(env_handle, npc_handle, rigid_body_props)
+
+        # Apply box mass override if specified (for heavy box to encourage collaboration)
+        npc_mass_override = getattr(self.cfg.asset, "npc_mass_override", None)
+        if npc_mass_override is not None:
+            rigid_body_props = self.gym.get_actor_rigid_body_properties(env_handle, npc_handle)
+            rigid_body_props[0].mass = npc_mass_override
+            # Recalculate inertia for box: I = (1/12) * m * (a² + b²) for each axis
+            # Box dimensions from SmallBox.urdf: 1.2m x 1.2m x 0.5m
+            m = npc_mass_override
+            w, d, h = 1.2, 1.2, 0.5  # width (x), depth (y), height (z)
+            ixx = (1.0/12.0) * m * (d*d + h*h)
+            iyy = (1.0/12.0) * m * (w*w + h*h)
+            izz = (1.0/12.0) * m * (w*w + d*d)
+            rigid_body_props[0].inertia.x = gymapi.Vec3(ixx, 0, 0)
+            rigid_body_props[0].inertia.y = gymapi.Vec3(0, iyy, 0)
+            rigid_body_props[0].inertia.z = gymapi.Vec3(0, 0, izz)
+            self.gym.set_actor_rigid_body_properties(env_handle, npc_handle, rigid_body_props, recomputeInertia=False)
+            if env_id == 0:
+                print(f"[Box Mass Override] Box mass set to {npc_mass_override:.1f} kg (URDF default: 4 kg)")
+
         npc_handles.append(npc_handle)
         # create target box illusion
         npc_handle = self.gym.create_actor(env_handle, self._asset_npc, self.start_pose_npc, self.cfg.asset._name_npc, env_id, not self.cfg.asset._npc_collision, 0)

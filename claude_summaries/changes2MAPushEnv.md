@@ -87,3 +87,86 @@ Set to `0` to disable (not recommended).
 ```
 
 ---
+
+## 2. Box Mass Override Option (Optional Flag)
+
+**Date:** 2026-01-31
+**Files Modified:**
+- `mqe/envs/configs/go1_push_mid_config.py` - added `npc_mass_override` parameter (this is the config used by ENV_DICT)
+- `mqe/envs/npc/go1_object.py` - implemented runtime mass override
+
+**Note:** The config in `task/cuboid/config.py` is NOT used by the hetero environment. The actual config used is `mqe/envs/configs/go1_push_mid_config.py`.
+
+### Problem
+
+With HAPPO's separate actor networks (unlike MAPPO's shared network), agents don't naturally learn to collaborate. The default box mass of **4 kg** is trivially easy for either robot to push solo:
+- Go1: ~12 kg
+- Anymal C: ~50 kg
+
+This allows free-rider behavior where one agent does nothing while the other pushes.
+
+### Solution
+
+Added optional **runtime box mass override** that can make the box heavy enough to require both agents to push together.
+
+### Configuration
+
+In `mqe/envs/configs/go1_push_mid_config.py`:
+
+```python
+class asset(Go1Cfg.asset):
+    # Box mass override: None = use URDF default (4kg)
+    # Set to higher value (e.g., 50.0) to require collaboration
+    # Box dimensions: 1.2m x 1.2m x 0.5m
+    npc_mass_override = None  # or set to desired mass in kg
+```
+
+### Usage
+
+**Test old checkpoint with light box (default):**
+```python
+class asset:
+    npc_mass_override = None  # Uses URDF default (4 kg)
+```
+
+**Train/test with heavy box:**
+```python
+class asset:
+    npc_mass_override = 50.0  # 50 kg box - requires collaboration
+```
+
+### Recommended Mass Values
+
+| Mass | Effect | Use Case |
+|------|--------|----------|
+| None / 4 kg | Trivial for single robot | Baseline / old checkpoints |
+| 20-30 kg | Challenging for Go1 solo, easy for Anymal | Mild collaboration pressure |
+| 40-60 kg | Hard for either solo, needs both | Strong collaboration signal |
+| 80+ kg | Very difficult even together | Stress test |
+
+### Implementation Details
+
+When `npc_mass_override` is set (not None), the code:
+1. Overrides the box mass from URDF
+2. Recalculates correct inertia tensor for the new mass using box dimensions (1.2m × 1.2m × 0.5m)
+3. Prints confirmation message: `[Box Mass Override] Box mass set to X kg (URDF default: 4 kg)`
+
+```python
+# In go1_object.py _create_npc():
+if npc_mass_override is not None:
+    rigid_body_props[0].mass = npc_mass_override
+    # Recalculate inertia: I = (1/12) * m * (a² + b²)
+    m = npc_mass_override
+    w, d, h = 1.2, 1.2, 0.5
+    ixx = (1.0/12.0) * m * (d*d + h*h)
+    iyy = (1.0/12.0) * m * (w*w + h*h)
+    izz = (1.0/12.0) * m * (w*w + d*d)
+```
+
+### Backwards Compatibility
+
+- Default is `None` (no override) → existing checkpoints work unchanged
+- Old models trained with 4 kg box can be tested with heavy box by setting the flag
+- New models can be trained with heavy box from the start
+
+---
