@@ -170,3 +170,103 @@ if npc_mass_override is not None:
 - New models can be trained with heavy box from the start
 
 ---
+
+## 3. Run Configuration Saver (HARL Training)
+
+**Date:** 2026-01-31
+**Files Created/Modified:**
+- `HARL/harl_mapush/utils/run_config_saver.py` - New utility for saving run configuration
+- `HARL/harl_mapush/runners/mapush_happo_runner.py` - Integration into training
+
+### Problem
+
+With many command-line flags and configuration options (reward types, critic modes, heterogeneous agents, box mass, etc.), it became difficult to:
+1. Remember what flags were used for a specific training run
+2. Reproduce a training run later
+3. Verify test settings match training settings
+
+### Solution
+
+Implemented automatic **run configuration saving** at training start. Two files are created in the run directory:
+
+#### 1. `command.txt`
+```
+# Training command - copy-paste to reproduce
+# Generated: 2026-01-31 14:30:00
+# Run directory: HARL/results/mapush/cuboid/happo/hetero_go1_anymal/...
+
+python HARL/harl_mapush/train.py --algo happo --exp_name hetero_go1_anymal --hetero_agent anymal_c ...
+
+# Testing command template (update checkpoint path):
+# python HARL/harl_mapush/test.py \
+#   --checkpoint .../checkpoints/LATEST \
+#   --hetero_agent anymal_c \
+#   --mode viewer \
+#   --num_episodes 5
+```
+
+#### 2. `run_config.yaml`
+Complete configuration snapshot including:
+- **Agents**: agent0 type, agent1 type, is_heterogeneous
+- **Algorithm**: name, seed, learning rates, PPO params
+- **Training**: num_env_steps, n_rollout_threads, episode_length
+- **Network**: hidden_sizes, activation, recurrent settings
+- **Environment args**: all command-line flags (reward modes, critic modes, etc.)
+- **Environment config** (from Python class):
+  - **Box**: `effective_mass_kg`, dimensions, collision/gravity settings
+  - **Spawn**: angular separation, position range, friction
+  - **Rewards**: scales for all reward components
+  - **Termination**: thresholds for z_wave, collision
+  - **Goal**: distance range, threshold
+
+### Key Feature: Box Mass Tracking
+
+The run config explicitly tracks box mass:
+```yaml
+environment:
+  box:
+    mass_override_kg: 50.0
+    urdf_default_mass_kg: 4.0
+    effective_mass_kg: 50.0  # ← The actual mass used
+    dimensions_m: [1.2, 1.2, 0.5]
+```
+
+### Usage
+
+Configuration is saved automatically when training starts. To check what settings a run used:
+
+```bash
+# View the command used
+cat HARL/results/.../command.txt
+
+# View full configuration
+cat HARL/results/.../run_config.yaml
+```
+
+To load configuration in Python (e.g., for testing):
+```python
+from harl_mapush.utils.run_config_saver import load_run_config, print_config_summary
+
+config = load_run_config("/path/to/run_dir")
+print_config_summary(config)
+
+# Access specific values
+box_mass = config["environment"]["box"]["effective_mass_kg"]
+hetero_agent = config["agents"]["agent1"]  # e.g., "anymal_c"
+```
+
+### Files in Run Directory
+
+After training starts, the run directory structure is:
+```
+HARL/results/mapush/cuboid/happo/<exp_name>/seed-1-<timestamp>/
+├── command.txt         # ← Training command for reproduction
+├── run_config.yaml     # ← Complete configuration snapshot
+├── checkpoints/
+│   ├── 10M/
+│   ├── 20M/
+│   └── ...
+└── logs/
+```
+
+---

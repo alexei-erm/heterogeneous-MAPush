@@ -4,11 +4,13 @@ This runner extends HARL's OnPolicyHARunner to add:
 - Checkpoint saving every 10M steps (instead of episode-based)
 - Checkpoint folder naming: 10M, 20M, 30M, etc.
 - Three models per checkpoint: actor_agent0.pt, actor_agent1.pt, critic_agent.pt
+- Run configuration saving at training start (command.txt, run_config.yaml)
 """
 import os
 import torch
 import numpy as np
 from harl.runners.on_policy_ha_runner import OnPolicyHARunner
+from harl_mapush.utils.run_config_saver import save_run_config
 
 
 class MAPushHAPPORunner(OnPolicyHARunner):
@@ -24,6 +26,10 @@ class MAPushHAPPORunner(OnPolicyHARunner):
         """
         # Disable evaluation (Isaac Gym doesn't support multiple instances)
         algo_args["eval"]["use_eval"] = False
+
+        # Store args for config saving
+        self._init_args = args
+        self._init_env_args = env_args
 
         super().__init__(args, algo_args, env_args)
 
@@ -41,6 +47,16 @@ class MAPushHAPPORunner(OnPolicyHARunner):
 
         # Track total steps across all episodes
         self.total_steps = 0
+
+        # Save run configuration (command, args, env config)
+        env_cfg = getattr(self.envs, 'env_cfg', None)
+        save_run_config(
+            run_dir=self.run_dir,
+            args=self._init_args,
+            algo_args=self.algo_args,
+            env_args=self._init_env_args,
+            env_cfg=env_cfg,
+        )
 
         print(f"\n{'='*60}")
         print(f"MAPush HAPPO Runner Initialized")
