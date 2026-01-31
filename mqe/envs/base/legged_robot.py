@@ -624,12 +624,40 @@ class LeggedRobot(BaseTask):
 
             random_base_distance_from_init = getattr(self.cfg.domain_rand,'init_base_pos_range')["r"]
             random_base_theta_from_init = getattr(self.cfg.domain_rand,"init_base_pos_range")["theta"]
+
+            # Sample radii for all agents
             base_init_state[:, 0] = torch.rand(self.num_envs*self.num_agents, device=self.device) \
                 *(random_base_distance_from_init[1] - random_base_distance_from_init[0]) \
                 + random_base_distance_from_init[0]
-            base_init_state[:, 1] = torch.rand(self.num_envs*self.num_agents, device=self.device) \
-                *(random_base_theta_from_init[1] - random_base_theta_from_init[0]) \
-                + random_base_theta_from_init[0]
+
+            # Minimum angular separation between agents (default: pi/2 = 90 degrees)
+            # This prevents agents from spawning on top of each other
+            min_agent_angular_sep = getattr(self.cfg.domain_rand, "min_agent_angular_separation", 1.57)  # pi/2 radians
+
+            # Sample angles with guaranteed minimum separation between agents in each env
+            if self.num_agents > 1 and min_agent_angular_sep > 0:
+                theta_range = random_base_theta_from_init[1] - random_base_theta_from_init[0]
+
+                # For each env, sample a base angle, then offset each agent by fixed angular slots
+                # This ensures agents are spread around the box
+                base_theta = torch.rand(self.num_envs, device=self.device) * theta_range + random_base_theta_from_init[0]
+
+                # Create angular offsets for each agent: agent0 at base_theta, agent1 at base_theta + separation, etc.
+                # Add small random jitter within each slot to maintain diversity
+                jitter_range = min(0.5, min_agent_angular_sep * 0.3)  # Jitter up to 30% of slot size, max 0.5 rad (~29 deg)
+
+                agent_thetas = torch.zeros(self.num_envs, self.num_agents, device=self.device)
+                for agent_idx in range(self.num_agents):
+                    jitter = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2 * jitter_range
+                    agent_thetas[:, agent_idx] = base_theta + agent_idx * min_agent_angular_sep + jitter
+
+                base_init_state[:, 1] = agent_thetas.reshape(-1)
+            else:
+                # Original behavior for single agent or no separation
+                base_init_state[:, 1] = torch.rand(self.num_envs*self.num_agents, device=self.device) \
+                    *(random_base_theta_from_init[1] - random_base_theta_from_init[0]) \
+                    + random_base_theta_from_init[0]
+
             x = base_init_state[:, 0] * torch.cos(base_init_state[:, 1])
             y = base_init_state[:, 0] * torch.sin(base_init_state[:, 1])
             base_init_state[:, 0] = x
