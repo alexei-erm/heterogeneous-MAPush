@@ -526,6 +526,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -563,6 +570,13 @@
                 <mesh filename="../meshes/hip_l.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="0.03 0.04 0"/>
+            <geometry>
+                <box size="0.1 0.08 0.08"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="0.048 0.008 -0.003"/>
             <mass value="0.74"/>
@@ -583,6 +597,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -620,6 +641,13 @@
                 <mesh filename="../meshes/thigh.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="0 0.05 -0.14"/>
+            <geometry>
+                <box size="0.04 0.06 0.28"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="0.0 0.018 -0.169"/>
             <mass value="1.03"/>
@@ -738,6 +766,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -775,6 +810,13 @@
                 <mesh filename="../meshes/hip_r.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="0.03 -0.04 0"/>
+            <geometry>
+                <box size="0.1 0.08 0.08"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="0.048 -0.008 -0.003"/>
             <mass value="0.74"/>
@@ -795,6 +837,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -832,6 +881,13 @@
                 <mesh filename="../meshes/thigh.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="0 -0.05 -0.14"/>
+            <geometry>
+                <box size="0.04 0.06 0.28"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="0.0 -0.018 -0.169"/>
             <mass value="1.03"/>
@@ -950,6 +1006,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -987,6 +1050,13 @@
                 <mesh filename="../meshes/hip_r.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="-0.03 0.04 0"/>
+            <geometry>
+                <box size="0.1 0.08 0.08"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.048 0.008 -0.003"/>
             <mass value="0.74"/>
@@ -1007,6 +1077,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -1044,6 +1121,13 @@
                 <mesh filename="../meshes/thigh.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="0 0.05 -0.14"/>
+            <geometry>
+                <box size="0.04 0.06 0.28"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.0 0.018 -0.169"/>
             <mass value="1.03"/>
@@ -1163,6 +1247,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -1200,6 +1291,13 @@
                 <mesh filename="../meshes/hip_l.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="-0.03 -0.04 0"/>
+            <geometry>
+                <box size="0.1 0.08 0.08"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.048 -0.008 -0.003"/>
             <mass value="0.74"/>
@@ -1220,6 +1318,13 @@
                 <mesh filename="../meshes/drive.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 1.57079632679 0" xyz="-0.06 0 0"/>
+            <geometry>
+                <cylinder length="0.12" radius="0.055"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.063 7e-05 0.00046"/>
             <mass value="2.04"/>
@@ -1257,6 +1362,13 @@
                 <mesh filename="../meshes/thigh.dae" scale="1.0 1.0 1.0"/>
             </geometry>
         </visual>
+        <!-- Added collision for pushing contact -->
+        <collision>
+            <origin rpy="0 0 0" xyz="0 -0.05 -0.14"/>
+            <geometry>
+                <box size="0.04 0.06 0.28"/>
+            </geometry>
+        </collision>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.0 -0.018 -0.169"/>
             <mass value="1.03"/>
