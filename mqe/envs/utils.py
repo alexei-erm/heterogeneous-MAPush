@@ -95,7 +95,7 @@ def make_hetero_env(env_name: str, agent_types: list, args=None, custom_cfg=None
 
     return env, env_cfg
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, hetero_agent=None):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1'):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -104,11 +104,12 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
 
         cfg.env.record_video = args.record_video
 
-        # Enable heterogeneous agents if specified
-        if hetero_agent is not None and hasattr(cfg, 'hetero'):
+        # Enable heterogeneous agents if agent types differ
+        is_hetero = (agent0 != agent1)
+        if is_hetero and hasattr(cfg, 'hetero'):
             cfg.hetero.use_hetero = True
-            cfg.hetero.hetero_agent_types = ['go1', hetero_agent]
-            print(f"[custom_cfg] Enabled hetero mode: agent0=go1, agent1={hetero_agent}")
+            cfg.hetero.hetero_agent_types = [agent0, agent1]
+            print(f"[custom_cfg] Enabled hetero mode: agent0={agent0}, agent1={agent1}")
 
         # Enable individualized rewards for HAPPO if requested
         if individualized_rewards and hasattr(cfg, 'rewards'):

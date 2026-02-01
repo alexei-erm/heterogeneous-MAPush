@@ -209,19 +209,24 @@ def test_calculator_mode(actors, env, num_episodes, seed):
     return stats
 
 
-def test_viewer_mode(checkpoint_dir, num_episodes, seed, hetero_agent=None):
+def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1"):
     """Run viewer mode to visualize episodes sequentially.
 
     Args:
         checkpoint_dir: Path to checkpoint directory
         num_episodes: Number of episodes to visualize
         seed: Random seed
-        hetero_agent: Second robot type for hetero mode (None for homogeneous)
+        agent0: Robot type for agent 0 (default: go1)
+        agent1: Robot type for agent 1 (default: go1)
     """
+    is_hetero = (agent0 != agent1)
+
     print(f"\n{'='*70}")
     print(f"Viewer Mode - Visualizing {num_episodes} episodes")
-    if hetero_agent:
-        print(f"Heterogeneous mode: agent0=go1, agent1={hetero_agent}")
+    if is_hetero:
+        print(f"Heterogeneous mode: agent0={agent0}, agent1={agent1}")
+    else:
+        print(f"Homogeneous mode: both {agent0}")
     print(f"{'='*70}\n")
 
     # Create single-environment version for visualization
@@ -249,18 +254,18 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, hetero_agent=None):
     args.subscenes = 0
     args.num_threads = 0
 
-    # Create environment - use make_hetero_env if hetero_agent specified
+    # Create environment - use make_hetero_env if heterogeneous agents
     print("Creating visualization environment...")
-    if hetero_agent:
-        print(f"  Using heterogeneous mode: agent0=go1, agent1={hetero_agent}")
+    if is_hetero:
+        print(f"  Using heterogeneous mode: agent0={agent0}, agent1={agent1}")
         env_raw, _ = make_hetero_env(
             env_name=args.task,
-            agent_types=['go1', hetero_agent],
+            agent_types=[agent0, agent1],
             args=args
         )
     else:
-        print("  Using homogeneous mode: 2x go1")
-        env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, hetero_agent=hetero_agent))
+        print(f"  Using homogeneous mode: 2x {agent0}")
+        env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1))
 
     n_agents = env_raw.num_agents
 
@@ -393,10 +398,15 @@ def main():
     # Other
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
-    parser.add_argument("--hetero_agent", type=str, default=None,
-                       help="Enable heterogeneous agents. Specify second robot type (e.g., 'wheeled_bot'). Agent0 will be Go1, Agent1 will be the specified robot.")
+    parser.add_argument("--agent0", type=str, default="go1",
+                       help="Robot type for agent 0. Options: go1, anymal_c. DEFAULT: go1")
+    parser.add_argument("--agent1", type=str, default="go1",
+                       help="Robot type for agent 1. Options: go1, anymal_c. DEFAULT: go1")
 
     args = parser.parse_args()
+
+    # Determine if heterogeneous
+    is_hetero = (args.agent0 != args.agent1)
 
     # Verify checkpoint path exists
     if not os.path.exists(args.checkpoint):
@@ -480,10 +490,11 @@ def main():
                     "task": "go1push_mid",
                     "n_threads": args.num_envs,
                     "headless": True,
-                    "hetero_agent": args.hetero_agent,  # Add hetero support
+                    "agent0": args.agent0,
+                    "agent1": args.agent1,
                 }
-                if args.hetero_agent:
-                    print(f"\n[HAPPO Testing] Heterogeneous mode: agent0=go1, agent1={args.hetero_agent}")
+                if is_hetero:
+                    print(f"\n[HAPPO Testing] Heterogeneous mode: agent0={args.agent0}, agent1={args.agent1}")
                 print("\nInitializing calculator mode environment...")
                 env = MAPushEnv(env_args)
 
@@ -513,7 +524,7 @@ def main():
                 print("This may take a long time. Consider using calculator mode instead.\n")
 
             # Run viewer mode (creates its own single-env environment)
-            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.hetero_agent)
+            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1)
 
     # Clean up
     if args.mode == "calculator":

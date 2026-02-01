@@ -171,7 +171,94 @@ if npc_mass_override is not None:
 
 ---
 
-## 3. Run Configuration Saver (HARL Training)
+## 3. Per-Agent Type Flags (--agent0/--agent1)
+
+**Date:** 2026-01-31
+**Files Modified:**
+- `HARL/harl_mapush/train.py` - Replaced `--hetero_agent` with `--agent0`/`--agent1`
+- `HARL/harl_mapush/test.py` - Same flag changes
+- `HARL/harl/envs/mapush/mapush_env.py` - Updated to use agent0/agent1
+- `mqe/envs/utils.py` - Updated `custom_cfg()` signature
+- `HARL/harl_mapush/utils/run_config_saver.py` - Updated for new flags
+
+### Problem
+
+The original `--hetero_agent` flag hardcoded agent0 as Go1:
+```bash
+# Old approach - agent0 always Go1
+python train.py --hetero_agent anymal_c  # → agent0=go1, agent1=anymal_c
+```
+
+This prevented:
+- Testing arbitrary agent orderings (e.g., anymal_c as agent0)
+- Homogeneous training with non-Go1 robots (e.g., both anymal_c)
+- Future multi-robot combinations
+
+### Solution
+
+Replaced `--hetero_agent` with explicit `--agent0` and `--agent1` flags:
+
+```bash
+# New approach - full flexibility
+python train.py --agent0 go1 --agent1 anymal_c      # Heterogeneous
+python train.py --agent0 anymal_c --agent1 go1      # Reversed order
+python train.py --agent0 anymal_c --agent1 anymal_c # Both Anymal C
+python train.py                                      # Default: both go1
+```
+
+### Usage Examples
+
+**Training:**
+```bash
+# Homogeneous (default - both Go1)
+python HARL/harl_mapush/train.py --exp_name baseline
+
+# Heterogeneous (Go1 + Anymal C)
+python HARL/harl_mapush/train.py \
+  --exp_name go1_anymal \
+  --agent0 go1 \
+  --agent1 anymal_c
+
+# Reversed order
+python HARL/harl_mapush/train.py \
+  --exp_name anymal_go1 \
+  --agent0 anymal_c \
+  --agent1 go1
+```
+
+**Testing:**
+```bash
+python HARL/harl_mapush/test.py \
+  --checkpoint ./results/.../checkpoints/50M \
+  --agent0 go1 \
+  --agent1 anymal_c \
+  --mode calculator \
+  --num_episodes 100
+```
+
+### Detection Logic
+
+Heterogeneous mode is now detected by comparing agent types:
+```python
+is_hetero = (agent0 != agent1)
+```
+
+### Backwards Compatibility
+
+- Default values: `--agent0 go1 --agent1 go1` (homogeneous Go1)
+- Old `--hetero_agent` flag removed (not backwards compatible)
+- Existing checkpoints still work - just specify correct agent types when testing
+
+### Available Robot Types
+
+| Robot | Description |
+|-------|-------------|
+| `go1` | Unitree Go1 quadruped (12 DOF, hierarchical control) |
+| `anymal_c` | ANYmal C quadruped (12 DOF, hierarchical control) |
+
+---
+
+## 4. Run Configuration Saver (HARL Training)
 
 **Date:** 2026-01-31
 **Files Created/Modified:**

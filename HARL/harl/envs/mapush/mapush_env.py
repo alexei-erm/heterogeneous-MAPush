@@ -58,9 +58,11 @@ class MAPushEnv:
         args.subscenes = 0  # Number of PhysX subscenes
         args.num_threads = 0  # Number of cores used by PhysX
 
-        # Check for heterogeneous agent mode
-        hetero_agent = env_args.get("hetero_agent", None)
-        self.is_hetero = hetero_agent is not None
+        # Check for heterogeneous agent mode using agent0/agent1 flags
+        agent0 = env_args.get("agent0", "go1")
+        agent1 = env_args.get("agent1", "go1")
+        self.is_hetero = (agent0 != agent1)
+        self.agent_types = [agent0, agent1]
 
         # Create MQE environment with custom config
         individualized_rewards = env_args.get("individualized_rewards", False)
@@ -74,12 +76,11 @@ class MAPushEnv:
         if self.is_hetero:
             # Use make_hetero_env for heterogeneous agents
             from mqe.envs.utils import make_hetero_env
-            agent_types = ['go1', hetero_agent]
-            print(f"[HARL MAPushEnv] Creating heterogeneous environment: {agent_types}")
+            print(f"[HARL MAPushEnv] Creating heterogeneous environment: {self.agent_types}")
 
             self.env, self.env_cfg = make_hetero_env(
                 args.task,
-                agent_types,
+                self.agent_types,
                 args,
                 custom_cfg=custom_cfg(args, individualized_rewards=individualized_rewards,
                                       shared_gated_rewards=shared_gated_rewards,
@@ -88,7 +89,7 @@ class MAPushEnv:
                                       reward_scale_testing=reward_scale_testing,
                                       collaboration_rewards=collaboration_rewards,
                                       positive_approachtobox_reward=positive_approachtobox_reward,
-                                      hetero_agent=hetero_agent)
+                                      agent0=agent0, agent1=agent1)
             )
         else:
             # Standard homogeneous environment
@@ -101,7 +102,8 @@ class MAPushEnv:
                                       mapush_og_rewards_teamified=mapush_og_rewards_teamified,
                                       reward_scale_testing=reward_scale_testing,
                                       collaboration_rewards=collaboration_rewards,
-                                      positive_approachtobox_reward=positive_approachtobox_reward)
+                                      positive_approachtobox_reward=positive_approachtobox_reward,
+                                      agent0=agent0, agent1=agent1)
             )
 
         self.n_envs = self.env.num_envs
@@ -120,8 +122,8 @@ class MAPushEnv:
 
         if self.is_hetero:
             print(f"[MAPushEnv] Heterogeneous agents with unified action space:")
-            print(f"  Agent 0 (Go1): 3 DOF [vx, vy, vyaw] → Locomotion policy")
-            print(f"  Agent 1 ({hetero_agent}): 3 DOF [vx, vy, vyaw] → Differential drive controller")
+            print(f"  Agent 0 ({agent0}): 3 DOF [vx, vy, vyaw]")
+            print(f"  Agent 1 ({agent1}): 3 DOF [vx, vy, vyaw]")
 
         # Flags to control critic input coordinate system
         # Priority: relative_obs > concat_observations > goal_centered > box_centered > absolute

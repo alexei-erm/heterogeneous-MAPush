@@ -70,18 +70,14 @@ def save_run_config(
         f.write(f"# Testing command template (update checkpoint path):\n")
 
         # Generate test command based on training args
-        hetero_agent = env_args.get("hetero_agent")
-        if hetero_agent:
-            f.write(f"# python HARL/harl_mapush/test.py \\\n")
-            f.write(f"#   --checkpoint {run_dir}/checkpoints/LATEST \\\n")
-            f.write(f"#   --hetero_agent {hetero_agent} \\\n")
-            f.write(f"#   --mode viewer \\\n")
-            f.write(f"#   --num_episodes 5\n")
-        else:
-            f.write(f"# python HARL/harl_mapush/test.py \\\n")
-            f.write(f"#   --checkpoint {run_dir}/checkpoints/LATEST \\\n")
-            f.write(f"#   --mode viewer \\\n")
-            f.write(f"#   --num_episodes 5\n")
+        agent0 = env_args.get("agent0", "go1")
+        agent1 = env_args.get("agent1", "go1")
+        f.write(f"# python HARL/harl_mapush/test.py \\\n")
+        f.write(f"#   --checkpoint {run_dir}/checkpoints/LATEST \\\n")
+        f.write(f"#   --agent0 {agent0} \\\n")
+        f.write(f"#   --agent1 {agent1} \\\n")
+        f.write(f"#   --mode viewer \\\n")
+        f.write(f"#   --num_episodes 5\n")
 
     # =========================================================================
     # Build run_config.yaml
@@ -98,19 +94,14 @@ def save_run_config(
     # -------------------------------------------------------------------------
     # Agents
     # -------------------------------------------------------------------------
-    hetero_agent = env_args.get("hetero_agent")
-    if hetero_agent:
-        config["agents"] = {
-            "agent0": "go1",
-            "agent1": hetero_agent,
-            "is_heterogeneous": True,
-        }
-    else:
-        config["agents"] = {
-            "agent0": "go1",
-            "agent1": "go1",
-            "is_heterogeneous": False,
-        }
+    agent0 = env_args.get("agent0", "go1")
+    agent1 = env_args.get("agent1", "go1")
+    is_hetero = (agent0 != agent1)
+    config["agents"] = {
+        "agent0": agent0,
+        "agent1": agent1,
+        "is_heterogeneous": is_hetero,
+    }
 
     # -------------------------------------------------------------------------
     # Algorithm
