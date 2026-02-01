@@ -266,6 +266,7 @@ def get_args():
         {"name": "--hie",  "type": bool, "action": "store_true", "default": False},
         {"name": "--agent0", "type": str, "default": "go1", "help": "Robot type for agent 0 (default: go1)"},
         {"name": "--agent1", "type": str, "default": "go1", "help": "Robot type for agent 1 (default: go1)"},
+        {"name": "--baseline_mappo_rewards", "type": lambda x: (str(x).lower() == 'true'), "default": True, "help": "Use original MAPush baseline rewards only (7 rewards, original scales). Disables all HAPPO-specific rewards. DEFAULT: True"},
     ]
     # parse arguments
     args = parse_arguments(

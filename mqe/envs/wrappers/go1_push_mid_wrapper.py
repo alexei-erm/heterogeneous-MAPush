@@ -171,6 +171,33 @@ class Go1PushMidWrapper(EmptyWrapper):
         # approach_to_box uses AVERAGE (not sum), collision uses -0.0025, OCB uses ±0.004
         self.mapush_og_rewards_teamified = getattr(self.cfg.rewards, "mapush_og_rewards_teamified", False)
 
+        # BASELINE MAPPO REWARDS MODE: Uses ONLY original 7 MAPush rewards with original scales
+        # Disables ALL HAPPO-specific rewards (proximity_penalty, goal_push_bonus, cooperation, etc.)
+        self.baseline_mappo_rewards = getattr(self.cfg.rewards, "baseline_mappo_rewards", False)
+        if self.baseline_mappo_rewards:
+            # Force disable all HAPPO-specific reward flags
+            self.individualized_rewards = False
+            self.shared_gated_rewards = False
+            self.cooperation_rewards = False
+            self.collaboration_rewards = False
+            self.reward_scale_testing = False
+            self.positive_approachtobox_reward = False
+            # Force HAPPO-specific scales to 0
+            self.proximity_penalty_scale = 0.0
+            self.goal_push_bonus_scale = 0.0
+            self.engagement_bonus_scale = 0.0
+            self.cooperation_bonus_scale = 0.0
+            self.same_side_bonus_scale = 0.0
+            self.blocking_penalty_scale = 0.0
+            self.directional_progress_scale = 0.0
+            self.dual_push_bonus_scale = 0.0
+            self.gaussian_proximity_amplitude = 0.0
+            print(f"[Go1PushMidWrapper] BASELINE MAPPO REWARDS MODE ACTIVE")
+            print(f"  Using ONLY 7 original rewards: target, approach, collision, push, ocb, reach_target, exception")
+            print(f"  Scales: target={self.target_reward_scale}, approach={self.approach_reward_scale}, "
+                  f"collision={self.collision_punishment_scale}, push={self.push_reward_scale}, "
+                  f"ocb={self.ocb_reward_scale}, reach={self.reach_target_reward_scale}, exception={self.exception_punishment_scale}")
+
         # CRITIC17: Positive approach_to_box bonus (Gaussian with steep falloff)
         # When enabled: ADDS positive Gaussian bonus on top of original negative penalty
         # Net reward = negative penalty + positive bonus

@@ -95,7 +95,7 @@ def make_hetero_env(env_name: str, agent_types: list, args=None, custom_cfg=None
 
     return env, env_cfg
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1'):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -110,6 +110,23 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
             cfg.hetero.use_hetero = True
             cfg.hetero.hetero_agent_types = [agent0, agent1]
             print(f"[custom_cfg] Enabled hetero mode: agent0={agent0}, agent1={agent1}")
+
+        # MAPPO BASELINE MODE: Use original MAPush rewards only
+        # When enabled, disables ALL HAPPO-specific rewards and uses original scales
+        if baseline_mappo_rewards and hasattr(cfg, 'rewards'):
+            cfg.rewards.baseline_mappo_rewards = True
+            # Override scales to original MAPush values
+            cfg.rewards.scales.target_reward_scale = 0.00325
+            cfg.rewards.scales.approach_reward_scale = 0.00075
+            cfg.rewards.scales.collision_punishment_scale = -0.0025
+            cfg.rewards.scales.push_reward_scale = 0.0015
+            cfg.rewards.scales.ocb_reward_scale = 0.004  # Original was 0.004, not 0.01
+            cfg.rewards.scales.reach_target_reward_scale = 10
+            cfg.rewards.scales.exception_punishment_scale = -5
+            # Disable HAPPO-specific reward scales
+            if hasattr(cfg.rewards.scales, 'proximity_penalty_scale'):
+                cfg.rewards.scales.proximity_penalty_scale = 0.0
+            print(f"[custom_cfg] BASELINE MAPPO REWARDS MODE: Using original 7 rewards with original scales")
 
         # Enable individualized rewards for HAPPO if requested
         if individualized_rewards and hasattr(cfg, 'rewards'):

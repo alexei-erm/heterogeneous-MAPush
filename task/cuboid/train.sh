@@ -26,7 +26,9 @@ if [ $test_mode = False ]; then
     --agent0 go1 \
     --agent1 anymal_c \
     --layer_N 2 \
-    --hidden_size 256 
+    --hidden_size 256 \
+    --baseline_mappo_rewards True
+
     #   --checkpoint $current_dir$checkpoint \
 
 

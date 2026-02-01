@@ -125,6 +125,11 @@ def save_run_config(
         "exp_name": getattr(args, 'exp_name', 'default'),
     }
 
+    config["rewards"] = {
+        "baseline_mappo_rewards": getattr(args, 'baseline_mappo_rewards', True),
+        "description": "baseline_mappo_rewards=True uses ONLY original 7 MAPush rewards with original scales",
+    }
+
     # -------------------------------------------------------------------------
     # Environment Config (from Python config class)
     # -------------------------------------------------------------------------

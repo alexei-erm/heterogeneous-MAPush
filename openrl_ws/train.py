@@ -27,12 +27,22 @@ def train(args):
     agent1 = getattr(args, 'agent1', 'go1')
     is_hetero = (agent0 != agent1)
 
+    # Baseline MAPPO rewards mode (default: True for MAPPO)
+    # When True, uses ONLY original 7 MAPush rewards with original scales
+    # Disables all HAPPO-specific rewards (proximity_penalty, goal_push_bonus, etc.)
+    baseline_mappo_rewards = getattr(args, 'baseline_mappo_rewards', True)
+
     if is_hetero:
         print(f"[MAPPO Training] Agent types: HETEROGENEOUS (agent0={agent0}, agent1={agent1})")
     else:
         print(f"[MAPPO Training] Agent types: HOMOGENEOUS ({agent0})")
 
-    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1), single_agent)
+    if baseline_mappo_rewards:
+        print(f"[MAPPO Training] Reward mode: BASELINE (original 7 MAPush rewards)")
+    else:
+        print(f"[MAPPO Training] Reward mode: EXTENDED (includes HAPPO-specific rewards)")
+
+    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1, baseline_mappo_rewards=baseline_mappo_rewards), single_agent)
     
     if args.algo == "ppo":
         # or use --config ./openrl_ws/cfgs/ppo.yaml in terminal
