@@ -12,7 +12,7 @@ python ./openrl_ws/update_config.py --filepath $script_dir/config.py
 if [ $test_mode = False ]; then
     # train
     num_envs=500
-    num_steps=150000000
+    num_steps=100000000
     checkpoint=/None  # "/results/07-28-13_task1/checkpoints/rl_model_100000000_steps/module.pt"
 
     python ./openrl_ws/train.py  --num_envs $num_envs --train_timesteps $num_steps\
@@ -22,13 +22,8 @@ if [ $test_mode = False ]; then
     --exp_name  $exp_name \
     --task go1push_mid \
     --use_tensorboard \
-    --headless \
-    --agent0 go1 \
-    --agent1 anymal_c \
-    --layer_N 2 \
-    --hidden_size 256 
-    #   --checkpoint $current_dir$checkpoint \
-
+    --checkpoint $current_dir$checkpoint \
+    --headless
 
     # calculate success rate
     steps=()

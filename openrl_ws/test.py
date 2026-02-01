@@ -104,12 +104,17 @@ def save_gif(frames, fps, filename="output.gif"):
 
 args = get_args()
 
-# Pass hetero_agent parameter to custom_cfg
-hetero_agent = getattr(args, 'hetero_agent', None)
-if hetero_agent:
-    print(f"[MAPPO Testing] Heterogeneous mode enabled: agent0=go1, agent1={hetero_agent}")
+# Get agent types (defaults to go1 for both)
+agent0 = getattr(args, 'agent0', 'go1')
+agent1 = getattr(args, 'agent1', 'go1')
+is_hetero = (agent0 != agent1)
 
-env, _ = make_env(args, custom_cfg(args, hetero_agent=hetero_agent))
+if is_hetero:
+    print(f"[MAPPO Testing] Agent types: HETEROGENEOUS (agent0={agent0}, agent1={agent1})")
+else:
+    print(f"[MAPPO Testing] Agent types: HOMOGENEOUS ({agent0})")
+
+env, _ = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1))
 net = PPONet(env, device="cuda")  # Create neural network.
 agent = PPOAgent(net)  # Initialize the agent.
 

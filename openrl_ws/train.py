@@ -1,5 +1,6 @@
 
 from openrl_ws.utils import make_env, get_args, MATWrapper
+from openrl_ws.run_utils.run_config_saver import save_run_config
 from mqe.envs.utils import custom_cfg
 from openrl.utils.logger import Logger
 from openrl.utils.callbacks.checkpoint_callback import CheckpointCallback
@@ -21,12 +22,17 @@ def train(args):
     else:
         single_agent = False
 
-    # Pass hetero_agent parameter to custom_cfg
-    hetero_agent = getattr(args, 'hetero_agent', None)
-    if hetero_agent:
-        print(f"[MAPPO Training] Heterogeneous mode enabled: agent0=go1, agent1={hetero_agent}")
+    # Get agent types (defaults to go1 for both)
+    agent0 = getattr(args, 'agent0', 'go1')
+    agent1 = getattr(args, 'agent1', 'go1')
+    is_hetero = (agent0 != agent1)
 
-    env, env_cfg = make_env(args, custom_cfg(args, hetero_agent=hetero_agent), single_agent)
+    if is_hetero:
+        print(f"[MAPPO Training] Agent types: HETEROGENEOUS (agent0={agent0}, agent1={agent1})")
+    else:
+        print(f"[MAPPO Training] Agent types: HOMOGENEOUS ({agent0})")
+
+    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1), single_agent)
     
     if args.algo == "ppo":
         # or use --config ./openrl_ws/cfgs/ppo.yaml in terminal
@@ -57,7 +63,11 @@ def train(args):
         if args.task == "go1push_mid":
             source_folder = "./task/"+args.exp_name+"/"
             target_folder = run_dir + "/task/"
-            shutil.copytree(source_folder, target_folder)
+            if os.path.exists(source_folder):
+                shutil.copytree(source_folder, target_folder)
+
+        # Save run configuration (command, hyperparameters, agent types, etc.)
+        save_run_config(run_dir, args, env_cfg)
 
         if getattr(args, "checkpoint") is not None:
             if os.path.exists(args.checkpoint):
