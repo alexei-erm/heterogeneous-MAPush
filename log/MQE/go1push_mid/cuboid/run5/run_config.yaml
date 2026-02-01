@@ -1,0 +1,47 @@
+# MAPPO/OpenRL Training Configuration
+# Auto-generated at training start - DO NOT EDIT
+# Timestamp: 2026-02-01 15:28:32
+
+_meta:
+  generated: '2026-02-01 15:28:32'
+  command: ./openrl_ws/train.py --num_envs 500 --train_timesteps 150000000 --algo
+    ppo --config ./openrl_ws/cfgs/ppo.yaml --seed 1 --exp_name cuboid --task go1push_mid
+    --use_tensorboard --headless --agent0 go1 --agent1 anymal_c --layer_N 2 --hidden_size
+    256
+  run_dir: log/MQE/go1push_mid/cuboid/run5
+  framework: MAPPO/OpenRL
+agents:
+  agent0: go1
+  agent1: anymal_c
+  is_heterogeneous: true
+algorithm:
+  name: ppo
+  seed: 1
+network:
+  hidden_size: 256
+  layer_N: 2
+  use_recurrent_policy: false
+training:
+  train_timesteps: 150000000
+  num_envs: 500
+  episode_length: 200
+  lr: 0.0005
+  critic_lr: 0.0005
+logging:
+  use_wandb: false
+  use_tensorboard: true
+  exp_name: cuboid
+environment:
+  box:
+    mass_override_kg: 500.0
+    effective_mass_kg: 500.0
+  episode:
+    num_agents: 2
+    episode_length_s: 20
+  hetero:
+    use_hetero: true
+    hetero_agent_types:
+    - go1
+    - anymal_c
+  rewards:
+    individualized_rewards: false

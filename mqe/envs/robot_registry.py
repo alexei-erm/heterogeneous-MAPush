@@ -47,6 +47,13 @@ ROBOT_REGISTRY = {
         'num_actions': 3,  # [vx, vy, w] for mid-level control
         'description': 'ANYmal C quadruped robot with trained locomotion policy'
     },
+    'cassie': {
+        'class_path': 'mqe.envs.go1.go1.Go1',  # Use Go1 base class (same interface)
+        'config_path': 'mqe.envs.cassie.cassie_config.CassieCfg',
+        'default_control': 'C',  # Hierarchical control with locomotion policy
+        'num_actions': 3,  # [vx, vy, w] for mid-level control
+        'description': 'Agility Robotics Cassie biped robot with trained locomotion policy'
+    },
     # Add more robots here as they are implemented
 }
 

@@ -153,6 +153,26 @@ class HeteroRobot(LeggedRobotField):
                         if hasattr(robot_config.control, 'actuator_network_path'):
                             self._load_actuator_network(robot_config.control.actuator_network_path, robot_type, agent_idx)
 
+                    elif robot_type == 'cassie':
+                        # Cassie uses standard legged_gym policy (48-dim obs, same as Anymal C)
+                        # After training, policy will be at: resources/robots/cassie/policy/policy_1.pt
+                        policy_model = torch.jit.load(policy_dir + '/policy_1.pt', map_location=self.device)
+
+                        def cassie_policy(obs, info={}):
+                            with torch.no_grad():
+                                action = policy_model.forward(obs)
+                            return action
+
+                        self.locomotion_policies.append(cassie_policy)
+                        # Cassie needs 48-dim obs (same structure as Anymal C for flat terrain)
+                        obs_buffer = torch.zeros(self.num_envs, 48, dtype=torch.float, device=self.device)
+                        self.locomotion_obs_buffers.append({'obs': obs_buffer, 'history': None})
+
+                        # Load Cassie's actuator network if available
+                        # Note: Cassie may use PD control instead of actuator network
+                        if hasattr(robot_config.control, 'actuator_network_path') and robot_config.control.actuator_network_path is not None:
+                            self._load_actuator_network(robot_config.control.actuator_network_path, robot_type, agent_idx)
+
                     else:
                         raise NotImplementedError(f"Locomotion policy loading for {robot_type} not implemented")
 
@@ -241,6 +261,32 @@ class HeteroRobot(LeggedRobotField):
                 return torques.view(num_envs, num_dof)
 
             self.actuator_networks[agent_idx] = eval_anymal_actuator
+
+        elif robot_type == 'cassie':
+            # Cassie uses PD control by default (no actuator network)
+            # If you train Cassie with an actuator network, add loading here
+            # For now, just use PD control as fallback
+            print(f"[HeteroRobot] Cassie agent {agent_idx} will use PD control (no actuator network)")
+
+            # Create a dummy entry that signals to use PD control
+            def eval_cassie_pd(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
+                               joint_vel, joint_vel_last, joint_vel_last_last):
+                # Use standard PD control
+                # Get the DOF offset for this agent to access correct gains
+                dof_offsets = [0]
+                for num_dof in self.robot_num_dofs:
+                    dof_offsets.append(dof_offsets[-1] + num_dof)
+                dof_start = dof_offsets[agent_idx]
+                dof_end = dof_offsets[agent_idx + 1]
+
+                torques = (
+                    self.p_gains[dof_start:dof_end] * (-joint_pos_err)  # Note: negated for PD convention
+                    - self.d_gains[dof_start:dof_end] * joint_vel
+                )
+                return torques
+
+            self.actuator_networks[agent_idx] = eval_cassie_pd
+            return  # No file to print
 
         else:
             raise ValueError(f"Unknown robot type for actuator network: {robot_type}")
@@ -932,6 +978,15 @@ class HeteroRobot(LeggedRobotField):
                     setattr(self, f'anymal_sea_hidden_{agent_idx}', sea_hidden)
                     setattr(self, f'anymal_sea_cell_{agent_idx}', sea_cell)
 
+            # ==== 1b. Reset Cassie-specific buffers ====
+            # Cassie uses PD control by default, no LSTM states to reset
+            # But we still need to reset last_joint_targets if it exists
+            if robot_type == 'cassie':
+                if self.locomotion_obs_buffers[agent_idx] is not None:
+                    obs_buffer_dict = self.locomotion_obs_buffers[agent_idx]
+                    if 'last_joint_targets' in obs_buffer_dict:
+                        obs_buffer_dict['last_joint_targets'][env_ids] = 0.0
+
             # ==== 2. Reset locomotion observation buffers ====
             if self.locomotion_obs_buffers[agent_idx] is not None:
                 obs_buffer_dict = self.locomotion_obs_buffers[agent_idx]
@@ -1274,6 +1329,35 @@ class HeteroRobot(LeggedRobotField):
                     # [12:24] dof_pos (already scaled in obs_buf)
                     # [24:36] dof_vel (already scaled in obs_buf)
                     # [36:48] previous actions
+
+                    # Get values from obs_buf (already per-agent and scaled)
+                    loc_obs[:, 0:3] = self.obs_buf.lin_vel[agent_env_indices]  # Already scaled
+                    loc_obs[:, 3:6] = self.obs_buf.ang_vel[agent_env_indices]  # Already scaled
+                    loc_obs[:, 6:9] = self.obs_buf.projected_gravity[agent_env_indices]
+                    # Scale commands like legged_gym does: [lin_vel, lin_vel, ang_vel] * [2.0, 2.0, 0.25]
+                    loc_obs[:, 9:12] = agent_actions * self.commands_scale  # Commands scaled
+                    loc_obs[:, 12:24] = self.obs_buf.dof_pos[agent_env_indices]  # Already scaled
+                    loc_obs[:, 24:36] = self.obs_buf.dof_vel[agent_env_indices]  # Already scaled
+
+                    # [36:48] previous actions (raw policy outputs from last step)
+                    if 'last_joint_targets' in obs_buffer_dict:
+                        loc_obs[:, 36:48] = obs_buffer_dict['last_joint_targets']
+                    else:
+                        # First step - use zeros
+                        loc_obs[:, 36:48] = torch.zeros(self.num_envs, 12, device=self.device)
+
+                    # Call policy
+                    joint_positions = locomotion_policy(loc_obs)
+
+                    # Store for next step
+                    obs_buffer_dict['last_joint_targets'] = joint_positions.clone()
+
+                elif robot_type == 'cassie':
+                    # Build 48-dim locomotion observation for Cassie
+                    # Same structure as Anymal C for flat terrain legged_gym policy
+                    # [0:3] base_lin_vel, [3:6] base_ang_vel, [6:9] projected_gravity,
+                    # [9:12] commands, [12:24] dof_pos, [24:36] dof_vel, [36:48] previous actions
+                    loc_obs = obs_buffer_dict['obs']
 
                     # Get values from obs_buf (already per-agent and scaled)
                     loc_obs[:, 0:3] = self.obs_buf.lin_vel[agent_env_indices]  # Already scaled
