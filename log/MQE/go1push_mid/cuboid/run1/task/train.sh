@@ -6,9 +6,6 @@ script_path=$(realpath "${BASH_SOURCE[0]}")
 script_dir=$(dirname "$script_path")
 test_mode=$1
 
-# Set PYTHONPATH to include the project root
-export PYTHONPATH=/home/gvlab/new-universal-MAPush:$PYTHONPATH
-
 # update config
 python ./openrl_ws/update_config.py --filepath $script_dir/config.py
 
@@ -56,13 +53,13 @@ if [ $test_mode = False ]; then
 
 else
 # test
-test_checkpoint="/home/gvlab/new-universal-MAPush/log/MQE/go1push_mid/cuboid/run1/checkpoints/rl_model_150000000_steps/module.pt"
+root_dir=$(dirname "$script_dir")
+filename="rl_model_110000000_steps/module.pt"
+test_checkpoint="$root_dir/checkpoints/$filename"
 python ./openrl_ws/test.py --num_envs 1 \
         --algo "$algo" \
         --task go1push_mid \
         --checkpoint "$test_checkpoint" \
         --test_mode viewer \
-        --agent0 go1 \
-        --agent1 anymal_c
 #       --record_video
 fi

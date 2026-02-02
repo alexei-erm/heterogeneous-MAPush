@@ -114,7 +114,7 @@ if is_hetero:
 else:
     print(f"[MAPPO Testing] Agent types: HOMOGENEOUS ({agent0})")
 
-env, _ = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1))
+env, _ = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1), agent0=agent0, agent1=agent1)
 net = PPONet(env, device="cuda")  # Create neural network.
 agent = PPOAgent(net)  # Initialize the agent.
 

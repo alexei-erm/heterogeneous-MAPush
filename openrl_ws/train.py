@@ -42,7 +42,7 @@ def train(args):
     else:
         print(f"[MAPPO Training] Reward mode: EXTENDED (includes HAPPO-specific rewards)")
 
-    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1, baseline_mappo_rewards=baseline_mappo_rewards), single_agent)
+    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1, baseline_mappo_rewards=baseline_mappo_rewards), single_agent, agent0=agent0, agent1=agent1)
     
     if args.algo == "ppo":
         # or use --config ./openrl_ws/cfgs/ppo.yaml in terminal

@@ -9,7 +9,7 @@ import torch
 import gym
 from gym import spaces
 
-from mqe.envs.utils import make_mqe_env
+from mqe.envs.utils import make_mqe_env, make_hetero_env
 
 from openrl.configs.config import create_config_parser
 from isaacgym import gymutil
@@ -28,9 +28,18 @@ from isaacgym.gymutil import parse_device_str
 from mqe.envs.go1.go1_config import Go1Cfg
 from openrl.envs.vec_env import BaseVecEnv
 
-def make_env(args, custom_cfg=None, single_agent=False):
-    
-    env, env_cfg = make_mqe_env(args.task, args, custom_cfg=custom_cfg)
+def make_env(args, custom_cfg=None, single_agent=False, agent0='go1', agent1='go1'):
+
+    # Check if heterogeneous agents are requested
+    is_hetero = (agent0 != agent1)
+
+    if is_hetero:
+        # Use hetero environment for different robot types
+        agent_types = [agent0, agent1]
+        env, env_cfg = make_hetero_env(args.task, agent_types, args, custom_cfg=custom_cfg)
+    else:
+        # Use standard homogeneous environment
+        env, env_cfg = make_mqe_env(args.task, args, custom_cfg=custom_cfg)
 
     if single_agent:
         env = SingleAgentWrapper(env)

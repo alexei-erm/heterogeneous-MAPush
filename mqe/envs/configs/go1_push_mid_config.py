@@ -36,9 +36,8 @@ class Go1PushMidCfg(Go1Cfg):
         fix_npc_base_link = False
         npc_gravity = True
         # Box mass override: None = use URDF default (4kg)
-        # Set to higher value (e.g., 50.0) to require collaboration
         # Box dimensions: 1.2m x 1.2m x 0.5m
-        npc_mass_override = 500.0
+        npc_mass_override = None # does not control anything !!!!
         # target area
         _terminate_after_contacts_on = []
         _file_npc = "{LEGGED_GYM_ROOT_DIR}/resources/objects/target.urdf"

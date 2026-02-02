@@ -539,25 +539,32 @@ class Go1PushMidWrapper(EmptyWrapper):
         
         # calculate exception punishment
         if self.exception_punishment_scale != 0:
-            # # DEBUG: Track exception counts
-            # num_sim_exceptions = self.exception_buf.sum().item()
-            # num_nan_exceptions = self.value_exception_buf.sum().item()
-            # self.debug_sim_exception_count += num_sim_exceptions
-            # self.debug_nan_exception_count += num_nan_exceptions
-            # self.debug_step_counter += 1
+            # DEBUG: Track exception counts
+            if not hasattr(self, 'debug_exception_step_counter'):
+                self.debug_exception_step_counter = 0
+                self.debug_sim_exception_count = 0
+                self.debug_nan_exception_count = 0
 
-            # # Log every 100 steps
-            # if self.debug_step_counter % 100 == 0:
-            #     total_exceptions = self.debug_sim_exception_count + self.debug_nan_exception_count
-            #     if total_exceptions > 0:
-            #         print(f"[DEBUG Step {self.debug_step_counter}] Exception breakdown over last 100 steps:")
-            #         print(f"  Simulation exceptions (roll/pitch/z): {self.debug_sim_exception_count} ({100*self.debug_sim_exception_count/total_exceptions:.1f}%)")
-            #         print(f"  NaN/Inf exceptions: {self.debug_nan_exception_count} ({100*self.debug_nan_exception_count/total_exceptions:.1f}%)")
-            #         print(f"  Total exceptions: {total_exceptions}")
-            #         print(f"  Exception rate: {100*total_exceptions/(100*self.num_envs):.2f}% of environments")
-            #     # Reset counters
-            #     self.debug_sim_exception_count = 0
-            #     self.debug_nan_exception_count = 0
+            num_sim_exceptions = self.exception_buf.sum().item()
+            num_nan_exceptions = self.value_exception_buf.sum().item()
+            self.debug_sim_exception_count += num_sim_exceptions
+            self.debug_nan_exception_count += num_nan_exceptions
+            self.debug_exception_step_counter += 1
+
+            # Log every 500 steps
+            if self.debug_exception_step_counter % 500 == 0:
+                total_exceptions = self.debug_sim_exception_count + self.debug_nan_exception_count
+                print(f"[DEBUG Exception Step {self.debug_exception_step_counter}] Over last 500 steps:")
+                print(f"  Simulation exceptions (roll/pitch/z/collision): {self.debug_sim_exception_count}")
+                print(f"  NaN/Inf exceptions: {self.debug_nan_exception_count}")
+                print(f"  Total: {total_exceptions}")
+                if hasattr(self.env, 'cfg') and hasattr(self.env.cfg, 'termination'):
+                    print(f"  Config has termination: YES, terms={self.env.cfg.termination.termination_terms}")
+                else:
+                    print(f"  Config has termination: NO!!!")
+                # Reset counters
+                self.debug_sim_exception_count = 0
+                self.debug_nan_exception_count = 0
 
             reward[self.exception_buf, :] += self.exception_punishment_scale
             reward[self.value_exception_buf, :] += self.exception_punishment_scale
@@ -566,81 +573,108 @@ class Go1PushMidWrapper(EmptyWrapper):
                     (self.exception_buf.sum().item() + self.value_exception_buf.sum().item())
 
         # distance_to_target_reward: Progress shaping based on box-to-goal distance
-        # CRITIC13 v2: Disabled (redundant with goal_push_bonus)
+        # CRITIC13 v2: Disabled for HAPPO experiments (redundant with goal_push_bonus)
         # mapush_og_rewards_teamified: RE-ENABLED with original formula
-        if self.mapush_og_rewards_teamified and self.target_reward_scale != 0:
+        # baseline_mappo_rewards: ENABLED (one of the original 7 MAPush rewards) - SHARED reward
+        if (self.mapush_og_rewards_teamified or self.baseline_mappo_rewards) and self.target_reward_scale != 0:
             if self.last_box_state is None:
                 self.last_box_state = copy(box_state)
             past_distance = self.env.dist_calculator.cal_dist(self.last_box_state, target_state)
             distance = self.env.dist_calculator.cal_dist(box_state, target_state)
             # Original MAPush formula: progress shaping + distance penalty
             distance_reward = self.target_reward_scale * 100 * (2 * (past_distance - distance) - 0.01 * distance)
-            # Iter8: Apply gating if enabled
-            if self.shared_gated_rewards:
+            # Iter8: Apply gating if enabled (NOT for baseline_mappo_rewards)
+            if self.shared_gated_rewards and not self.baseline_mappo_rewards:
                 distance_reward = distance_reward * gating_factor
-            # Shared reward
+            # Shared reward (both agents get same reward - original behavior)
             reward[:, :] += distance_reward.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["distance_to_target_reward"] += torch.sum(distance_reward).cpu()
 
         # calculate distance from each robot to box reward
+        # baseline_mappo_rewards: ORIGINAL per-agent reward (each agent gets own distance penalty)
         # CRITIC14: Converted to TEAM reward for centralized critic compatibility
         # CRITIC17 v2: Original negative penalty + Gaussian positive bonus (when flag enabled)
         # mapush_og_rewards_teamified: AVERAGE of both rewards (preserves original magnitude)
         # Default (CRITIC14): SUM of both rewards (2x magnitude)
         if self.approach_reward_scale != 0:
-            total_approach_reward = torch.zeros(self.num_envs, device=self.device)
-            total_gaussian_bonus = torch.zeros(self.num_envs, device=self.device)
+            if self.baseline_mappo_rewards:
+                # ORIGINAL MAPPO: Per-agent reward - each agent gets its own distance penalty
+                reward_logger = []
+                for i in range(self.num_agents):
+                    distance = torch.norm(box_pos - base_pos[:, i, :], dim=1, keepdim=True)
+                    distance_reward = (-(distance + 0.5)**2) * self.approach_reward_scale
+                    reward_logger.append(torch.sum(distance_reward).cpu())
+                    reward[:, i] += distance_reward.squeeze(-1)
+                self.reward_buffer["approach_to_box_reward"] += np.sum(np.array(reward_logger))
+            else:
+                # HAPPO: Team reward (sum or average)
+                total_approach_reward = torch.zeros(self.num_envs, device=self.device)
+                total_gaussian_bonus = torch.zeros(self.num_envs, device=self.device)
 
-            for i in range(self.num_agents):
-                distance = torch.norm(box_pos - base_pos[:, i, :], dim=1)
+                for i in range(self.num_agents):
+                    distance = torch.norm(box_pos - base_pos[:, i, :], dim=1)
 
-                # Always compute original negative quadratic penalty
-                distance_penalty = (-(distance + 0.5)**2) * self.approach_reward_scale
-                total_approach_reward += distance_penalty
+                    # Always compute original negative quadratic penalty
+                    distance_penalty = (-(distance + 0.5)**2) * self.approach_reward_scale
+                    total_approach_reward += distance_penalty
 
-                # CRITIC17 v2: ADD Gaussian bonus on top (steep falloff after 1.5m)
+                    # CRITIC17 v2: ADD Gaussian bonus on top (steep falloff after 1.5m)
+                    if self.positive_approachtobox_reward:
+                        # Gaussian: bonus = amplitude * exp(-(distance/sigma)^2)
+                        # sigma=0.4 gives ULTRA STEEP falloff
+                        # At d=0m: bonus=0.006, at d=1.5m: bonus~0 (0.00001)
+                        gaussian_bonus = self.gaussian_proximity_amplitude * torch.exp(
+                            -(distance / self.gaussian_proximity_sigma)**2
+                        )
+                        total_gaussian_bonus += gaussian_bonus
+
+                # mapush_og_rewards_teamified: AVERAGE to preserve designed scale magnitude
+                if self.mapush_og_rewards_teamified:
+                    total_approach_reward = total_approach_reward / self.num_agents
+                    if self.positive_approachtobox_reward:
+                        total_gaussian_bonus = total_gaussian_bonus / self.num_agents
+
+                # Add Gaussian bonus to the penalty (net reward)
                 if self.positive_approachtobox_reward:
-                    # Gaussian: bonus = amplitude * exp(-(distance/sigma)^2)
-                    # sigma=0.4 gives ULTRA STEEP falloff
-                    # At d=0m: bonus=0.006, at d=1.5m: bonus~0 (0.00001)
-                    gaussian_bonus = self.gaussian_proximity_amplitude * torch.exp(
-                        -(distance / self.gaussian_proximity_sigma)**2
-                    )
-                    total_gaussian_bonus += gaussian_bonus
+                    total_approach_reward = total_approach_reward + total_gaussian_bonus
 
-            # mapush_og_rewards_teamified: AVERAGE to preserve designed scale magnitude
-            if self.mapush_og_rewards_teamified:
-                total_approach_reward = total_approach_reward / self.num_agents
+                # Team reward: both agents get the (avg or sum) of rewards
+                reward[:, :] += total_approach_reward.unsqueeze(1).repeat(1, self.num_agents)
+                self.reward_buffer["approach_to_box_reward"] += torch.sum(total_approach_reward).cpu().item()
+
+                # Track Gaussian bonus separately for monitoring
                 if self.positive_approachtobox_reward:
-                    total_gaussian_bonus = total_gaussian_bonus / self.num_agents
-
-            # Add Gaussian bonus to the penalty (net reward)
-            if self.positive_approachtobox_reward:
-                total_approach_reward = total_approach_reward + total_gaussian_bonus
-
-            # Team reward: both agents get the (avg or sum) of rewards
-            reward[:, :] += total_approach_reward.unsqueeze(1).repeat(1, self.num_agents)
-            self.reward_buffer["approach_to_box_reward"] += torch.sum(total_approach_reward).cpu().item()
-
-            # Track Gaussian bonus separately for monitoring
-            if self.positive_approachtobox_reward:
-                self.reward_buffer["gaussian_proximity_bonus"] += torch.sum(total_gaussian_bonus).cpu().item() 
+                    self.reward_buffer["gaussian_proximity_bonus"] += torch.sum(total_gaussian_bonus).cpu().item() 
 
         # calculate collision punishment
+        # baseline_mappo_rewards: ORIGINAL per-agent reward (both agents in pair get punishment)
         # CRITIC14: Explicit TEAM reward for centralized critic compatibility
         # mapush_og_rewards_teamified: Uses original scale -0.0025 (hardcoded)
         if self.collision_punishment_scale != 0:
-            # Distance between agents (only 2 agents, so single pair)
-            agent_distance = torch.norm(base_pos[:, 0, :] - base_pos[:, 1, :], dim=1)
-            # Use original scale when mapush_og_rewards_teamified, otherwise from config
-            if self.mapush_og_rewards_teamified:
-                collision_scale = -0.0025  # Original MAPush scale
+            if self.baseline_mappo_rewards:
+                # ORIGINAL MAPPO: Per-agent collision punishment (both agents in pair get it)
+                punishment_logger = []
+                for i in range(self.num_agents):
+                    for j in range(i+1, self.num_agents):
+                        distance = torch.norm(base_pos[:, i, :] - base_pos[:, j, :], dim=1, keepdim=True)
+                        collision_punishment = (1 / (0.02 + distance/3)) * self.collision_punishment_scale
+                        punishment_logger.append(torch.sum(collision_punishment).cpu())
+                        reward[:, i] += collision_punishment.squeeze(-1)
+                        reward[:, j] += collision_punishment.squeeze(-1)
+                self.reward_buffer["collision_punishment"] += np.sum(np.array(punishment_logger))
             else:
-                collision_scale = self.collision_punishment_scale  # From config
-            collision_punishment = (1 / (0.02 + agent_distance / 3)) * collision_scale
-            # Team reward: both agents get the same punishment
-            reward[:, :] += collision_punishment.unsqueeze(1).repeat(1, self.num_agents)
-            self.reward_buffer["collision_punishment"] += torch.sum(collision_punishment).cpu().item()
+                # HAPPO: Team reward
+                # Distance between agents (only 2 agents, so single pair)
+                agent_distance = torch.norm(base_pos[:, 0, :] - base_pos[:, 1, :], dim=1)
+                # Use original scale when mapush_og_rewards_teamified, otherwise from config
+                if self.mapush_og_rewards_teamified:
+                    collision_scale = -0.0025  # Original MAPush scale
+                else:
+                    collision_scale = self.collision_punishment_scale  # From config
+                collision_punishment = (1 / (0.02 + agent_distance / 3)) * collision_scale
+                # Team reward: both agents get the same punishment
+                reward[:, :] += collision_punishment.unsqueeze(1).repeat(1, self.num_agents)
+                self.reward_buffer["collision_punishment"] += torch.sum(collision_punishment).cpu().item()
 
         # CRITIC13 v2: Re-enabled push_reward - curriculum learning (weak signal, then directional takes over)
         # calculate push reward for each agent
@@ -762,10 +796,17 @@ class Go1PushMidWrapper(EmptyWrapper):
                 raw_ocb = torch.sum(target_direction * normal_vector, dim=1)
                 raw_ocb_list.append(raw_ocb)
 
-            # CRITIC15 v2: Continuous averaged OCB (original MAPush formula, teamified)
-            # Restores continuous OCB and averages to preserve scale magnitude
-            if self.mapush_og_rewards_teamified:
-                # v2: Continuous OCB - average both agents' continuous values
+            # baseline_mappo_rewards: ORIGINAL per-agent OCB reward
+            if self.baseline_mappo_rewards:
+                # ORIGINAL MAPPO: Per-agent OCB reward
+                reward_logger = []
+                for i in range(self.num_agents):
+                    ocb_reward = raw_ocb_list[i] * self.ocb_reward_scale
+                    reward[:, i] += ocb_reward
+                    reward_logger.append(torch.sum(ocb_reward).cpu())
+                self.reward_buffer["ocb_reward"] += np.sum(np.array(reward_logger))
+            elif self.mapush_og_rewards_teamified:
+                # CRITIC15 v2: Continuous averaged OCB (teamified for HAPPO)
                 # Each agent gets partial immediate credit, doesn't rely solely on critic
                 total_ocb = torch.zeros(self.num_envs, device=self.device)
                 for i in range(self.num_agents):
@@ -775,6 +816,14 @@ class Go1PushMidWrapper(EmptyWrapper):
 
                 # Average to preserve scale magnitude (like approach_to_box_reward)
                 joint_ocb_reward = total_ocb / self.num_agents
+
+                # Iter8: Apply gating if enabled
+                if self.shared_gated_rewards:
+                    joint_ocb_reward = joint_ocb_reward * gating_factor
+
+                # Add as TEAM reward (same for both agents)
+                reward[:, :] += joint_ocb_reward.unsqueeze(1).repeat(1, self.num_agents)
+                self.reward_buffer["ocb_reward"] += torch.sum(joint_ocb_reward).cpu().item()
             else:
                 # CRITIC14: Joint binary OCB - both agents must be on correct side
                 both_correct = (raw_ocb_list[0] > 0) & (raw_ocb_list[1] > 0)
@@ -785,13 +834,13 @@ class Go1PushMidWrapper(EmptyWrapper):
                     torch.full_like(raw_ocb_list[0], -0.004)                   # Any wrong: -0.004 (fixed)
                 )
 
-            # Iter8: Apply gating if enabled
-            if self.shared_gated_rewards:
-                joint_ocb_reward = joint_ocb_reward * gating_factor
+                # Iter8: Apply gating if enabled
+                if self.shared_gated_rewards:
+                    joint_ocb_reward = joint_ocb_reward * gating_factor
 
-            # Add as TEAM reward (same for both agents)
-            reward[:, :] += joint_ocb_reward.unsqueeze(1).repeat(1, self.num_agents)
-            self.reward_buffer["ocb_reward"] += torch.sum(joint_ocb_reward).cpu().item()
+                # Add as TEAM reward (same for both agents)
+                reward[:, :] += joint_ocb_reward.unsqueeze(1).repeat(1, self.num_agents)
+                self.reward_buffer["ocb_reward"] += torch.sum(joint_ocb_reward).cpu().item()
 
         # =================================================================
         # CRITIC13 v3: Robot Proximity Penalty (quadratic)

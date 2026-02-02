@@ -357,3 +357,108 @@ HARL/results/mapush/cuboid/happo/<exp_name>/seed-1-<timestamp>/
 ```
 
 ---
+
+## 5. Baseline MAPPO Rewards Flag (--baseline_mappo_rewards)
+
+**Date:** 2026-02-01
+**Files Modified:**
+- `openrl_ws/utils.py` - Added `--baseline_mappo_rewards` argument (default: True)
+- `openrl_ws/train.py` - Pass flag to `custom_cfg()`
+- `mqe/envs/utils.py` - Accept flag in `custom_cfg()`, set config values and original scales
+- `mqe/envs/wrappers/go1_push_mid_wrapper.py` - Check flag and disable all HAPPO-specific rewards
+- `openrl_ws/run_utils/run_config_saver.py` - Save flag in run config
+
+**Note:** This flag is **ONLY for MAPPO (OpenRL)**. HAPPO has its own `--mapush_og_rewards_teamified` flag.
+
+### Problem
+
+The MAPush codebase evolved to include many HAPPO-specific rewards (proximity_penalty, goal_push_bonus, cooperation bonuses, etc.) that were added to the shared `go1_push_mid_wrapper.py`. These rewards were **enabled by default** via non-zero scale values in the config:
+
+```python
+# In config - these were contaminating MAPPO runs!
+proximity_penalty_scale = 0.002  # HAPPO reward - should be OFF for MAPPO
+ocb_reward_scale = 0.01  # Was changed from original 0.004
+```
+
+When running MAPPO training, it was unknowingly using these HAPPO rewards instead of the original 7 MAPush rewards.
+
+### Solution
+
+Added `--baseline_mappo_rewards` flag (default: True) that guarantees:
+
+1. **ONLY the original 7 MAPush rewards** are used
+2. **Original scales** are restored (some had been changed)
+3. **ALL HAPPO-specific rewards** are disabled (set to 0)
+
+### Original 7 MAPush Rewards (Baseline)
+
+| Reward | Original Scale | Description |
+|--------|---------------|-------------|
+| `target_reward` | 0.00325 | Distance to target |
+| `approach_reward` | 0.00075 | Distance to box |
+| `collision_punishment` | -0.0025 | Agent-agent collision |
+| `push_reward` | 0.0015 | Push force |
+| `ocb_reward` | **0.004** | Orientation-conditioned bonus |
+| `reach_target_reward` | 10 | Success bonus |
+| `exception_punishment` | -5 | Physics exception penalty |
+
+**Note:** `ocb_reward_scale` was changed to 0.01 at some point - the baseline restores it to the original 0.004.
+
+### Disabled HAPPO Rewards
+
+When `--baseline_mappo_rewards True`, the following are set to 0:
+
+| HAPPO Reward | Was Scale | Now |
+|--------------|-----------|-----|
+| `proximity_penalty` | 0.002 | 0 |
+| `goal_push_bonus` | 0.01 | 0 |
+| `engagement_bonus` | 0.0004 | 0 |
+| `cooperation_bonus` | 0.0002 | 0 |
+| `same_side_bonus` | 0.0004 | 0 |
+| `blocking_penalty` | -0.001 | 0 |
+| `directional_progress` | 0.003 | 0 |
+| `dual_push_bonus` | 0.005 | 0 |
+| `gaussian_proximity_bonus` | 0.006 | 0 |
+
+Also disables flags: `individualized_rewards`, `shared_gated_rewards`, `cooperation_rewards`, `collaboration_rewards`, `reward_scale_testing`, `positive_approachtobox_reward`
+
+### Usage
+
+```bash
+# Default (baseline rewards) - RECOMMENDED for fair MAPPO comparison
+python ./openrl_ws/train.py --algo ppo --task go1push_mid ...
+
+# Explicitly enable baseline (same as default)
+python ./openrl_ws/train.py --algo ppo --task go1push_mid --baseline_mappo_rewards True
+
+# Disable baseline to use HAPPO rewards with MAPPO (for experiments)
+python ./openrl_ws/train.py --algo ppo --task go1push_mid --baseline_mappo_rewards False
+```
+
+### Output
+
+When enabled, you'll see:
+```
+[MAPPO Training] Reward mode: BASELINE (original 7 MAPush rewards)
+[custom_cfg] BASELINE MAPPO REWARDS MODE: Using original 7 rewards with original scales
+[Go1PushMidWrapper] BASELINE MAPPO REWARDS MODE ACTIVE
+  Using ONLY 7 original rewards: target, approach, collision, push, ocb, reach_target, exception
+  Scales: target=0.00325, approach=0.00075, collision=-0.0025, push=0.0015, ocb=0.004, reach=10, exception=-5
+```
+
+### Run Config Tracking
+
+The flag is saved in `run_config.yaml`:
+```yaml
+rewards:
+  baseline_mappo_rewards: true
+  description: "baseline_mappo_rewards=True uses ONLY original 7 MAPush rewards with original scales"
+```
+
+### Backwards Compatibility
+
+- Default is `True` (baseline mode) for all new MAPPO runs
+- To replicate old contaminated runs, use `--baseline_mappo_rewards False`
+- HAPPO is unaffected - continue using `--mapush_og_rewards_teamified` for HAPPO baseline
+
+---

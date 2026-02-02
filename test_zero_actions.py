@@ -1,9 +1,7 @@
 """
-Test heterogeneous environment with ZERO actions.
+Test heterogeneous environment with constant velocity actions.
 
-This isolates whether the problem is:
-1. Locomotion policy issues -> If works with zero actions, policy is broken
-2. Physics/spawn issues -> If fails with zero actions, spawn/physics problem
+Tests Go1 + Cassie walking together in MAPush environment.
 """
 
 import sys
@@ -17,11 +15,11 @@ import torch
 from mqe.envs.utils import make_hetero_env
 from mqe.utils.helpers import get_args
 
-def test_zero_actions():
-    """Test with zero actions to see if robots can stand still."""
+def test_go1_cassie():
+    """Test Go1 + Cassie walking with constant velocity."""
 
     print("\n" + "="*60)
-    print("TESTING HETERO ENV WITH ZERO ACTIONS")
+    print("TESTING GO1 + CASSIE HETERO ENV")
     print("="*60)
 
     # Get proper args with defaults
@@ -31,18 +29,18 @@ def test_zero_actions():
     args.num_envs = 1
     args.record_video = False  # Disable video recording
 
-    # Create hetero environment (Go1 + Anymal C)
+    # Create hetero environment (Go1 + Cassie)
     print("\n[1] Creating heterogeneous environment...")
-    print("    Agent 0: Go1")
-    print("    Agent 1: Anymal C")
+    print("    Agent 0: Go1 (quadruped)")
+    print("    Agent 1: Cassie (biped)")
 
     env, env_cfg = make_hetero_env(
         env_name='go1push_mid',
-        agent_types=['go1', 'anymal_c'],
+        agent_types=['go1', 'cassie'],
         args=args
     )
 
-    print(f"✅ Environment created")
+    print(f"Environment created")
     print(f"   Num envs: {env.num_envs}")
     print(f"   Num agents: {env.num_agents}")
     print(f"   Total DOFs: {env.num_actuated_dof}")
@@ -50,38 +48,34 @@ def test_zero_actions():
     # Reset environment
     print("\n[2] Resetting environment...")
     obs = env.reset()
-    print(f"✅ Reset successful")
-    print(f"   Obs shape: {obs.shape}")
+    print(f"Reset successful")
 
-    # Test with SMALL CONSTANT velocity commands
-    print("\n[3] Stepping with SMALL CONSTANT velocity commands...")
-    print("    Testing if policies work better with non-zero commands")
+    # Test with constant forward velocity
+    print("\n[3] Stepping with constant forward velocity...")
+    print("    Both robots walking forward at 0.5 m/s")
 
-    num_steps = 500  # ~10 seconds at 50Hz
+    num_steps = 1000  # ~20 seconds at 50Hz
 
-    # Small constant velocity: [num_envs, num_agents, action_dim]
+    # Constant velocity: [num_envs, num_agents, action_dim]
     # action_dim = 3 for both agents [vx, vy, vyaw]
-    # Try small forward velocity (0.2 m/s) instead of zero
     constant_actions = torch.zeros(env.num_envs, env.num_agents, 3, device='cuda')
-    constant_actions[:, :, 0] = 0.2  # Small forward velocity
+    constant_actions[:, :, 0] = 0.5  # Forward velocity 0.5 m/s
 
-    print(f"    Command: vx=0.2 m/s, vy=0.0 m/s, vyaw=0.0 rad/s")
+    print(f"    Command: vx=0.5 m/s, vy=0.0 m/s, vyaw=0.0 rad/s")
+    print(f"    Running for {num_steps} steps (~20 seconds)")
+    print()
 
     reset_count = 0
-    step_count = 0
 
     for step in range(num_steps):
         obs, rewards, dones, infos = env.step(constant_actions)
-        step_count += 1
 
         if dones.any():
             reset_count += 1
-            # Reset and continue (silent)
             obs = env.reset()
-            step_count = 0
 
-        # Print progress every 100 steps (~2 seconds) - minimal output
-        if step % 100 == 0:
+        # Print progress every 200 steps
+        if step % 200 == 0:
             print(f"  Step {step}/{num_steps} - Resets: {reset_count}")
 
     print("\n" + "="*60)
@@ -91,21 +85,15 @@ def test_zero_actions():
     print(f"Total resets: {reset_count}")
 
     if reset_count == 0:
-        print("\n✅ SUCCESS: Robots stood stable for entire test!")
-        print("   -> Problem is likely in locomotion policy or action processing")
+        print("\nSUCCESS: Both robots walked stable for entire test!")
     elif reset_count < 5:
-        print(f"\n⚠️  PARTIAL SUCCESS: Only {reset_count} resets")
-        print("   -> Spawn might be slightly unstable but not catastrophic")
+        print(f"\nPARTIAL SUCCESS: Only {reset_count} resets")
     else:
-        print(f"\n❌ FAILURE: {reset_count} resets in {num_steps} steps")
-        print("   -> Physics/spawn issue - robots can't even stand still")
-
-        if reset_count > 20:
-            print("   -> CRITICAL: Immediate collapse on spawn")
+        print(f"\nISSUE: {reset_count} resets - check locomotion policies")
 
     print("="*60 + "\n")
 
     env.close()
 
 if __name__ == "__main__":
-    test_zero_actions()
+    test_go1_cassie()
