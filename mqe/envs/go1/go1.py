@@ -140,8 +140,11 @@ class Go1(LeggedRobotField):
     def _reset_buffers(self, env_ids):
         super()._reset_buffers(env_ids)
         agent_ids = self.env_agent_indices[env_ids].reshape(-1)
-        self.gait_indices[agent_ids] = 0
-        self.history_locomotion_obs[agent_ids] = 0
+        if hasattr(self, 'gait_indices'):
+            self.gait_indices[agent_ids] = 0
+        # Only reset history buffer if it exists (Go1 uses walk_these_ways with history)
+        if hasattr(self, 'history_locomotion_obs'):
+            self.history_locomotion_obs[agent_ids] = 0
 
     def reset(self):
         """ Reset all robots"""
@@ -362,6 +365,9 @@ class Go1(LeggedRobotField):
         self.lag_buffer = [torch.zeros_like(self.dof_pos, device=self.device) for i in range(self.cfg.domain_rand.lag_timesteps + 1)]
 
         if self.cfg.control.control_type == "actuator_net" or self.cfg.control.control_type == "C":
+            # Only load actuator network if path is provided (some robots like Cassie use PD control)
+            if not hasattr(self.cfg.control, 'actuator_network_path') or self.cfg.control.actuator_network_path is None:
+                return  # Skip actuator network loading for robots that don't use it
 
             actuator_network = torch.jit.load(self.cfg.control.actuator_network_path + "/unitree_go1.pt", map_location=self.device)
 

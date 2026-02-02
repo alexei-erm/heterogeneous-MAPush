@@ -110,13 +110,14 @@ class HeteroRobot(LeggedRobotField):
                     # Check robot type to determine policy loading method
                     if robot_type == 'go1':
                         # Go1 uses walk_these_ways (body + adaptation_module)
-                        body = torch.jit.load(policy_dir + '/body_latest.jit', map_location=self.device)
-                        adaptation_module = torch.jit.load(policy_dir + '/adaptation_module_latest.jit', map_location=self.device)
+                        go1_body = torch.jit.load(policy_dir + '/body_latest.jit', map_location=self.device)
+                        go1_adaptation_module = torch.jit.load(policy_dir + '/adaptation_module_latest.jit', map_location=self.device)
 
-                        def go1_policy(obs, info={}):
+                        # CRITICAL: Use default arguments to capture models at definition time
+                        def go1_policy(obs, info={}, _body=go1_body, _adapt=go1_adaptation_module):
                             with torch.no_grad():
-                                latent = adaptation_module.forward(obs)
-                                action = body.forward(torch.cat((obs, latent), dim=-1))
+                                latent = _adapt.forward(obs)
+                                action = _body.forward(torch.cat((obs, latent), dim=-1))
                             info['latent'] = latent
                             return action
 
@@ -137,11 +138,13 @@ class HeteroRobot(LeggedRobotField):
 
                     elif robot_type == 'anymal_c':
                         # Anymal C uses single JIT policy (48-dim obs)
-                        policy_model = torch.jit.load(policy_dir + '/policy_1.pt', map_location=self.device)
+                        anymal_policy_model = torch.jit.load(policy_dir + '/policy_1.pt', map_location=self.device)
 
-                        def anymal_policy(obs, info={}):
+                        # CRITICAL: Use default argument to capture policy_model at definition time
+                        # Otherwise Python closure captures by reference and all agents use last loaded policy!
+                        def anymal_policy(obs, info={}, _model=anymal_policy_model):
                             with torch.no_grad():
-                                action = policy_model.forward(obs)
+                                action = _model.forward(obs)
                             return action
 
                         self.locomotion_policies.append(anymal_policy)
@@ -156,11 +159,13 @@ class HeteroRobot(LeggedRobotField):
                     elif robot_type == 'cassie':
                         # Cassie uses standard legged_gym policy (48-dim obs, same as Anymal C)
                         # After training, policy will be at: resources/robots/cassie/policy/policy_1.pt
-                        policy_model = torch.jit.load(policy_dir + '/policy_1.pt', map_location=self.device)
+                        cassie_policy_model = torch.jit.load(policy_dir + '/policy_1.pt', map_location=self.device)
 
-                        def cassie_policy(obs, info={}):
+                        # CRITICAL: Use default argument to capture policy_model at definition time
+                        # Otherwise Python closure captures by reference and all agents use last loaded policy!
+                        def cassie_policy(obs, info={}, _model=cassie_policy_model):
                             with torch.no_grad():
-                                action = policy_model.forward(obs)
+                                action = _model.forward(obs)
                             return action
 
                         self.locomotion_policies.append(cassie_policy)
@@ -188,8 +193,9 @@ class HeteroRobot(LeggedRobotField):
         """
         Load per-robot actuator network for torque computation.
         Different robots use different actuator networks:
-        - Go1 -> unitree_go1.pt (feedforward, input: [pos_err, vel] x 3 timesteps)
+        - Go1 -> unitree_go1.pt (feedforward MLP, input: [pos_err, vel] x 3 timesteps)
         - Anymal C -> anydrive_v3_lstm.pt (LSTM, input: [pos_err, vel], needs hidden state)
+        - Cassie -> PD control fallback (no actuator network)
         """
         # Initialize dict if needed
         if not hasattr(self, 'actuator_networks'):
@@ -198,11 +204,13 @@ class HeteroRobot(LeggedRobotField):
         # Determine which actuator network file to use
         if robot_type == 'go1':
             actuator_file = actuator_network_path + "/unitree_go1.pt"
-            actuator_net = torch.jit.load(actuator_file, map_location=self.device)
+            go1_actuator_net = torch.jit.load(actuator_file, map_location=self.device)
 
             # Go1 uses feedforward network with history
+            # CRITICAL: Use default argument to capture actuator_net at definition time
             def eval_go1_actuator(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
-                                  joint_vel, joint_vel_last, joint_vel_last_last):
+                                  joint_vel, joint_vel_last, joint_vel_last_last,
+                                  _net=go1_actuator_net):
                 # Stack inputs: [num_envs, num_dof, 6]
                 xs = torch.cat((joint_pos_err.unsqueeze(-1),
                                joint_pos_err_last.unsqueeze(-1),
@@ -214,16 +222,18 @@ class HeteroRobot(LeggedRobotField):
                 num_envs = joint_pos_err.shape[0]
                 num_dof = joint_pos_err.shape[1]
                 with torch.no_grad():
-                    torques = actuator_net(xs.view(num_envs * num_dof, 6))
+                    torques = _net(xs.view(num_envs * num_dof, 6))
                 return torques.view(num_envs, num_dof)
 
             self.actuator_networks[agent_idx] = eval_go1_actuator
 
         elif robot_type == 'anymal_c':
+            # Anymal C uses LSTM actuator network (anydrive_v3_lstm.pt)
+            # This matches the original legged_gym training setup
             actuator_file = actuator_network_path + "/anydrive_v3_lstm.pt"
-            actuator_net = torch.jit.load(actuator_file, map_location=self.device)
+            anymal_actuator_net = torch.jit.load(actuator_file, map_location=self.device)
 
-            # Anymal C uses LSTM network - initialize hidden states
+            # Initialize LSTM hidden states
             # Shape: [2 layers, num_envs * num_dof, 8 hidden]
             num_dof = 12  # Anymal C has 12 DOFs
             sea_hidden = torch.zeros(2, self.num_envs * num_dof, 8, device=self.device)
@@ -233,30 +243,32 @@ class HeteroRobot(LeggedRobotField):
             setattr(self, f'anymal_sea_hidden_{agent_idx}', sea_hidden)
             setattr(self, f'anymal_sea_cell_{agent_idx}', sea_cell)
 
-            # Anymal C LSTM actuator - different input format!
-            # CRITICAL: legged_gym computes pos_err as (target - actual), but we compute (actual - target)
-            # So we need to NEGATE the position error for Anymal C's LSTM
+            # Anymal C LSTM actuator network
+            # CRITICAL: legged_gym computes error as (target - current), which is POSITIVE convention
+            # Our _compute_torques passes (current - target), so we need to NEGATE
+            # CRITICAL: Use default arguments to capture values at definition time
             def eval_anymal_actuator(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
-                                     joint_vel, joint_vel_last, joint_vel_last_last):
+                                     joint_vel, joint_vel_last, joint_vel_last_last,
+                                     _net=anymal_actuator_net, _agent_idx=agent_idx):
                 num_envs = joint_pos_err.shape[0]
                 num_dof = joint_pos_err.shape[1]
 
                 # Get hidden states
-                sea_hidden = getattr(self, f'anymal_sea_hidden_{agent_idx}')
-                sea_cell = getattr(self, f'anymal_sea_cell_{agent_idx}')
+                sea_hidden = getattr(self, f'anymal_sea_hidden_{_agent_idx}')
+                sea_cell = getattr(self, f'anymal_sea_cell_{_agent_idx}')
 
                 # Input format: [num_envs * num_dof, 1, 2] with [pos_err, vel]
-                # NEGATE pos_err because legged_gym uses (target - actual) but we pass (actual - target)
+                # NEGATE pos_err: we receive (current - target), but LSTM expects (target - current)
                 sea_input = torch.zeros(num_envs * num_dof, 1, 2, device=self.device)
-                sea_input[:, 0, 0] = -joint_pos_err.flatten()  # NEGATED!
+                sea_input[:, 0, 0] = -joint_pos_err.flatten()  # Negate to get (target - current)
                 sea_input[:, 0, 1] = joint_vel.flatten()
 
                 with torch.inference_mode():
-                    torques, (new_hidden, new_cell) = actuator_net(sea_input, (sea_hidden, sea_cell))
+                    torques, (new_hidden, new_cell) = _net(sea_input, (sea_hidden, sea_cell))
 
                 # Update hidden states
-                setattr(self, f'anymal_sea_hidden_{agent_idx}', new_hidden)
-                setattr(self, f'anymal_sea_cell_{agent_idx}', new_cell)
+                setattr(self, f'anymal_sea_hidden_{_agent_idx}', new_hidden)
+                setattr(self, f'anymal_sea_cell_{_agent_idx}', new_cell)
 
                 return torques.view(num_envs, num_dof)
 
@@ -269,15 +281,17 @@ class HeteroRobot(LeggedRobotField):
             print(f"[HeteroRobot] Cassie agent {agent_idx} will use PD control (no actuator network)")
 
             # Create a dummy entry that signals to use PD control
+            # CRITICAL: Use default argument to capture agent_idx at definition time
             def eval_cassie_pd(joint_pos_err, joint_pos_err_last, joint_pos_err_last_last,
-                               joint_vel, joint_vel_last, joint_vel_last_last):
+                               joint_vel, joint_vel_last, joint_vel_last_last,
+                               _agent_idx=agent_idx):
                 # Use standard PD control
                 # Get the DOF offset for this agent to access correct gains
                 dof_offsets = [0]
                 for num_dof in self.robot_num_dofs:
                     dof_offsets.append(dof_offsets[-1] + num_dof)
-                dof_start = dof_offsets[agent_idx]
-                dof_end = dof_offsets[agent_idx + 1]
+                dof_start = dof_offsets[_agent_idx]
+                dof_end = dof_offsets[_agent_idx + 1]
 
                 torques = (
                     self.p_gains[dof_start:dof_end] * (-joint_pos_err)  # Note: negated for PD convention

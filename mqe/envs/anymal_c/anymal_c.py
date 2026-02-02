@@ -63,33 +63,43 @@ class AnymalC(LeggedRobotField):
         """
         Preprocess mid-level actions into locomotion policy observations.
 
-        SIMPLIFIED for legged_gym default (48 dims), NOT walk_these_ways (70 dims)!
-        Structure:
-          [0:3]   projected_gravity
-          [3:6]   commands [vx, vy, vyaw]
-          [6:18]  dof_pos (relative to default)
-          [18:30] dof_vel
-          [30:42] last_action
-          [42:45] base_ang_vel
-          [45:48] extras (height_scan or other)
+        legged_gym default observation structure (48 dims):
+        Structure (MUST match legged_gym/envs/base/legged_robot.py):
+          [0:3]   base_lin_vel (scaled by obs_scales.lin_vel)
+          [3:6]   base_ang_vel (scaled by obs_scales.ang_vel)
+          [6:9]   projected_gravity (NOT scaled)
+          [9:12]  commands [vx, vy, vyaw] (scaled by command_scales)
+          [12:24] dof_pos (scaled by obs_scales.dof_pos)
+          [24:36] dof_vel (scaled by obs_scales.dof_vel)
+          [36:48] previous actions (raw policy outputs)
         """
 
-        # Fill velocity commands from mid-level actions [vx, vy, vyaw]
+        # [0:3] base_lin_vel (already scaled in obs_buf)
+        self.locomotion_obs[:, 0:3] = self.obs_buf.lin_vel
+
+        # [3:6] base_ang_vel (already scaled in obs_buf)
+        self.locomotion_obs[:, 3:6] = self.obs_buf.ang_vel
+
+        # [6:9] projected_gravity (NOT scaled)
+        self.locomotion_obs[:, 6:9] = self.obs_buf.projected_gravity
+
+        # [9:12] Fill velocity commands from mid-level actions [vx, vy, vyaw]
         if self.cfg.command.cfg.vel:
-            self.locomotion_obs[:, 3:6] = actions[:, self.vel_idx : self.vel_idx + 3] * torch.tensor(
+            self.locomotion_obs[:, 9:12] = actions[:, self.vel_idx : self.vel_idx + 3] * torch.tensor(
                 [self.cfg.control.obs_scales.lin_vel,
                  self.cfg.control.obs_scales.lin_vel,
                  self.cfg.control.obs_scales.ang_vel],
                 device=self.device
             )
 
-        # Fill core observations
-        self.locomotion_obs[:, 0:3] = self.obs_buf.projected_gravity
-        self.locomotion_obs[:, 6:18] = self.obs_buf.dof_pos
-        self.locomotion_obs[:, 18:30] = self.obs_buf.dof_vel
-        self.locomotion_obs[:, 30:42] = self.last_locomotion_action
-        self.locomotion_obs[:, 42:45] = self.obs_buf.ang_vel  # base angular velocity
-        # [45:48] left as zeros (could be height measurements, etc.)
+        # [12:24] dof_pos (already scaled in obs_buf)
+        self.locomotion_obs[:, 12:24] = self.obs_buf.dof_pos
+
+        # [24:36] dof_vel (already scaled in obs_buf)
+        self.locomotion_obs[:, 24:36] = self.obs_buf.dof_vel
+
+        # [36:48] previous actions (raw policy outputs from last step)
+        self.locomotion_obs[:, 36:48] = self.last_locomotion_action
 
         # Call policy (no history buffer needed for legged_gym default policy)
         locomotion_action = self.locomotion_policy(self.locomotion_obs)
@@ -129,7 +139,11 @@ class AnymalC(LeggedRobotField):
         super()._reset_buffers(env_ids)
         agent_ids = self.env_agent_indices[env_ids].reshape(-1)
         self.gait_indices[agent_ids] = 0
-        # No history buffer for legged_gym default policy
+
+        # Reset LSTM actuator network hidden states for reset environments
+        if hasattr(self, 'sea_hidden_state_per_env'):
+            self.sea_hidden_state_per_env[:, agent_ids] = 0.0
+            self.sea_cell_state_per_env[:, agent_ids] = 0.0
 
     def reset(self):
         """ Reset all robots"""
@@ -261,14 +275,12 @@ class AnymalC(LeggedRobotField):
             else:
                 self.joint_pos_target = actions_scaled + self.default_dof_pos
 
-            self.joint_pos_err = (self.dof_pos - self.joint_pos_target).reshape([-1, 12]) # + self.motor_offsets
+            # Compute position error and velocity for LSTM actuator network
+            self.joint_pos_err = (self.dof_pos - self.joint_pos_target).reshape([-1, 12])
             self.joint_vel = self.dof_vel.reshape([-1, 12])
-            torques = self.actuator_network(self.joint_pos_err, self.joint_pos_err_last, self.joint_pos_err_last_last,
-                                            self.joint_vel, self.joint_vel_last, self.joint_vel_last_last)
-            self.joint_pos_err_last_last = torch.clone(self.joint_pos_err_last)
-            self.joint_pos_err_last = torch.clone(self.joint_pos_err)
-            self.joint_vel_last_last = torch.clone(self.joint_vel_last)
-            self.joint_vel_last = torch.clone(self.joint_vel)
+
+            # LSTM actuator network only needs current error and velocity (maintains internal state)
+            torques = self.actuator_network(self.joint_pos_err, self.joint_vel)
             return torch.clip(torques, -self.torque_limits, self.torque_limits)
         else:
             return super()._compute_torques(actions)
@@ -284,28 +296,32 @@ class AnymalC(LeggedRobotField):
 
         if self.cfg.control.control_type == "actuator_net" or self.cfg.control.control_type == "C":
 
-            # Try to use Go1 actuator network first (similar hardware)
-            actuator_network = torch.jit.load(self.cfg.control.actuator_network_path + "/unitree_go1.pt", map_location=self.device)
+            # Anymal C uses LSTM actuator network (anydrive_v3_lstm.pt)
+            # This matches the original legged_gym training setup
+            actuator_network = torch.jit.load(self.cfg.control.actuator_network_path + "/anydrive_v3_lstm.pt", map_location=self.device)
 
-            def eval_actuator_network(joint_pos, joint_pos_last, joint_pos_last_last, joint_vel, joint_vel_last,
-                                      joint_vel_last_last):
+            # Initialize LSTM hidden states
+            # Shape: [2 layers, num_envs * num_agents * num_dof, 8 hidden]
+            self.sea_input = torch.zeros(self.num_envs * self.num_agents * 12, 1, 2, device=self.device, requires_grad=False)
+            self.sea_hidden_state = torch.zeros(2, self.num_envs * self.num_agents * 12, 8, device=self.device, requires_grad=False)
+            self.sea_cell_state = torch.zeros(2, self.num_envs * self.num_agents * 12, 8, device=self.device, requires_grad=False)
+            # View for per-environment reset
+            self.sea_hidden_state_per_env = self.sea_hidden_state.view(2, self.num_envs * self.num_agents, 12, 8)
+            self.sea_cell_state_per_env = self.sea_cell_state.view(2, self.num_envs * self.num_agents, 12, 8)
 
-                xs = torch.cat((joint_pos.unsqueeze(-1),
-                                joint_pos_last.unsqueeze(-1),
-                                joint_pos_last_last.unsqueeze(-1),
-                                joint_vel.unsqueeze(-1),
-                                joint_vel_last.unsqueeze(-1),
-                                joint_vel_last_last.unsqueeze(-1)), dim=-1)
-                with torch.no_grad():
-                    torques = actuator_network(xs.view(self.num_envs * self.num_agents * 12, 6))
+            def eval_actuator_network(joint_pos_err, joint_vel):
+                # LSTM expects error as (target - actual), but we pass (actual - target)
+                # So we need to NEGATE the position error
+                self.sea_input[:, 0, 0] = -joint_pos_err.flatten()  # Negate for correct sign
+                self.sea_input[:, 0, 1] = joint_vel.flatten()
+
+                with torch.inference_mode():
+                    torques, (self.sea_hidden_state[:], self.sea_cell_state[:]) = actuator_network(
+                        self.sea_input, (self.sea_hidden_state, self.sea_cell_state)
+                    )
                 return torques.view(self.num_envs, self.num_actuated_dof)
 
             self.actuator_network = eval_actuator_network
-
-            self.joint_pos_err_last_last = torch.zeros((self.num_envs * self.num_agents, 12), device=self.device)
-            self.joint_pos_err_last = torch.zeros((self.num_envs * self.num_agents, 12), device=self.device)
-            self.joint_vel_last_last = torch.zeros((self.num_envs * self.num_agents, 12), device=self.device)
-            self.joint_vel_last = torch.zeros((self.num_envs * self.num_agents, 12), device=self.device)
 
     def _prepare_locomotion_policy(self):
         """
@@ -332,37 +348,29 @@ class AnymalC(LeggedRobotField):
 
     def _fill_command_obs(self):
         """
-        Fill command in locomotion observation with default command.
+        Fill command in locomotion observation with default values.
 
-        IMPORTANT: Anymal C policy expects 48 dims (legged_gym default), NOT 70 dims (walk_these_ways)!
-        Structure (48 dims):
-          [0:3]   projected_gravity (3)
-          [3:6]   commands [vx, vy, vyaw] (3)
-          [6:18]  dof_pos (12)
-          [18:30] dof_vel (12)
-          [30:42] last_action (12)
-          [42:48] base_ang_vel (3) + height (1) + other (2)  (6)
+        legged_gym default observation structure (48 dims):
+        Structure (MUST match legged_gym/envs/base/legged_robot.py):
+          [0:3]   base_lin_vel (scaled)
+          [3:6]   base_ang_vel (scaled)
+          [6:9]   projected_gravity
+          [9:12]  commands [vx, vy, vyaw] (scaled)
+          [12:24] dof_pos (scaled)
+          [24:36] dof_vel (scaled)
+          [36:48] previous actions
         """
 
         idx = 0
         locomotion_obs = torch.zeros(1, 48, dtype=torch.float, device=self.device, requires_grad=False)
 
-        # Default commands for velocity (will be overwritten by mid-level policy)
+        # Default commands for velocity at indices [9:12] (will be overwritten by mid-level policy)
         if not self.cfg.command.cfg.vel:
-            locomotion_obs[0, 3] = self.cfg.control.default_command.lin_vel_x * self.cfg.control.obs_scales.lin_vel
-            locomotion_obs[0, 4] = self.cfg.control.default_command.lin_vel_y * self.cfg.control.obs_scales.lin_vel
-            locomotion_obs[0, 5] = self.cfg.control.default_command.ang_vel * self.cfg.control.obs_scales.ang_vel
+            locomotion_obs[0, 9] = self.cfg.control.default_command.lin_vel_x * self.cfg.control.obs_scales.lin_vel
+            locomotion_obs[0, 10] = self.cfg.control.default_command.lin_vel_y * self.cfg.control.obs_scales.lin_vel
+            locomotion_obs[0, 11] = self.cfg.control.default_command.ang_vel * self.cfg.control.obs_scales.ang_vel
         else:
             self.vel_idx = idx
             idx += 3
-
-        # Simplified: No body_height, gait_freq, footswing_height, etc. for legged_gym default
-        # These were walk_these_ways specific features
-
-        if not self.cfg.command.cfg.aux_reward:
-            locomotion_obs[0, 17] = self.cfg.control.default_command.aux_reward * self.cfg.control.obs_scales.aux_reward
-        else:
-            self.aux_reward_idx = idx
-            idx += 1
 
         return locomotion_obs
