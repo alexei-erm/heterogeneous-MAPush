@@ -173,12 +173,14 @@ if npc_mass_override is not None:
 
 ## 3. Per-Agent Type Flags (--agent0/--agent1)
 
-**Date:** 2026-01-31
+**Date:** 2026-01-31 (Updated: 2026-02-02)
 **Files Modified:**
 - `HARL/harl_mapush/train.py` - Replaced `--hetero_agent` with `--agent0`/`--agent1`
 - `HARL/harl_mapush/test.py` - Same flag changes
 - `HARL/harl/envs/mapush/mapush_env.py` - Updated to use agent0/agent1
-- `mqe/envs/utils.py` - Updated `custom_cfg()` signature
+- `mqe/envs/utils.py` - Updated `custom_cfg()` signature, `make_hetero_env()` for routing
+- `mqe/envs/robot_registry.py` - Central robot registry for all supported robots
+- `mqe/envs/base/hetero_robot.py` - Heterogeneous robot environment class
 - `HARL/harl_mapush/utils/run_config_saver.py` - Updated for new flags
 
 ### Problem
@@ -203,8 +205,35 @@ Replaced `--hetero_agent` with explicit `--agent0` and `--agent1` flags:
 python train.py --agent0 go1 --agent1 anymal_c      # Heterogeneous
 python train.py --agent0 anymal_c --agent1 go1      # Reversed order
 python train.py --agent0 anymal_c --agent1 anymal_c # Both Anymal C
+python train.py --agent0 cassie --agent1 cassie     # Both Cassie
+python train.py --agent0 go1 --agent1 cassie        # Go1 + Cassie
 python train.py                                      # Default: both go1
 ```
+
+### Environment Routing Logic
+
+The system automatically detects whether to create a homogeneous or heterogeneous environment:
+
+```python
+# In make_hetero_env():
+is_homogeneous = (agent0 == agent1)  # Same robot type
+
+if is_homogeneous and robot_type == 'go1':
+    # TRUE HOMOGENEOUS: Use native Go1Object class directly
+    # This is the original MAPush environment
+    task_class = Go1Object
+
+else:
+    # HETERO PATH: Use HeteroRobot for:
+    # 1. Different robots (e.g., go1 + cassie)
+    # 2. Same non-Go1 robots (e.g., cassie + cassie, anymal_c + anymal_c)
+    task_class = HeteroRobot + Go1Object
+```
+
+**Why this routing?**
+- `Go1Object` inherits from `Go1`, so go1+go1 uses the native class directly
+- Non-Go1 homogeneous pairs (cassie+cassie) use HeteroRobot to avoid MRO conflicts
+- All heterogeneous pairs use HeteroRobot
 
 ### Usage Examples
 
@@ -213,17 +242,23 @@ python train.py                                      # Default: both go1
 # Homogeneous (default - both Go1)
 python HARL/harl_mapush/train.py --exp_name baseline
 
+# Homogeneous Cassie
+python HARL/harl_mapush/train.py \
+  --exp_name cassie_pair \
+  --agent0 cassie \
+  --agent1 cassie
+
 # Heterogeneous (Go1 + Anymal C)
 python HARL/harl_mapush/train.py \
   --exp_name go1_anymal \
   --agent0 go1 \
   --agent1 anymal_c
 
-# Reversed order
+# Heterogeneous (Cassie + Anymal C)
 python HARL/harl_mapush/train.py \
-  --exp_name anymal_go1 \
-  --agent0 anymal_c \
-  --agent1 go1
+  --exp_name cassie_anymal \
+  --agent0 cassie \
+  --agent1 anymal_c
 ```
 
 **Testing:**
@@ -251,10 +286,82 @@ is_hetero = (agent0 != agent1)
 
 ### Available Robot Types
 
-| Robot | Description |
-|-------|-------------|
-| `go1` | Unitree Go1 quadruped (12 DOF, hierarchical control) |
-| `anymal_c` | ANYmal C quadruped (12 DOF, hierarchical control) |
+| Robot | Description | Control | DOF |
+|-------|-------------|---------|-----|
+| `go1` | Unitree Go1 quadruped | Hierarchical (walk_these_ways) | 12 |
+| `anymal_c` | ANYmal C quadruped | Hierarchical (legged_gym LSTM) | 12 |
+| `cassie` | Agility Robotics Cassie biped | Hierarchical (legged_gym) | 10 |
+
+### Adding New Robots
+
+To add a new robot to the system:
+
+#### Step 1: Create Robot Files
+```
+mqe/envs/<robot_name>/
+├── <robot_name>.py          # Robot class (inherits LeggedRobotField)
+├── <robot_name>_config.py   # Robot configuration
+```
+
+#### Step 2: Register in Robot Registry
+Edit `mqe/envs/robot_registry.py`:
+```python
+ROBOT_REGISTRY = {
+    # ... existing robots ...
+    'new_robot': {
+        'class_path': 'mqe.envs.new_robot.new_robot.NewRobot',
+        'config_path': 'mqe.envs.new_robot.new_robot_config.NewRobotCfg',
+        'default_control': 'C',  # 'C' for hierarchical, 'P' for direct
+        'num_actions': 3,        # Mid-level action dim [vx, vy, vyaw]
+        'description': 'New robot description'
+    },
+}
+```
+
+#### Step 3: Add Locomotion Policy Loading (if control_type='C')
+Edit `mqe/envs/base/hetero_robot.py` in `_load_locomotion_policies()`:
+```python
+elif robot_type == 'new_robot':
+    # Load locomotion policy
+    policy_model = torch.jit.load(policy_dir + '/policy_1.pt', map_location=self.device)
+
+    def new_robot_policy(obs, info={}, _model=policy_model):
+        with torch.no_grad():
+            action = _model.forward(obs)
+        return action
+
+    self.locomotion_policies.append(new_robot_policy)
+    obs_buffer = torch.zeros(self.num_envs, OBS_DIM, dtype=torch.float, device=self.device)
+    self.locomotion_obs_buffers.append({'obs': obs_buffer, 'history': None})
+```
+
+#### Step 4: Add Actuator Network (if applicable)
+In `_load_actuator_network()`:
+```python
+elif robot_type == 'new_robot':
+    # Load actuator network or use PD control fallback
+    ...
+```
+
+#### Step 5: Provide Assets
+```
+resources/robots/<robot_name>/
+├── urdf/<robot_name>.urdf
+├── policy/policy_1.pt        # Trained locomotion policy
+└── actuator_net/...          # If using actuator network
+```
+
+### Interchangeability Matrix
+
+All combinations are supported:
+
+|          | go1 | anymal_c | cassie |
+|----------|-----|----------|--------|
+| **go1**      | ✅ Homo | ✅ Hetero | ✅ Hetero |
+| **anymal_c** | ✅ Hetero | ✅ Homo* | ✅ Hetero |
+| **cassie**   | ✅ Hetero | ✅ Hetero | ✅ Homo* |
+
+*Non-Go1 homogeneous pairs use HeteroRobot internally but function as homogeneous environments.
 
 ---
 
