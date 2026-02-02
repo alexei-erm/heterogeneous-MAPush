@@ -1,10 +1,14 @@
-exp_name="cuboid"
+exp_name="heterogenMAPPObaseline_go1_anymal"
 current_dir=$(pwd)
 algo="ppo"
 script_path=$(realpath "${BASH_SOURCE[0]}")
 # script_path=$(realpath $0)
 script_dir=$(dirname "$script_path")
 test_mode=$1
+
+# Agent configuration (used in both train and test modes)
+agent0='go1'
+agent1='anymal_c' # or cassie, anymal_c or go1
 
 # Set PYTHONPATH to include the project root
 export PYTHONPATH=/home/gvlab/new-universal-MAPush:$PYTHONPATH
@@ -26,10 +30,10 @@ if [ $test_mode = False ]; then
     --task go1push_mid \
     --use_tensorboard \
     --headless \
-    --agent0 go1 \
-    --agent1 anymal_c \
+    --agent0 $agent0 \
+    --agent1 $agent1 \
     --layer_N 2 \
-    --hidden_size 256 \
+    --hidden_size 128 \
     --baseline_mappo_rewards True
 
     #   --checkpoint $current_dir$checkpoint \
@@ -50,6 +54,8 @@ if [ $test_mode = False ]; then
                 --algo "$algo" \
                 --task go1push_mid \
                 --checkpoint "$test_checkpoint" \
+                --agent0 $agent0 \
+                --agent1 $agent1 \
                 --test_mode calculator \
                 --headless  >> $last_folder/success_rate.txt 2>&1
     done
@@ -62,7 +68,7 @@ python ./openrl_ws/test.py --num_envs 1 \
         --task go1push_mid \
         --checkpoint "$test_checkpoint" \
         --test_mode viewer \
-        --agent0 go1 \
-        --agent1 anymal_c
+        --agent0 $agent0 \
+        --agent1 $agent1 
 #       --record_video
 fi
