@@ -473,6 +473,23 @@ python legged_gym/scripts/play.py --task=cassie_flat
 - **Cause:** Raw checkpoint copied instead of exported JIT model
 - **Fix:** Re-export using the JIT export script in Section 1.5
 
+### Robot Jumps/Extends Legs and Falls (FIXED 2026-02-02)
+
+- **Cause:** PD control sign error in `hetero_robot.py`
+- **Symptom:** Cassie would jump, extend legs incorrectly, and fall within 2 seconds
+- **Root Cause:** The PD control formula was computing `torque = Kp * (current - target)` instead of `torque = Kp * (target - current)`
+- **Fix:** Updated `mqe/envs/base/hetero_robot.py` line ~1148 to use correct sign:
+  ```python
+  # BEFORE (wrong):
+  joint_pos_err_agent = self.dof_pos - self.joint_pos_target
+  torques = p_gains * joint_pos_err_agent - d_gains * vel  # Moves AWAY from target!
+
+  # AFTER (correct):
+  joint_pos_err_agent = self.joint_pos_target - self.dof_pos
+  torques = p_gains * joint_pos_err_agent - d_gains * vel  # Moves TOWARD target
+  ```
+- **Note:** Actuator networks (Go1, Anymal C) use the opposite sign convention (`current - target`) because they were trained that way
+
 ---
 
 ## 7. Files Modified/Created
@@ -491,6 +508,7 @@ python legged_gym/scripts/play.py --task=cassie_flat
 | File | Changes |
 |------|---------|
 | `mqe/envs/robot_registry.py` | Updated Cassie to use `Cassie` class |
+| `mqe/envs/base/hetero_robot.py` | Fixed PD control sign for Cassie (line ~1148) |
 
 ### legged_gym Files (Training Only)
 

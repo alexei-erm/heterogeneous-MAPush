@@ -124,20 +124,26 @@ def test_env_observations():
     print(f"\n[2] Environment observation buffer:")
     print(f"    obs_buf type: {type(env.obs_buf)}")
 
-    # Check if Cassie locomotion obs is being populated
-    if hasattr(env, 'locomotion_obs'):
+    # Check HeteroRobot locomotion obs buffers
+    if hasattr(env, 'locomotion_obs_buffers'):
+        print(f"\n[3] HeteroRobot locomotion observation buffers:")
+        for i, buf in enumerate(env.locomotion_obs_buffers):
+            if buf is not None and 'obs' in buf:
+                loc_obs = buf['obs']
+                print(f"\n    Agent {i} ({env.agent_types[i]}):")
+                print(f"      Buffer shape: {loc_obs.shape}")
+                print(f"      lin_vel [0:3]:        {loc_obs[0, 0:3].tolist()}")
+                print(f"      ang_vel [3:6]:        {loc_obs[0, 3:6].tolist()}")
+                print(f"      gravity [6:9]:        {loc_obs[0, 6:9].tolist()}")
+                print(f"      commands [9:12]:      {loc_obs[0, 9:12].tolist()}")
+                print(f"      dof_pos [12:18]:      {loc_obs[0, 12:18].tolist()}")
+                print(f"      dof_vel [24:30]:      {loc_obs[0, 24:30].tolist()}")
+                print(f"      last_action [36:42]:  {loc_obs[0, 36:42].tolist()}")
+    elif hasattr(env, 'locomotion_obs'):
         loc_obs = env.locomotion_obs
-        print(f"\n[3] Locomotion observation buffer:")
-        print(f"    Shape: {loc_obs.shape}")
-        print(f"    lin_vel [0:3]:        {loc_obs[0, 0:3].tolist()}")
-        print(f"    ang_vel [3:6]:        {loc_obs[0, 3:6].tolist()}")
-        print(f"    gravity [6:9]:        {loc_obs[0, 6:9].tolist()}")
-        print(f"    commands [9:12]:      {loc_obs[0, 9:12].tolist()}")
-        print(f"    dof_pos [12:18]:      {loc_obs[0, 12:18].tolist()}")
-        print(f"    dof_vel [24:30]:      {loc_obs[0, 24:30].tolist()}")
-        print(f"    last_action [36:42]:  {loc_obs[0, 36:42].tolist()}")
+        print(f"\n[3] Standalone locomotion obs: shape {loc_obs.shape}")
     else:
-        print("\n    ERROR: No locomotion_obs buffer found!")
+        print("\n    ERROR: No locomotion obs buffer found!")
 
     # Step with constant forward velocity
     print(f"\n[4] Stepping with forward velocity command...")
@@ -147,14 +153,13 @@ def test_env_observations():
     for i in range(5):
         obs, rewards, dones, infos = env.step(constant_actions)
 
-        if hasattr(env, 'locomotion_obs'):
-            loc_obs = env.locomotion_obs
+        if hasattr(env, 'locomotion_obs_buffers') and env.locomotion_obs_buffers[0] is not None:
+            loc_obs = env.locomotion_obs_buffers[0]['obs']
             print(f"\n    Step {i+1}:")
             print(f"      commands [9:12]: {loc_obs[0, 9:12].tolist()}")
             print(f"      gravity [6:9]:   {loc_obs[0, 6:9].tolist()}")
-
-            if hasattr(env, 'last_locomotion_action'):
-                print(f"      last_action[0:6]: {env.last_locomotion_action[0, 0:6].tolist()}")
+            if 'last_joint_targets' in env.locomotion_obs_buffers[0]:
+                print(f"      last_targets[0:6]: {env.locomotion_obs_buffers[0]['last_joint_targets'][0, 0:6].tolist()}")
 
         if dones.any():
             print(f"      RESET triggered!")

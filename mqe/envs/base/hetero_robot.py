@@ -1105,17 +1105,19 @@ class HeteroRobot(LeggedRobotField):
                 dof_end = dof_offsets[agent_idx + 1]
                 num_dof_agent = self.robot_num_dofs[agent_idx]
 
-                # Extract this agent's DOF positions, velocities, and targets
-                joint_pos_err_agent = (
-                    self.dof_pos[:, dof_start:dof_end]
-                    - self.joint_pos_target[:, dof_start:dof_end]
-                )
+                # Extract this agent's DOF velocities
                 joint_vel_agent = self.dof_vel[:, dof_start:dof_end]
 
                 # Compute torques based on control type
                 if robot_info['default_control'] == 'C':
                     # Hierarchical control: use per-robot actuator network
                     if hasattr(self, 'actuator_networks') and agent_idx in self.actuator_networks:
+                        # Actuator networks expect error = current - target (trained convention)
+                        joint_pos_err_agent = (
+                            self.dof_pos[:, dof_start:dof_end]
+                            - self.joint_pos_target[:, dof_start:dof_end]
+                        )
+
                         # Initialize history buffers if needed
                         if not hasattr(self, f'joint_pos_err_last_{agent_idx}'):
                             setattr(self, f'joint_pos_err_last_{agent_idx}', joint_pos_err_agent.clone())
@@ -1145,7 +1147,12 @@ class HeteroRobot(LeggedRobotField):
                         setattr(self, f'joint_vel_last_last_{agent_idx}', joint_vel_last.clone())
                         setattr(self, f'joint_vel_last_{agent_idx}', joint_vel_agent.clone())
                     else:
-                        # Fallback to PD control
+                        # PD control fallback (e.g., for Cassie)
+                        # PD formula: torque = Kp * (target - current) - Kd * velocity
+                        joint_pos_err_agent = (
+                            self.joint_pos_target[:, dof_start:dof_end]
+                            - self.dof_pos[:, dof_start:dof_end]
+                        )
                         torques_agent = (
                             self.p_gains[dof_start:dof_end] * joint_pos_err_agent
                             - self.d_gains[dof_start:dof_end] * joint_vel_agent
