@@ -1,0 +1,2518 @@
+2026-02-03 09:58:15,971 [INFO] Episode: 0/1500
+2026-02-03 09:58:45,254 [INFO] 
+	average_step_reward: -0.01662476174533367
+	distance_to_target_reward: -0.00731705641373992
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.004724956765174866
+	collision_punishment: -0.004392649021148682
+	reach_target_reward: 0.0
+	push_reward: 1.4160019418341108e-05
+	ocb_reward: -0.0002042596022412181
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 09:58:45,264 [INFO] 
+	value_loss: 0.5779811978340149
+	policy_loss: -0.0007675257869152574
+	dist_entropy: 4.261844682693481
+	actor_grad_norm: 0.04315773397684097
+	critic_grad_norm: 1.6955899000167847
+	ratio: 1.0000163435935974
+
+2026-02-03 09:58:45,266 [INFO] Episode: 1/1500
+2026-02-03 09:59:11,327 [INFO] Episode: 2/1500
+2026-02-03 09:59:35,873 [INFO] Episode: 3/1500
+2026-02-03 09:59:58,934 [INFO] Episode: 4/1500
+2026-02-03 10:00:20,387 [INFO] Episode: 5/1500
+2026-02-03 10:00:49,458 [INFO] 
+	average_step_reward: -0.01647137850522995
+	distance_to_target_reward: -0.007319076452404261
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.004826258459091187
+	collision_punishment: -0.0043907243752479555
+	reach_target_reward: 0.0
+	push_reward: 2.11500191653613e-05
+	ocb_reward: 4.353014570660889e-05
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:00:49,468 [INFO] 
+	value_loss: 0.07060272395610809
+	policy_loss: -0.0005984711884266858
+	dist_entropy: 4.317668008804321
+	actor_grad_norm: 0.05697261169552803
+	critic_grad_norm: 0.47793126106262207
+	ratio: 0.9999629855155945
+
+2026-02-03 10:00:49,471 [INFO] Episode: 6/1500
+2026-02-03 10:01:15,255 [INFO] Episode: 7/1500
+2026-02-03 10:01:39,209 [INFO] Episode: 8/1500
+2026-02-03 10:02:01,534 [INFO] Episode: 9/1500
+2026-02-03 10:02:22,480 [INFO] Episode: 10/1500
+2026-02-03 10:02:53,582 [INFO] 
+	average_step_reward: -0.016595473513007164
+	distance_to_target_reward: -0.007415439002215862
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.004947522006034851
+	collision_punishment: -0.004317725363969803
+	reach_target_reward: 0.0
+	push_reward: 2.1540006855502725e-05
+	ocb_reward: 6.367284832522273e-05
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:02:53,589 [INFO] 
+	value_loss: 0.09727976098656654
+	policy_loss: -0.0005390959298175347
+	dist_entropy: 4.378496170043945
+	actor_grad_norm: 0.04622417688369751
+	critic_grad_norm: 0.33419033885002136
+	ratio: 0.999947589635849
+
+2026-02-03 10:02:53,593 [INFO] Episode: 11/1500
+2026-02-03 10:03:19,142 [INFO] Episode: 12/1500
+2026-02-03 10:03:42,648 [INFO] Episode: 13/1500
+2026-02-03 10:04:04,664 [INFO] Episode: 14/1500
+2026-02-03 10:04:27,292 [INFO] Episode: 15/1500
+2026-02-03 10:04:57,954 [INFO] 
+	average_step_reward: -0.01638038642704487
+	distance_to_target_reward: -0.007277632597833872
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.005374633615016937
+	collision_punishment: -0.003971949589252472
+	reach_target_reward: 0.0
+	push_reward: 1.6035020962590352e-05
+	ocb_reward: 0.00022779388956725596
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:04:57,964 [INFO] 
+	value_loss: 0.1284121535718441
+	policy_loss: -0.0004014101312858287
+	dist_entropy: 4.430083179473877
+	actor_grad_norm: 0.03983933851122856
+	critic_grad_norm: 0.46736326813697815
+	ratio: 0.9999516189098359
+
+2026-02-03 10:04:57,967 [INFO] Episode: 16/1500
+2026-02-03 10:05:24,401 [INFO] Episode: 17/1500
+2026-02-03 10:05:48,879 [INFO] Episode: 18/1500
+2026-02-03 10:06:09,803 [INFO] Episode: 19/1500
+2026-02-03 10:06:30,375 [INFO] Episode: 20/1500
+2026-02-03 10:06:57,731 [INFO] 
+	average_step_reward: -0.016648543998599052
+	distance_to_target_reward: -0.007324706297367811
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.005658756978511811
+	collision_punishment: -0.003929720384478569
+	reach_target_reward: 0.0
+	push_reward: 1.7640018995734863e-05
+	ocb_reward: 0.0002469998891185969
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:06:57,739 [INFO] 
+	value_loss: 0.1608639493584633
+	policy_loss: -0.0006239919069886635
+	dist_entropy: 4.48632493019104
+	actor_grad_norm: 0.051896363496780396
+	critic_grad_norm: 0.5314098596572876
+	ratio: 1.0000129342079163
+
+2026-02-03 10:06:57,742 [INFO] Episode: 21/1500
+2026-02-03 10:07:21,611 [INFO] Episode: 22/1500
+2026-02-03 10:07:43,237 [INFO] Episode: 23/1500
+2026-02-03 10:08:03,706 [INFO] Episode: 24/1500
+2026-02-03 10:08:23,594 [INFO] Episode: 25/1500
+2026-02-03 10:08:50,773 [INFO] 
+	average_step_reward: -0.01697828434407711
+	distance_to_target_reward: -0.0072671398520469666
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.006331907279491424
+	collision_punishment: -0.003714771699309349
+	reach_target_reward: 0.0
+	push_reward: 1.6725009118090384e-05
+	ocb_reward: 0.00031881070528179406
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:08:50,781 [INFO] 
+	value_loss: 0.2040863499045372
+	policy_loss: -0.00042344806408323166
+	dist_entropy: 4.539000749588013
+	actor_grad_norm: 0.036803584545850754
+	critic_grad_norm: 0.6963092684745789
+	ratio: 1.0000110685825347
+
+2026-02-03 10:08:50,786 [INFO] Episode: 26/1500
+2026-02-03 10:09:13,092 [INFO] Episode: 27/1500
+2026-02-03 10:09:33,887 [INFO] Episode: 28/1500
+2026-02-03 10:09:53,625 [INFO] Episode: 29/1500
+2026-02-03 10:10:13,158 [INFO] Episode: 30/1500
+2026-02-03 10:10:40,858 [INFO] 
+	average_step_reward: -0.017441945150494576
+	distance_to_target_reward: -0.0072002653032541275
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.0066504369854927066
+	collision_punishment: -0.003736558590531349
+	reach_target_reward: 0.0
+	push_reward: 2.7840012990054674e-05
+	ocb_reward: 0.00011747735141310841
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:10:40,866 [INFO] 
+	value_loss: 0.25189922004938126
+	policy_loss: -0.0006475761668454539
+	dist_entropy: 4.597686147689819
+	actor_grad_norm: 0.06032687425613403
+	critic_grad_norm: 0.7311220765113831
+	ratio: 1.0000251948833465
+
+2026-02-03 10:10:40,870 [INFO] Episode: 31/1500
+2026-02-03 10:11:04,406 [INFO] Episode: 32/1500
+2026-02-03 10:11:26,237 [INFO] Episode: 33/1500
+2026-02-03 10:11:47,172 [INFO] Episode: 34/1500
+2026-02-03 10:12:07,033 [INFO] Episode: 35/1500
+2026-02-03 10:12:34,928 [INFO] 
+	average_step_reward: -0.017530087381601334
+	distance_to_target_reward: -0.007165668997913599
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.006732115852832794
+	collision_punishment: -0.003761407572031021
+	reach_target_reward: 0.0
+	push_reward: 3.041999661945738e-05
+	ocb_reward: 9.868413750082254e-05
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:12:34,937 [INFO] 
+	value_loss: 0.2889184683561325
+	policy_loss: -0.0007506613695241526
+	dist_entropy: 4.647924757003784
+	actor_grad_norm: 0.048963066190481186
+	critic_grad_norm: 0.7972732782363892
+	ratio: 0.999997615814209
+
+2026-02-03 10:12:34,940 [INFO] Episode: 36/1500
+2026-02-03 10:12:58,471 [INFO] Episode: 37/1500
+2026-02-03 10:13:19,948 [INFO] Episode: 38/1500
+2026-02-03 10:13:40,518 [INFO] Episode: 39/1500
+2026-02-03 10:14:00,637 [INFO] Episode: 40/1500
+2026-02-03 10:14:27,751 [INFO] 
+	average_step_reward: -0.01822277158498764
+	distance_to_target_reward: -0.007243717089295387
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.007585979664325714
+	collision_punishment: -0.003624714370369911
+	reach_target_reward: 0.0
+	push_reward: 2.859000233002007e-05
+	ocb_reward: 0.00020305121567100286
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:14:27,759 [INFO] 
+	value_loss: 0.3493150621652603
+	policy_loss: -0.0005860906790324805
+	dist_entropy: 4.705829524993897
+	actor_grad_norm: 0.05705130845308304
+	critic_grad_norm: 0.8217378854751587
+	ratio: 1.0000294685363769
+
+2026-02-03 10:14:27,763 [INFO] Episode: 41/1500
+2026-02-03 10:14:50,413 [INFO] Episode: 42/1500
+2026-02-03 10:15:11,522 [INFO] Episode: 43/1500
+2026-02-03 10:15:32,530 [INFO] Episode: 44/1500
+2026-02-03 10:15:53,086 [INFO] Episode: 45/1500
+2026-02-03 10:16:20,540 [INFO] 
+	average_step_reward: -0.01846894808113575
+	distance_to_target_reward: -0.007345668971538544
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.00757253888130188
+	collision_punishment: -0.003554079942703247
+	reach_target_reward: 0.0
+	push_reward: 3.480001396383159e-05
+	ocb_reward: -3.146043194457889e-05
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:16:20,548 [INFO] 
+	value_loss: 0.3849978506565094
+	policy_loss: -0.0005509915210822669
+	dist_entropy: 4.748338508605957
+	actor_grad_norm: 0.04525331035256386
+	critic_grad_norm: 0.8813085556030273
+	ratio: 0.9999471485614777
+
+2026-02-03 10:16:20,552 [INFO] Episode: 46/1500
+2026-02-03 10:16:43,493 [INFO] Episode: 47/1500
+2026-02-03 10:17:04,689 [INFO] Episode: 48/1500
+2026-02-03 10:17:25,245 [INFO] Episode: 49/1500
+2026-02-03 10:17:45,213 [INFO] Episode: 50/1500
+2026-02-03 10:18:12,564 [INFO] 
+	average_step_reward: -0.01836579665541649
+	distance_to_target_reward: -0.007208837661892176
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.00767561065196991
+	collision_punishment: -0.0036597633218765258
+	reach_target_reward: 0.0
+	push_reward: 3.594000736484304e-05
+	ocb_reward: 0.0001424757300876081
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:18:12,573 [INFO] 
+	value_loss: 0.4246268838644028
+	policy_loss: -0.0004569890252081876
+	dist_entropy: 4.797715568542481
+	actor_grad_norm: 0.04220430180430412
+	critic_grad_norm: 0.9065331816673279
+	ratio: 1.0000308871269226
+
+2026-02-03 10:18:12,576 [INFO] Episode: 51/1500
+2026-02-03 10:18:35,767 [INFO] Episode: 52/1500
+2026-02-03 10:18:57,674 [INFO] Episode: 53/1500
+2026-02-03 10:19:18,685 [INFO] Episode: 54/1500
+2026-02-03 10:19:38,801 [INFO] Episode: 55/1500
+2026-02-03 10:20:05,455 [INFO] 
+	average_step_reward: -0.018422668799757957
+	distance_to_target_reward: -0.007167635019868612
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008000732688903809
+	collision_punishment: -0.0034543887770175936
+	reach_target_reward: 0.0
+	push_reward: 3.389999983482994e-05
+	ocb_reward: 0.00016618707474321128
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:20:05,465 [INFO] 
+	value_loss: 0.4103217601776123
+	policy_loss: -0.000604775792153589
+	dist_entropy: 4.842695569992065
+	actor_grad_norm: 0.0488552525639534
+	critic_grad_norm: 0.887265682220459
+	ratio: 0.9999420821666718
+
+2026-02-03 10:20:05,468 [INFO] Episode: 56/1500
+2026-02-03 10:20:28,078 [INFO] Episode: 57/1500
+2026-02-03 10:20:49,324 [INFO] Episode: 58/1500
+2026-02-03 10:21:09,453 [INFO] Episode: 59/1500
+2026-02-03 10:21:28,896 [INFO] Episode: 60/1500
+2026-02-03 10:21:55,529 [INFO] 
+	average_step_reward: -0.0189465694129467
+	distance_to_target_reward: -0.007137714885175228
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.00870714061498642
+	collision_punishment: -0.0033837747275829314
+	reach_target_reward: 0.0
+	push_reward: 3.238500721636228e-05
+	ocb_reward: 0.00024967428982257845
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:21:55,537 [INFO] 
+	value_loss: 0.45653627812862396
+	policy_loss: -0.0004130567697316678
+	dist_entropy: 4.8807053565979
+	actor_grad_norm: 0.042378660291433334
+	critic_grad_norm: 0.8263792395591736
+	ratio: 0.9999473690986633
+
+2026-02-03 10:21:55,541 [INFO] Episode: 61/1500
+2026-02-03 10:22:18,145 [INFO] Episode: 62/1500
+2026-02-03 10:22:38,967 [INFO] Episode: 63/1500
+2026-02-03 10:22:59,137 [INFO] Episode: 64/1500
+2026-02-03 10:23:18,351 [INFO] Episode: 65/1500
+2026-02-03 10:23:44,506 [INFO] 
+	average_step_reward: -0.019772101193666458
+	distance_to_target_reward: -0.007236454635858536
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009275360460281372
+	collision_punishment: -0.003282974182963371
+	reach_target_reward: 0.0
+	push_reward: 3.699000444612466e-05
+	ocb_reward: -1.4303991133347154e-05
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:23:44,515 [INFO] 
+	value_loss: 0.5209320306777954
+	policy_loss: -0.0005124425064451544
+	dist_entropy: 4.9243919372558596
+	actor_grad_norm: 0.039739999920129776
+	critic_grad_norm: 0.832557201385498
+	ratio: 0.9999382793903351
+
+2026-02-03 10:23:44,518 [INFO] Episode: 66/1500
+2026-02-03 10:24:06,535 [INFO] Episode: 67/1500
+2026-02-03 10:24:26,877 [INFO] Episode: 68/1500
+2026-02-03 10:24:46,256 [INFO] Episode: 69/1500
+2026-02-03 10:25:04,799 [INFO] Episode: 70/1500
+2026-02-03 10:25:31,053 [INFO] 
+	average_step_reward: -0.020187944173812866
+	distance_to_target_reward: -0.007205719593912363
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010139028663635254
+	collision_punishment: -0.003238070220351219
+	reach_target_reward: 0.0
+	push_reward: 3.999000909971073e-05
+	ocb_reward: 0.00035488573268055917
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:25:31,061 [INFO] 
+	value_loss: 0.5714922845363617
+	policy_loss: -0.0006163392680015534
+	dist_entropy: 4.974246454238892
+	actor_grad_norm: 0.052945416420698166
+	critic_grad_norm: 0.8903589248657227
+	ratio: 0.9999320447444916
+
+2026-02-03 10:25:31,065 [INFO] Episode: 71/1500
+2026-02-03 10:25:52,671 [INFO] Episode: 72/1500
+2026-02-03 10:26:12,861 [INFO] Episode: 73/1500
+2026-02-03 10:26:32,304 [INFO] Episode: 74/1500
+2026-02-03 10:26:51,033 [INFO] Episode: 75/1500
+2026-02-03 10:27:17,521 [INFO] 
+	average_step_reward: -0.020446814596652985
+	distance_to_target_reward: -0.007297855336219072
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010196965808868409
+	collision_punishment: -0.0033077684277296065
+	reach_target_reward: 0.0
+	push_reward: 3.191999712726101e-05
+	ocb_reward: 0.0003238560079038143
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:27:17,529 [INFO] 
+	value_loss: 0.5869298219680786
+	policy_loss: -0.0002708538861128318
+	dist_entropy: 5.038623523712158
+	actor_grad_norm: 0.0801989734172821
+	critic_grad_norm: 0.968015193939209
+	ratio: 0.9998819291591644
+
+2026-02-03 10:27:17,533 [INFO] Episode: 76/1500
+2026-02-03 10:27:39,415 [INFO] Episode: 77/1500
+2026-02-03 10:27:59,951 [INFO] Episode: 78/1500
+2026-02-03 10:28:19,247 [INFO] Episode: 79/1500
+2026-02-03 10:28:38,163 [INFO] Episode: 80/1500
+2026-02-03 10:29:04,164 [INFO] 
+	average_step_reward: -0.020444922149181366
+	distance_to_target_reward: -0.007210767827928066
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010061854801177978
+	collision_punishment: -0.003289219231009483
+	reach_target_reward: 0.0
+	push_reward: 3.0720017093699425e-05
+	ocb_reward: 8.619842305779457e-05
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:29:04,173 [INFO] 
+	value_loss: 0.5765291035175324
+	policy_loss: -0.0005719708675329116
+	dist_entropy: 5.104176235198975
+	actor_grad_norm: 0.04489156976342201
+	critic_grad_norm: 0.9219069480895996
+	ratio: 0.9998779177665711
+
+2026-02-03 10:29:04,176 [INFO] Episode: 81/1500
+2026-02-03 10:29:26,670 [INFO] Episode: 82/1500
+2026-02-03 10:29:47,654 [INFO] Episode: 83/1500
+2026-02-03 10:30:07,312 [INFO] Episode: 84/1500
+2026-02-03 10:30:26,063 [INFO] Episode: 85/1500
+2026-02-03 10:30:52,112 [INFO] 
+	average_step_reward: -0.020865272730588913
+	distance_to_target_reward: -0.007299337536096573
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010828728041648864
+	collision_punishment: -0.0032892789882421492
+	reach_target_reward: 0.0
+	push_reward: 3.583501165849157e-05
+	ocb_reward: 0.0005162358313798905
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:30:52,121 [INFO] 
+	value_loss: 0.5868231415748596
+	policy_loss: -0.0005940902334458543
+	dist_entropy: 5.1713480949401855
+	actor_grad_norm: 0.06090487167239189
+	critic_grad_norm: 0.9129201173782349
+	ratio: 0.9999363601207734
+
+2026-02-03 10:30:52,124 [INFO] Episode: 86/1500
+2026-02-03 10:31:14,242 [INFO] Episode: 87/1500
+2026-02-03 10:31:35,432 [INFO] Episode: 88/1500
+2026-02-03 10:31:55,872 [INFO] Episode: 89/1500
+2026-02-03 10:32:15,297 [INFO] Episode: 90/1500
+2026-02-03 10:32:40,880 [INFO] 
+	average_step_reward: -0.020449334755539894
+	distance_to_target_reward: -0.007235613185912371
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010717351417541503
+	collision_punishment: -0.003187536829710007
+	reach_target_reward: 0.0
+	push_reward: 4.697999975178391e-05
+	ocb_reward: 0.0006441869246959686
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:32:40,889 [INFO] 
+	value_loss: 0.5849188804626465
+	policy_loss: -0.0006342840316030163
+	dist_entropy: 5.234370517730713
+	actor_grad_norm: 0.05461344122886658
+	critic_grad_norm: 0.9774165153503418
+	ratio: 0.9999483406543732
+
+2026-02-03 10:32:40,892 [INFO] Episode: 91/1500
+2026-02-03 10:33:03,071 [INFO] Episode: 92/1500
+2026-02-03 10:33:24,683 [INFO] Episode: 93/1500
+2026-02-03 10:33:45,510 [INFO] Episode: 94/1500
+2026-02-03 10:34:05,911 [INFO] Episode: 95/1500
+2026-02-03 10:34:31,652 [INFO] 
+	average_step_reward: -0.02083086408674717
+	distance_to_target_reward: -0.007212153170257807
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.0108766357088089
+	collision_punishment: -0.0032387425965070727
+	reach_target_reward: 0.0
+	push_reward: 6.176999158924446e-05
+	ocb_reward: 0.000434897078089416
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:34:31,660 [INFO] 
+	value_loss: 0.5988661706447601
+	policy_loss: -0.0007556463536957381
+	dist_entropy: 5.284323024749756
+	actor_grad_norm: 0.05048830434679985
+	critic_grad_norm: 0.9323215484619141
+	ratio: 1.0000162899494172
+
+2026-02-03 10:34:31,664 [INFO] Episode: 96/1500
+2026-02-03 10:34:54,224 [INFO] Episode: 97/1500
+2026-02-03 10:35:15,505 [INFO] Episode: 98/1500
+2026-02-03 10:35:36,767 [INFO] Episode: 99/1500
+2026-02-03 10:35:57,324 [INFO] Episode: 100/1500
+2026-02-03 10:36:23,524 [INFO] 
+	average_step_reward: -0.021902021020650864
+	distance_to_target_reward: -0.007381777744740248
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.011642269790172577
+	collision_punishment: -0.003219878657460213
+	reach_target_reward: 0.0001
+	push_reward: 5.153999154572375e-05
+	ocb_reward: 0.0001903651505615562
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:36:23,533 [INFO] 
+	value_loss: 0.652038037776947
+	policy_loss: -0.0005632617524113925
+	dist_entropy: 5.336510896682739
+	actor_grad_norm: 0.044001154601573944
+	critic_grad_norm: 0.9487821459770203
+	ratio: 0.9999691843986511
+
+2026-02-03 10:36:23,536 [INFO] Episode: 101/1500
+2026-02-03 10:36:46,376 [INFO] Episode: 102/1500
+2026-02-03 10:37:08,086 [INFO] Episode: 103/1500
+2026-02-03 10:37:28,568 [INFO] Episode: 104/1500
+2026-02-03 10:37:48,611 [INFO] Episode: 105/1500
+2026-02-03 10:38:14,828 [INFO] 
+	average_step_reward: -0.02126169390976429
+	distance_to_target_reward: -0.007265560328960419
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.011024902613162994
+	collision_punishment: -0.003324573032259941
+	reach_target_reward: 0.0
+	push_reward: 5.581498771789484e-05
+	ocb_reward: 0.0002975276176631451
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:38:14,835 [INFO] 
+	value_loss: 0.6255003929138183
+	policy_loss: -0.0006426092977157794
+	dist_entropy: 5.403221845626831
+	actor_grad_norm: 0.06102101132273674
+	critic_grad_norm: 0.9448593258857727
+	ratio: 0.9999653220176696
+
+2026-02-03 10:38:14,839 [INFO] Episode: 106/1500
+2026-02-03 10:38:38,595 [INFO] Episode: 107/1500
+2026-02-03 10:39:01,729 [INFO] Episode: 108/1500
+2026-02-03 10:39:24,436 [INFO] Episode: 109/1500
+2026-02-03 10:39:47,097 [INFO] Episode: 110/1500
+2026-02-03 10:40:13,728 [INFO] 
+	average_step_reward: -0.01960895210504532
+	distance_to_target_reward: -0.007182413712143898
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009247684206962585
+	collision_punishment: -0.0034262269270420075
+	reach_target_reward: 0.0
+	push_reward: 7.114499021554366e-05
+	ocb_reward: 0.000176229166071862
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:40:13,737 [INFO] 
+	value_loss: 0.5892788469791412
+	policy_loss: -0.0007433341643102498
+	dist_entropy: 5.452395057678222
+	actor_grad_norm: 0.05687478929758072
+	critic_grad_norm: 0.9344318509101868
+	ratio: 0.9999233305454254
+
+2026-02-03 10:40:13,740 [INFO] Episode: 111/1500
+2026-02-03 10:40:37,380 [INFO] Episode: 112/1500
+2026-02-03 10:41:00,722 [INFO] Episode: 113/1500
+2026-02-03 10:41:23,412 [INFO] Episode: 114/1500
+2026-02-03 10:41:45,646 [INFO] Episode: 115/1500
+2026-02-03 10:42:12,266 [INFO] 
+	average_step_reward: -0.01912691444158554
+	distance_to_target_reward: -0.00718508567661047
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009052923274040222
+	collision_punishment: -0.00329484804213047
+	reach_target_reward: 0.0
+	push_reward: 5.510997289093211e-05
+	ocb_reward: 0.00035083056481555105
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:42:12,275 [INFO] 
+	value_loss: 0.5114281743764877
+	policy_loss: -0.0006774378300452355
+	dist_entropy: 5.514905405044556
+	actor_grad_norm: 0.04896789416670799
+	critic_grad_norm: 0.9216791391372681
+	ratio: 1.0000168442726136
+
+2026-02-03 10:42:12,278 [INFO] Episode: 116/1500
+2026-02-03 10:42:35,940 [INFO] Episode: 117/1500
+2026-02-03 10:42:58,926 [INFO] Episode: 118/1500
+2026-02-03 10:43:21,719 [INFO] Episode: 119/1500
+2026-02-03 10:43:44,082 [INFO] Episode: 120/1500
+2026-02-03 10:44:10,677 [INFO] 
+	average_step_reward: -0.01886332593858242
+	distance_to_target_reward: -0.007216988131403923
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008714802601337434
+	collision_punishment: -0.0034170551562309266
+	reach_target_reward: 0.0001
+	push_reward: 7.420501060551032e-05
+	ocb_reward: 0.0003113129173219204
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:44:10,686 [INFO] 
+	value_loss: 0.5388004779815674
+	policy_loss: -0.0006859144183248844
+	dist_entropy: 5.581678009033203
+	actor_grad_norm: 0.05847863107919693
+	critic_grad_norm: 0.8912221193313599
+	ratio: 1.0000101685523988
+
+2026-02-03 10:44:10,689 [INFO] Episode: 121/1500
+2026-02-03 10:44:34,705 [INFO] Episode: 122/1500
+2026-02-03 10:44:57,904 [INFO] Episode: 123/1500
+2026-02-03 10:45:20,358 [INFO] Episode: 124/1500
+2026-02-03 10:45:43,045 [INFO] Episode: 125/1500
+2026-02-03 10:46:09,805 [INFO] 
+	average_step_reward: -0.019032662734389305
+	distance_to_target_reward: -0.007226405665278435
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008926357023715973
+	collision_punishment: -0.0033695933163166046
+	reach_target_reward: 0.0
+	push_reward: 5.2604977099690586e-05
+	ocb_reward: 0.00043708889976143834
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:46:09,815 [INFO] 
+	value_loss: 0.4830036610364914
+	policy_loss: -0.0009138989065046843
+	dist_entropy: 5.635239553451538
+	actor_grad_norm: 0.06833814829587936
+	critic_grad_norm: 0.8253639340400696
+	ratio: 1.0000036418437959
+
+2026-02-03 10:46:09,818 [INFO] Episode: 126/1500
+2026-02-03 10:46:33,721 [INFO] Episode: 127/1500
+2026-02-03 10:46:56,667 [INFO] Episode: 128/1500
+2026-02-03 10:47:19,117 [INFO] Episode: 129/1500
+2026-02-03 10:47:40,487 [INFO] Episode: 130/1500
+2026-02-03 10:48:06,742 [INFO] 
+	average_step_reward: -0.01948253996670246
+	distance_to_target_reward: -0.007158742286264896
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009535536694526673
+	collision_punishment: -0.003178230087757111
+	reach_target_reward: 0.0
+	push_reward: 5.8769979659700766e-05
+	ocb_reward: 0.00033119847640395166
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:48:06,749 [INFO] 
+	value_loss: 0.47723252773284913
+	policy_loss: -0.0005448198301280626
+	dist_entropy: 5.688648700714111
+	actor_grad_norm: 0.046918731182813644
+	critic_grad_norm: 0.7519382834434509
+	ratio: 0.9999086737632752
+
+2026-02-03 10:48:06,754 [INFO] Episode: 131/1500
+2026-02-03 10:48:30,547 [INFO] Episode: 132/1500
+2026-02-03 10:48:53,177 [INFO] Episode: 133/1500
+2026-02-03 10:49:15,224 [INFO] Episode: 134/1500
+2026-02-03 10:49:36,122 [INFO] Episode: 135/1500
+2026-02-03 10:50:02,170 [INFO] 
+	average_step_reward: -0.01953897252678871
+	distance_to_target_reward: -0.007149449549615383
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009775398225784302
+	collision_punishment: -0.003232193166613579
+	reach_target_reward: 0.0
+	push_reward: 5.668497033184394e-05
+	ocb_reward: 0.0005613804410398006
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:50:02,178 [INFO] 
+	value_loss: 0.48475142121315
+	policy_loss: -0.000657131472892658
+	dist_entropy: 5.746054792404175
+	actor_grad_norm: 0.051374055445194244
+	critic_grad_norm: 0.7773120403289795
+	ratio: 0.9999849975109101
+
+2026-02-03 10:50:02,183 [INFO] Episode: 136/1500
+2026-02-03 10:50:26,328 [INFO] Episode: 137/1500
+2026-02-03 10:50:49,375 [INFO] Episode: 138/1500
+2026-02-03 10:51:12,442 [INFO] Episode: 139/1500
+2026-02-03 10:51:34,723 [INFO] Episode: 140/1500
+2026-02-03 10:52:01,090 [INFO] 
+	average_step_reward: -0.019692422822117805
+	distance_to_target_reward: -0.007219013758003712
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009835178489685058
+	collision_punishment: -0.0031972845047712325
+	reach_target_reward: 0.0001
+	push_reward: 7.309496140806004e-05
+	ocb_reward: 0.0003859582670405507
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:52:01,100 [INFO] 
+	value_loss: 0.5478011190891265
+	policy_loss: -0.0005190712966019362
+	dist_entropy: 5.80023512840271
+	actor_grad_norm: 0.046839822083711624
+	critic_grad_norm: 0.7331151962280273
+	ratio: 1.0000286281108857
+
+2026-02-03 10:52:01,103 [INFO] Episode: 141/1500
+2026-02-03 10:52:25,108 [INFO] Episode: 142/1500
+2026-02-03 10:52:48,170 [INFO] Episode: 143/1500
+2026-02-03 10:53:11,172 [INFO] Episode: 144/1500
+2026-02-03 10:53:34,253 [INFO] Episode: 145/1500
+2026-02-03 10:54:00,729 [INFO] 
+	average_step_reward: -0.02056514099240303
+	distance_to_target_reward: -0.007152094505727291
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010727453584671021
+	collision_punishment: -0.0031197295367717745
+	reach_target_reward: 0.0
+	push_reward: 7.732499943813309e-05
+	ocb_reward: 0.00035681280151009557
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:54:00,738 [INFO] 
+	value_loss: 0.5034979581832886
+	policy_loss: -0.0005778355223824861
+	dist_entropy: 5.855276870727539
+	actor_grad_norm: 0.04054003581404686
+	critic_grad_norm: 0.7330794930458069
+	ratio: 0.9999192893505097
+
+2026-02-03 10:54:00,741 [INFO] Episode: 146/1500
+2026-02-03 10:54:24,469 [INFO] Episode: 147/1500
+2026-02-03 10:54:47,727 [INFO] Episode: 148/1500
+2026-02-03 10:55:10,282 [INFO] Episode: 149/1500
+2026-02-03 10:55:32,611 [INFO] Episode: 150/1500
+2026-02-03 10:55:58,749 [INFO] 
+	average_step_reward: -0.019748827442526817
+	distance_to_target_reward: -0.007117321714758873
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009934086477756501
+	collision_punishment: -0.0031627619749307633
+	reach_target_reward: 0.0
+	push_reward: 7.132498285500333e-05
+	ocb_reward: 0.00039401919558644294
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:55:58,757 [INFO] 
+	value_loss: 0.5036233454942703
+	policy_loss: -0.0006528429972007643
+	dist_entropy: 5.905605936050415
+	actor_grad_norm: 0.05552629381418228
+	critic_grad_norm: 0.7883078455924988
+	ratio: 1.0000035107135772
+
+2026-02-03 10:55:58,761 [INFO] Episode: 151/1500
+2026-02-03 10:56:23,653 [INFO] Episode: 152/1500
+2026-02-03 10:56:47,682 [INFO] Episode: 153/1500
+2026-02-03 10:57:11,205 [INFO] Episode: 154/1500
+2026-02-03 10:57:33,847 [INFO] Episode: 155/1500
+2026-02-03 10:57:59,859 [INFO] 
+	average_step_reward: -0.019855782389640808
+	distance_to_target_reward: -0.0071705421432852745
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010011923027038573
+	collision_punishment: -0.0031512247627973554
+	reach_target_reward: 0.0001
+	push_reward: 8.294999861391261e-05
+	ocb_reward: 0.00029495898067951205
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 10:57:59,867 [INFO] 
+	value_loss: 0.4881328344345093
+	policy_loss: -0.0005834655305534397
+	dist_entropy: 5.961448907852173
+	actor_grad_norm: 0.03536056727170944
+	critic_grad_norm: 0.7066342234611511
+	ratio: 1.0000160574913024
+
+2026-02-03 10:57:59,871 [INFO] Episode: 156/1500
+2026-02-03 10:58:24,026 [INFO] Episode: 157/1500
+2026-02-03 10:58:47,569 [INFO] Episode: 158/1500
+2026-02-03 10:59:10,878 [INFO] Episode: 159/1500
+2026-02-03 10:59:36,076 [INFO] Episode: 160/1500
+2026-02-03 11:00:04,514 [INFO] 
+	average_step_reward: -0.020505370572209358
+	distance_to_target_reward: -0.007285149767994881
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010610072557926177
+	collision_punishment: -0.003102721338868141
+	reach_target_reward: 0.0
+	push_reward: 8.299499313579872e-05
+	ocb_reward: 0.00040957618959248064
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:00:04,524 [INFO] 
+	value_loss: 0.44330818951129913
+	policy_loss: -0.000691922634685227
+	dist_entropy: 6.0219078540802
+	actor_grad_norm: 0.04385873302817345
+	critic_grad_norm: 0.6876173615455627
+	ratio: 1.0000171065330505
+
+2026-02-03 11:00:04,527 [INFO] Episode: 161/1500
+2026-02-03 11:00:31,325 [INFO] Episode: 162/1500
+2026-02-03 11:00:57,333 [INFO] Episode: 163/1500
+2026-02-03 11:01:21,268 [INFO] Episode: 164/1500
+2026-02-03 11:01:43,966 [INFO] Episode: 165/1500
+2026-02-03 11:02:09,345 [INFO] 
+	average_step_reward: -0.020991824567317963
+	distance_to_target_reward: -0.007218181621283293
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.011520925302505492
+	collision_punishment: -0.0028788621908426284
+	reach_target_reward: 0.0002
+	push_reward: 8.980498387245461e-05
+	ocb_reward: 0.0003363371275365353
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:02:09,354 [INFO] 
+	value_loss: 0.5607804179191589
+	policy_loss: -0.0005496944670021264
+	dist_entropy: 6.08556981086731
+	actor_grad_norm: 0.03870668634772301
+	critic_grad_norm: 0.6577216982841492
+	ratio: 0.9999618828296661
+
+2026-02-03 11:02:09,357 [INFO] Episode: 166/1500
+2026-02-03 11:02:33,098 [INFO] Episode: 167/1500
+2026-02-03 11:02:56,264 [INFO] Episode: 168/1500
+2026-02-03 11:03:19,307 [INFO] Episode: 169/1500
+2026-02-03 11:03:42,046 [INFO] Episode: 170/1500
+2026-02-03 11:04:07,198 [INFO] 
+	average_step_reward: -0.021855687722563744
+	distance_to_target_reward: -0.007253217976540327
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.012171073186397553
+	collision_punishment: -0.002882674264907837
+	reach_target_reward: 0.0
+	push_reward: 9.697501081973314e-05
+	ocb_reward: 0.00035430311812087895
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:04:07,207 [INFO] 
+	value_loss: 0.492016863822937
+	policy_loss: -0.0007829669475498235
+	dist_entropy: 6.156387233734131
+	actor_grad_norm: 0.049761153757572174
+	critic_grad_norm: 0.6261410713195801
+	ratio: 1.0000272870063782
+
+2026-02-03 11:04:07,210 [INFO] Episode: 171/1500
+2026-02-03 11:04:30,908 [INFO] Episode: 172/1500
+2026-02-03 11:04:54,269 [INFO] Episode: 173/1500
+2026-02-03 11:05:17,345 [INFO] Episode: 174/1500
+2026-02-03 11:05:40,311 [INFO] Episode: 175/1500
+2026-02-03 11:06:05,604 [INFO] 
+	average_step_reward: -0.022622080519795418
+	distance_to_target_reward: -0.0071895127184689045
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.012986193432807923
+	collision_punishment: -0.0028291897702217104
+	reach_target_reward: 0.0001
+	push_reward: 8.82749809534289e-05
+	ocb_reward: 0.00019454298600554465
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:06:05,612 [INFO] 
+	value_loss: 0.5523997128009797
+	policy_loss: -0.0006710220918236587
+	dist_entropy: 6.215467071533203
+	actor_grad_norm: 0.041648995131254196
+	critic_grad_norm: 0.6394690871238708
+	ratio: 1.0000445604324342
+
+2026-02-03 11:06:05,616 [INFO] Episode: 176/1500
+2026-02-03 11:06:29,200 [INFO] Episode: 177/1500
+2026-02-03 11:06:52,218 [INFO] Episode: 178/1500
+2026-02-03 11:07:15,009 [INFO] Episode: 179/1500
+2026-02-03 11:07:37,307 [INFO] Episode: 180/1500
+2026-02-03 11:08:02,483 [INFO] 
+	average_step_reward: -0.023779921233654022
+	distance_to_target_reward: -0.007149571552872658
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.014666872446537018
+	collision_punishment: -0.0027989678639173507
+	reach_target_reward: 0.0003
+	push_reward: 9.871501242741942e-05
+	ocb_reward: 0.000436774957627058
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:08:02,491 [INFO] 
+	value_loss: 0.6568349599838257
+	policy_loss: -0.000619681587170362
+	dist_entropy: 6.27962646484375
+	actor_grad_norm: 0.04045480117201805
+	critic_grad_norm: 0.6387147307395935
+	ratio: 1.0000022530555726
+
+2026-02-03 11:08:02,495 [INFO] Episode: 181/1500
+2026-02-03 11:08:26,592 [INFO] Episode: 182/1500
+2026-02-03 11:08:50,139 [INFO] Episode: 183/1500
+2026-02-03 11:09:13,329 [INFO] Episode: 184/1500
+2026-02-03 11:09:35,760 [INFO] Episode: 185/1500
+2026-02-03 11:10:00,867 [INFO] 
+	average_step_reward: -0.023060567677021027
+	distance_to_target_reward: -0.007167248986661434
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.013781905851364136
+	collision_punishment: -0.0027819396555423736
+	reach_target_reward: 0.0003
+	push_reward: 9.026999759953469e-05
+	ocb_reward: 0.0002802568669617176
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:10:00,877 [INFO] 
+	value_loss: 0.649974924325943
+	policy_loss: -0.0006572461599855473
+	dist_entropy: 6.339834213256836
+	actor_grad_norm: 0.035798002034425735
+	critic_grad_norm: 0.6453195810317993
+	ratio: 1.0000227630138396
+
+2026-02-03 11:10:00,880 [INFO] Episode: 186/1500
+2026-02-03 11:10:24,719 [INFO] Episode: 187/1500
+2026-02-03 11:10:47,873 [INFO] Episode: 188/1500
+2026-02-03 11:11:10,553 [INFO] Episode: 189/1500
+2026-02-03 11:11:32,788 [INFO] Episode: 190/1500
+2026-02-03 11:11:57,354 [INFO] 
+	average_step_reward: -0.023007867857813835
+	distance_to_target_reward: -0.007075482979416847
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.013516868698596954
+	collision_punishment: -0.0027736471307277678
+	reach_target_reward: 0.0001
+	push_reward: 8.435996278421953e-05
+	ocb_reward: 0.00017377041161991655
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:11:57,363 [INFO] 
+	value_loss: 0.5589680016040802
+	policy_loss: -0.0007768026929142024
+	dist_entropy: 6.411101341247559
+	actor_grad_norm: 0.05688595399260521
+	critic_grad_norm: 0.6676737666130066
+	ratio: 0.9999041497707367
+
+2026-02-03 11:11:57,367 [INFO] Episode: 191/1500
+2026-02-03 11:12:21,315 [INFO] Episode: 192/1500
+2026-02-03 11:12:45,064 [INFO] Episode: 193/1500
+2026-02-03 11:13:08,596 [INFO] Episode: 194/1500
+2026-02-03 11:13:31,255 [INFO] Episode: 195/1500
+2026-02-03 11:13:56,471 [INFO] 
+	average_step_reward: -0.021076582372188568
+	distance_to_target_reward: -0.007159422151744366
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.011585992233753204
+	collision_punishment: -0.0029365352928638457
+	reach_target_reward: 0.0001
+	push_reward: 0.00010675501835066825
+	ocb_reward: 0.00039861177556216716
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:13:56,480 [INFO] 
+	value_loss: 0.47851543724536894
+	policy_loss: -0.0006486143242511843
+	dist_entropy: 6.468844413757324
+	actor_grad_norm: 0.04415399581193924
+	critic_grad_norm: 0.6697466969490051
+	ratio: 0.999944680929184
+
+2026-02-03 11:13:56,483 [INFO] Episode: 196/1500
+2026-02-03 11:14:21,317 [INFO] Episode: 197/1500
+2026-02-03 11:14:45,581 [INFO] Episode: 198/1500
+2026-02-03 11:15:09,580 [INFO] Episode: 199/1500
+2026-02-03 11:15:33,270 [INFO] Episode: 200/1500
+2026-02-03 11:15:58,825 [INFO] 
+	average_step_reward: -0.021434465423226357
+	distance_to_target_reward: -0.007213864009827375
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.011646238753795625
+	collision_punishment: -0.0031345299863815308
+	reach_target_reward: 0.0001
+	push_reward: 0.00011275499127805233
+	ocb_reward: 0.00034741353135555984
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:15:58,833 [INFO] 
+	value_loss: 0.4362042278051376
+	policy_loss: -0.0006365441889577994
+	dist_entropy: 6.528983640670776
+	actor_grad_norm: 0.04637639597058296
+	critic_grad_norm: 0.6248375177383423
+	ratio: 0.9999916613101959
+
+2026-02-03 11:15:58,838 [INFO] Episode: 201/1500
+2026-02-03 11:16:23,658 [INFO] Episode: 202/1500
+2026-02-03 11:16:48,190 [INFO] Episode: 203/1500
+2026-02-03 11:17:12,466 [INFO] Episode: 204/1500
+2026-02-03 11:17:35,905 [INFO] Episode: 205/1500
+2026-02-03 11:18:01,248 [INFO] 
+	average_step_reward: -0.022774772718548775
+	distance_to_target_reward: -0.00712377205491066
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.013383502988815308
+	collision_punishment: -0.0029780241751670837
+	reach_target_reward: 0.0003
+	push_reward: 0.00010740001744125038
+	ocb_reward: 0.00030312611386179925
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:18:01,257 [INFO] 
+	value_loss: 0.475213959813118
+	policy_loss: -0.0005934612224106683
+	dist_entropy: 6.5857056140899655
+	actor_grad_norm: 0.04168146476149559
+	critic_grad_norm: 0.5225293040275574
+	ratio: 0.9999797403812408
+
+2026-02-03 11:18:01,261 [INFO] Episode: 206/1500
+2026-02-03 11:18:26,195 [INFO] Episode: 207/1500
+2026-02-03 11:18:50,522 [INFO] Episode: 208/1500
+2026-02-03 11:19:13,795 [INFO] Episode: 209/1500
+2026-02-03 11:19:37,540 [INFO] Episode: 210/1500
+2026-02-03 11:20:02,792 [INFO] 
+	average_step_reward: -0.025576718151569366
+	distance_to_target_reward: -0.007157006300985813
+	exception_punishment: -5e-05
+	approach_to_box_reward: -0.016398599805831908
+	collision_punishment: -0.00275797607421875
+	reach_target_reward: 0.0002
+	push_reward: 0.00014287499652709812
+	ocb_reward: 0.0004439899429678917
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:20:02,801 [INFO] 
+	value_loss: 0.5052605211734772
+	policy_loss: -0.0005728294725074079
+	dist_entropy: 6.6476788997650145
+	actor_grad_norm: 0.04493527114391327
+	critic_grad_norm: 0.44106316566467285
+	ratio: 1.0001211643218995
+
+2026-02-03 11:20:02,804 [INFO] Episode: 211/1500
+2026-02-03 11:20:27,321 [INFO] Episode: 212/1500
+2026-02-03 11:20:51,609 [INFO] Episode: 213/1500
+2026-02-03 11:21:15,334 [INFO] Episode: 214/1500
+2026-02-03 11:21:38,354 [INFO] Episode: 215/1500
+2026-02-03 11:22:03,169 [INFO] 
+	average_step_reward: -0.026911955326795578
+	distance_to_target_reward: -0.007039944641292095
+	exception_punishment: -5e-05
+	approach_to_box_reward: -0.017645200085639953
+	collision_punishment: -0.0027135788357257845
+	reach_target_reward: 0.0002
+	push_reward: 0.00013451995619107038
+	ocb_reward: 0.0002022501453012228
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:22:03,178 [INFO] 
+	value_loss: 0.5809546291828156
+	policy_loss: -0.0007429341593420347
+	dist_entropy: 6.707222509384155
+	actor_grad_norm: 0.03932537883520126
+	critic_grad_norm: 0.6180631518363953
+	ratio: 0.9999802470207214
+
+2026-02-03 11:22:03,181 [INFO] Episode: 216/1500
+2026-02-03 11:22:27,554 [INFO] Episode: 217/1500
+2026-02-03 11:22:51,850 [INFO] Episode: 218/1500
+2026-02-03 11:23:15,578 [INFO] Episode: 219/1500
+2026-02-03 11:23:39,199 [INFO] Episode: 220/1500
+2026-02-03 11:24:03,938 [INFO] 
+	average_step_reward: -0.023878037929534912
+	distance_to_target_reward: -0.007115521468222141
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.014940701475143432
+	collision_punishment: -0.0028250021731853485
+	reach_target_reward: 0.0005
+	push_reward: 0.0001292699744226411
+	ocb_reward: 0.0003739180855453014
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:24:03,947 [INFO] 
+	value_loss: 0.6350878536701202
+	policy_loss: -0.0005704227530941352
+	dist_entropy: 6.774119424819946
+	actor_grad_norm: 0.03530104085803032
+	critic_grad_norm: 0.7575625777244568
+	ratio: 1.0000163555145263
+
+2026-02-03 11:24:03,950 [INFO] Episode: 221/1500
+2026-02-03 11:24:28,491 [INFO] Episode: 222/1500
+2026-02-03 11:24:52,433 [INFO] Episode: 223/1500
+2026-02-03 11:25:16,118 [INFO] Episode: 224/1500
+2026-02-03 11:25:39,729 [INFO] Episode: 225/1500
+2026-02-03 11:26:04,559 [INFO] 
+	average_step_reward: -0.02224472351372242
+	distance_to_target_reward: -0.007219222839921713
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.013099957184791565
+	collision_punishment: -0.0029534425830841063
+	reach_target_reward: 0.0003
+	push_reward: 0.00012690002040471882
+	ocb_reward: 0.0006009984651207924
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:26:04,568 [INFO] 
+	value_loss: 0.4888197422027588
+	policy_loss: -0.00042660345185296933
+	dist_entropy: 6.84965672492981
+	actor_grad_norm: 0.028819231316447258
+	critic_grad_norm: 0.7556132674217224
+	ratio: 0.9999688863754272
+
+2026-02-03 11:26:04,570 [INFO] Episode: 226/1500
+2026-02-03 11:26:29,070 [INFO] Episode: 227/1500
+2026-02-03 11:26:52,865 [INFO] Episode: 228/1500
+2026-02-03 11:27:16,374 [INFO] Episode: 229/1500
+2026-02-03 11:27:39,300 [INFO] Episode: 230/1500
+2026-02-03 11:28:03,399 [INFO] 
+	average_step_reward: -0.022322893142700195
+	distance_to_target_reward: -0.007111453916877508
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.013291119365692139
+	collision_punishment: -0.0028064723908901214
+	reach_target_reward: 0.0002
+	push_reward: 7.532996824011207e-05
+	ocb_reward: 0.000610822609513998
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:28:03,408 [INFO] 
+	value_loss: 0.4393791794776917
+	policy_loss: -0.0004127386891667584
+	dist_entropy: 6.924638032913208
+	actor_grad_norm: 0.030747223645448685
+	critic_grad_norm: 0.7886282801628113
+	ratio: 1.000002247095108
+
+2026-02-03 11:28:03,411 [INFO] Episode: 231/1500
+2026-02-03 11:28:27,532 [INFO] Episode: 232/1500
+2026-02-03 11:28:51,131 [INFO] Episode: 233/1500
+2026-02-03 11:29:14,247 [INFO] Episode: 234/1500
+2026-02-03 11:29:36,825 [INFO] Episode: 235/1500
+2026-02-03 11:30:01,434 [INFO] 
+	average_step_reward: -0.022572867572307587
+	distance_to_target_reward: -0.007191415410488844
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.013594969668388367
+	collision_punishment: -0.0027405429291725157
+	reach_target_reward: 0.0001
+	push_reward: 9.24900159589015e-05
+	ocb_reward: 0.0007615730601549149
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:30:01,443 [INFO] 
+	value_loss: 0.37647989094257356
+	policy_loss: -0.0006554592967117579
+	dist_entropy: 6.983890771865845
+	actor_grad_norm: 0.03801899403333664
+	critic_grad_norm: 0.872508704662323
+	ratio: 1.0000491619110108
+
+2026-02-03 11:30:01,446 [INFO] Episode: 236/1500
+2026-02-03 11:30:25,758 [INFO] Episode: 237/1500
+2026-02-03 11:30:49,478 [INFO] Episode: 238/1500
+2026-02-03 11:31:12,713 [INFO] Episode: 239/1500
+2026-02-03 11:31:35,775 [INFO] Episode: 240/1500
+2026-02-03 11:31:59,795 [INFO] 
+	average_step_reward: -0.021927257999777794
+	distance_to_target_reward: -0.0071961949579417706
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.01263262309551239
+	collision_punishment: -0.0027687430119514465
+	reach_target_reward: 0.0
+	push_reward: 8.280000474769622e-05
+	ocb_reward: 0.0005875052320957184
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:31:59,803 [INFO] 
+	value_loss: 0.3210852652788162
+	policy_loss: -0.0004906439992488742
+	dist_entropy: 7.048495721817017
+	actor_grad_norm: 0.04118827357888222
+	critic_grad_norm: 0.889190673828125
+	ratio: 1.0000071406364441
+
+2026-02-03 11:31:59,807 [INFO] Episode: 241/1500
+2026-02-03 11:32:23,878 [INFO] Episode: 242/1500
+2026-02-03 11:32:47,515 [INFO] Episode: 243/1500
+2026-02-03 11:33:10,816 [INFO] Episode: 244/1500
+2026-02-03 11:33:33,857 [INFO] Episode: 245/1500
+2026-02-03 11:33:58,396 [INFO] 
+	average_step_reward: -0.020853612571954727
+	distance_to_target_reward: -0.007237621583044529
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.011820575723648072
+	collision_punishment: -0.0028145616257190705
+	reach_target_reward: 0.0001
+	push_reward: 8.132999209919944e-05
+	ocb_reward: 0.0008378155019879341
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:33:58,405 [INFO] 
+	value_loss: 0.31773379147052766
+	policy_loss: -0.000628063219837216
+	dist_entropy: 7.106342601776123
+	actor_grad_norm: 0.03771400824189186
+	critic_grad_norm: 0.8212754130363464
+	ratio: 0.9999769449234008
+
+2026-02-03 11:33:58,409 [INFO] Episode: 246/1500
+2026-02-03 11:34:22,759 [INFO] Episode: 247/1500
+2026-02-03 11:34:46,673 [INFO] Episode: 248/1500
+2026-02-03 11:35:10,047 [INFO] Episode: 249/1500
+2026-02-03 11:35:33,772 [INFO] Episode: 250/1500
+2026-02-03 11:35:58,494 [INFO] 
+	average_step_reward: -0.021883906796574593
+	distance_to_target_reward: -0.007246976252645254
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.012243922381401063
+	collision_punishment: -0.0027487379240989686
+	reach_target_reward: 0.0
+	push_reward: 9.061501623364165e-05
+	ocb_reward: 0.00026511359311640265
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:35:58,502 [INFO] 
+	value_loss: 0.30007913112640383
+	policy_loss: -0.0006828278500847773
+	dist_entropy: 7.164239931106567
+	actor_grad_norm: 0.04270680993795395
+	critic_grad_norm: 0.7504844069480896
+	ratio: 0.9999774932861328
+
+2026-02-03 11:35:58,505 [INFO] Episode: 251/1500
+2026-02-03 11:36:22,588 [INFO] Episode: 252/1500
+2026-02-03 11:36:46,120 [INFO] Episode: 253/1500
+2026-02-03 11:37:09,423 [INFO] Episode: 254/1500
+2026-02-03 11:37:32,196 [INFO] Episode: 255/1500
+2026-02-03 11:37:56,143 [INFO] 
+	average_step_reward: -0.024471130222082138
+	distance_to_target_reward: -0.007365983910858631
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.015244902238845824
+	collision_punishment: -0.002488328426480293
+	reach_target_reward: 0.0004
+	push_reward: 0.00011546996393008158
+	ocb_reward: 0.0001126161427423358
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:37:56,152 [INFO] 
+	value_loss: 0.4718572378158569
+	policy_loss: -0.0005868351999730237
+	dist_entropy: 7.225668287277221
+	actor_grad_norm: 0.036626819521188736
+	critic_grad_norm: 0.7992612719535828
+	ratio: 0.9999545872211456
+
+2026-02-03 11:37:56,155 [INFO] Episode: 256/1500
+2026-02-03 11:38:20,147 [INFO] Episode: 257/1500
+2026-02-03 11:38:43,525 [INFO] Episode: 258/1500
+2026-02-03 11:39:06,419 [INFO] Episode: 259/1500
+2026-02-03 11:39:29,332 [INFO] Episode: 260/1500
+2026-02-03 11:39:53,577 [INFO] 
+	average_step_reward: -0.02533918246626854
+	distance_to_target_reward: -0.007188152987509966
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.015934368143081665
+	collision_punishment: -0.002547740409374237
+	reach_target_reward: 0.0001
+	push_reward: 0.00011621999874478206
+	ocb_reward: 0.00011485913023352623
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:39:53,587 [INFO] 
+	value_loss: 0.42764224410057067
+	policy_loss: -0.000360691274998981
+	dist_entropy: 7.293692350387573
+	actor_grad_norm: 0.024605924263596535
+	critic_grad_norm: 0.9583958983421326
+	ratio: 0.9999939322471618
+
+2026-02-03 11:39:53,589 [INFO] Episode: 261/1500
+2026-02-03 11:40:18,445 [INFO] Episode: 262/1500
+2026-02-03 11:40:42,979 [INFO] Episode: 263/1500
+2026-02-03 11:41:07,809 [INFO] Episode: 264/1500
+2026-02-03 11:41:32,515 [INFO] Episode: 265/1500
+2026-02-03 11:41:58,260 [INFO] 
+	average_step_reward: -0.02008390799164772
+	distance_to_target_reward: -0.007034434005618095
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010765016131401062
+	collision_punishment: -0.0030497282743453978
+	reach_target_reward: 0.0004
+	push_reward: 0.00017059493984561414
+	ocb_reward: 0.0001946768794208765
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:41:58,268 [INFO] 
+	value_loss: 0.3865749478340149
+	policy_loss: -0.0004996880879589938
+	dist_entropy: 7.370808458328247
+	actor_grad_norm: 0.031388912349939346
+	critic_grad_norm: 0.9936884045600891
+	ratio: 0.9999932646751404
+
+2026-02-03 11:41:58,272 [INFO] Episode: 266/1500
+2026-02-03 11:42:23,972 [INFO] Episode: 267/1500
+2026-02-03 11:42:49,393 [INFO] Episode: 268/1500
+2026-02-03 11:43:14,666 [INFO] Episode: 269/1500
+2026-02-03 11:43:39,257 [INFO] Episode: 270/1500
+2026-02-03 11:44:04,586 [INFO] 
+	average_step_reward: -0.018718702718615532
+	distance_to_target_reward: -0.0069420658983290195
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010948251857757569
+	collision_punishment: -0.0026735518205165862
+	reach_target_reward: 0.0009
+	push_reward: 0.00014501999248750508
+	ocb_reward: 0.0008001451812684536
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:44:04,595 [INFO] 
+	value_loss: 0.5423750042915344
+	policy_loss: -0.0004061451744090339
+	dist_entropy: 7.436242246627808
+	actor_grad_norm: 0.02989836409687996
+	critic_grad_norm: 1.3085943460464478
+	ratio: 1.000003409385681
+
+2026-02-03 11:44:04,598 [INFO] Episode: 271/1500
+2026-02-03 11:44:29,707 [INFO] Episode: 272/1500
+2026-02-03 11:44:54,270 [INFO] Episode: 273/1500
+2026-02-03 11:45:18,849 [INFO] Episode: 274/1500
+2026-02-03 11:45:43,012 [INFO] Episode: 275/1500
+2026-02-03 11:46:08,425 [INFO] 
+	average_step_reward: -0.01984735019505024
+	distance_to_target_reward: -0.007027836516499519
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010982265601158142
+	collision_punishment: -0.0027869994938373565
+	reach_target_reward: 0.0006
+	push_reward: 0.0001682699949014932
+	ocb_reward: 0.0001814814598020166
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:46:08,435 [INFO] 
+	value_loss: 0.40744072794914243
+	policy_loss: -0.0007068274079998993
+	dist_entropy: 7.48280177116394
+	actor_grad_norm: 0.04760662466287613
+	critic_grad_norm: 1.3198906183242798
+	ratio: 1.000053834915161
+
+2026-02-03 11:46:08,437 [INFO] Episode: 276/1500
+2026-02-03 11:46:33,443 [INFO] Episode: 277/1500
+2026-02-03 11:46:58,300 [INFO] Episode: 278/1500
+2026-02-03 11:47:22,799 [INFO] Episode: 279/1500
+2026-02-03 11:47:47,254 [INFO] Episode: 280/1500
+2026-02-03 11:48:12,312 [INFO] 
+	average_step_reward: -0.020883433520793915
+	distance_to_target_reward: -0.0071964384987950325
+	exception_punishment: -5e-05
+	approach_to_box_reward: -0.011852254977226258
+	collision_punishment: -0.0028128762125968934
+	reach_target_reward: 0.0004
+	push_reward: 0.00015502503083553165
+	ocb_reward: 0.0004731120800971985
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:48:12,320 [INFO] 
+	value_loss: 0.37528827488422395
+	policy_loss: -0.0003897427835586775
+	dist_entropy: 7.5333638191223145
+	actor_grad_norm: 0.035748619586229324
+	critic_grad_norm: 1.2687660455703735
+	ratio: 0.9999822318553925
+
+2026-02-03 11:48:12,324 [INFO] Episode: 281/1500
+2026-02-03 11:48:37,444 [INFO] Episode: 282/1500
+2026-02-03 11:49:03,093 [INFO] Episode: 283/1500
+2026-02-03 11:49:28,409 [INFO] Episode: 284/1500
+2026-02-03 11:49:53,558 [INFO] Episode: 285/1500
+2026-02-03 11:50:19,864 [INFO] 
+	average_step_reward: -0.018601102754473686
+	distance_to_target_reward: -0.006836713291704655
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010998153772354125
+	collision_punishment: -0.0030844968116283417
+	reach_target_reward: 0.0014
+	push_reward: 0.0002367751148995012
+	ocb_reward: 0.0006814872545003891
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:50:19,873 [INFO] 
+	value_loss: 0.6332387506961823
+	policy_loss: -0.0007044927294266757
+	dist_entropy: 7.597572278976441
+	actor_grad_norm: 0.04706709831953049
+	critic_grad_norm: 1.1134427785873413
+	ratio: 0.9999748051166535
+
+2026-02-03 11:50:19,876 [INFO] Episode: 286/1500
+2026-02-03 11:50:45,263 [INFO] Episode: 287/1500
+2026-02-03 11:51:10,122 [INFO] Episode: 288/1500
+2026-02-03 11:51:35,258 [INFO] Episode: 289/1500
+2026-02-03 11:51:59,906 [INFO] Episode: 290/1500
+2026-02-03 11:52:25,049 [INFO] 
+	average_step_reward: -0.02059565857052803
+	distance_to_target_reward: -0.007002110127359629
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.01204896978855133
+	collision_punishment: -0.0028147913444042205
+	reach_target_reward: 0.0006
+	push_reward: 0.00016571996093261987
+	ocb_reward: 0.0005044939529895783
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:52:25,058 [INFO] 
+	value_loss: 0.3852504551410675
+	policy_loss: -0.0007003663003221306
+	dist_entropy: 7.6652895450592045
+	actor_grad_norm: 0.04142707213759422
+	critic_grad_norm: 0.9648929834365845
+	ratio: 1.0001139044761658
+
+2026-02-03 11:52:25,061 [INFO] Episode: 291/1500
+2026-02-03 11:52:50,468 [INFO] Episode: 292/1500
+2026-02-03 11:53:15,740 [INFO] Episode: 293/1500
+2026-02-03 11:53:40,707 [INFO] Episode: 294/1500
+2026-02-03 11:54:05,906 [INFO] Episode: 295/1500
+2026-02-03 11:54:31,102 [INFO] 
+	average_step_reward: -0.01983720064163208
+	distance_to_target_reward: -0.007248728536069393
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.01103982500076294
+	collision_punishment: -0.002863090716600418
+	reach_target_reward: 0.0007
+	push_reward: 0.000172214990016073
+	ocb_reward: 0.0004422267162799835
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:54:31,111 [INFO] 
+	value_loss: 0.3731704443693161
+	policy_loss: -0.0007931850655420903
+	dist_entropy: 7.731505346298218
+	actor_grad_norm: 0.04099850729107857
+	critic_grad_norm: 0.8449586033821106
+	ratio: 0.9999499559402466
+
+2026-02-03 11:54:31,114 [INFO] Episode: 296/1500
+2026-02-03 11:54:56,184 [INFO] Episode: 297/1500
+2026-02-03 11:55:21,912 [INFO] Episode: 298/1500
+2026-02-03 11:55:48,064 [INFO] Episode: 299/1500
+2026-02-03 11:56:13,315 [INFO] Episode: 300/1500
+2026-02-03 11:56:38,578 [INFO] 
+	average_step_reward: -0.01850726641714573
+	distance_to_target_reward: -0.007195440120995045
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.01002866662979126
+	collision_punishment: -0.0029274977803230287
+	reach_target_reward: 0.001
+	push_reward: 0.00021391497284639627
+	ocb_reward: 0.0004304214243590832
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:56:38,588 [INFO] 
+	value_loss: 0.463320380449295
+	policy_loss: -0.0006361765293000588
+	dist_entropy: 7.795279216766358
+	actor_grad_norm: 0.038523416966199875
+	critic_grad_norm: 0.9483127593994141
+	ratio: 1.0000419437885284
+
+2026-02-03 11:56:38,591 [INFO] Episode: 301/1500
+2026-02-03 11:57:03,989 [INFO] Episode: 302/1500
+2026-02-03 11:57:29,136 [INFO] Episode: 303/1500
+2026-02-03 11:57:53,978 [INFO] Episode: 304/1500
+2026-02-03 11:58:19,028 [INFO] Episode: 305/1500
+2026-02-03 11:58:44,169 [INFO] 
+	average_step_reward: -0.01884612627327442
+	distance_to_target_reward: -0.007046202197670937
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.0109154909658432
+	collision_punishment: -0.0026991589522361754
+	reach_target_reward: 0.0011
+	push_reward: 0.00023114994110073894
+	ocb_reward: 0.0004835741248726845
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 11:58:44,178 [INFO] 
+	value_loss: 0.4631466418504715
+	policy_loss: -0.0005744475742601729
+	dist_entropy: 7.863870668411255
+	actor_grad_norm: 0.03284196928143501
+	critic_grad_norm: 1.0443745851516724
+	ratio: 1.0000276684761047
+
+2026-02-03 11:58:44,181 [INFO] Episode: 306/1500
+2026-02-03 11:59:09,617 [INFO] Episode: 307/1500
+2026-02-03 11:59:34,729 [INFO] Episode: 308/1500
+2026-02-03 12:00:00,093 [INFO] Episode: 309/1500
+2026-02-03 12:00:25,936 [INFO] Episode: 310/1500
+2026-02-03 12:00:52,248 [INFO] 
+	average_step_reward: -0.017154624685645103
+	distance_to_target_reward: -0.007046489976346493
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008597614963054657
+	collision_punishment: -0.0032448525583744048
+	reach_target_reward: 0.0008
+	push_reward: 0.0002717100433073938
+	ocb_reward: 0.0006626229205727578
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:00:52,256 [INFO] 
+	value_loss: 0.3630801022052765
+	policy_loss: -0.0005961056310884061
+	dist_entropy: 7.928922271728515
+	actor_grad_norm: 0.037004560232162476
+	critic_grad_norm: 0.6873897910118103
+	ratio: 0.999977421760559
+
+2026-02-03 12:00:52,260 [INFO] Episode: 311/1500
+2026-02-03 12:01:18,850 [INFO] Episode: 312/1500
+2026-02-03 12:01:45,055 [INFO] Episode: 313/1500
+2026-02-03 12:02:11,749 [INFO] Episode: 314/1500
+2026-02-03 12:02:37,961 [INFO] Episode: 315/1500
+2026-02-03 12:03:04,475 [INFO] 
+	average_step_reward: -0.016432618722319603
+	distance_to_target_reward: -0.007045050151646137
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008579644932746888
+	collision_punishment: -0.0033324260330200193
+	reach_target_reward: 0.0016
+	push_reward: 0.000278894993243739
+	ocb_reward: 0.0006456072813272476
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:03:04,484 [INFO] 
+	value_loss: 0.5076413631439209
+	policy_loss: -0.0005397572207582968
+	dist_entropy: 7.991727066040039
+	actor_grad_norm: 0.026692843064665794
+	critic_grad_norm: 0.6586172580718994
+	ratio: 1.0000227570533753
+
+2026-02-03 12:03:04,487 [INFO] Episode: 316/1500
+2026-02-03 12:03:30,537 [INFO] Episode: 317/1500
+2026-02-03 12:03:56,319 [INFO] Episode: 318/1500
+2026-02-03 12:04:22,364 [INFO] Episode: 319/1500
+2026-02-03 12:04:48,374 [INFO] Episode: 320/1500
+2026-02-03 12:05:14,402 [INFO] 
+	average_step_reward: -0.0183646809309721
+	distance_to_target_reward: -0.007189799100160599
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.010707463274002075
+	collision_punishment: -0.003045550662279129
+	reach_target_reward: 0.0013
+	push_reward: 0.0003309301391709596
+	ocb_reward: 0.0009472039115428925
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:05:14,412 [INFO] 
+	value_loss: 0.40036671459674833
+	policy_loss: -0.0005109991748433629
+	dist_entropy: 8.061886215209961
+	actor_grad_norm: 0.03260865435004234
+	critic_grad_norm: 0.6389084458351135
+	ratio: 1.0000558257102967
+
+2026-02-03 12:05:14,414 [INFO] Episode: 321/1500
+2026-02-03 12:05:40,322 [INFO] Episode: 322/1500
+2026-02-03 12:06:08,539 [INFO] Episode: 323/1500
+2026-02-03 12:06:37,155 [INFO] Episode: 324/1500
+2026-02-03 12:07:05,874 [INFO] Episode: 325/1500
+2026-02-03 12:07:34,841 [INFO] 
+	average_step_reward: -0.017052065581083298
+	distance_to_target_reward: -0.00699330260977149
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009315585885047913
+	collision_punishment: -0.003395101429224014
+	reach_target_reward: 0.0016
+	push_reward: 0.00036234004073776305
+	ocb_reward: 0.0006895856246352196
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:07:34,851 [INFO] 
+	value_loss: 0.48862183690071104
+	policy_loss: -0.0007464696363622903
+	dist_entropy: 8.129305362701416
+	actor_grad_norm: 0.03534991666674614
+	critic_grad_norm: 0.9048463702201843
+	ratio: 1.000065302848816
+
+2026-02-03 12:07:34,853 [INFO] Episode: 326/1500
+2026-02-03 12:08:04,059 [INFO] Episode: 327/1500
+2026-02-03 12:08:33,466 [INFO] Episode: 328/1500
+2026-02-03 12:09:02,767 [INFO] Episode: 329/1500
+2026-02-03 12:09:31,951 [INFO] Episode: 330/1500
+2026-02-03 12:09:58,848 [INFO] 
+	average_step_reward: -0.015536395832896233
+	distance_to_target_reward: -0.007043005432933569
+	exception_punishment: -5e-05
+	approach_to_box_reward: -0.007800321552753449
+	collision_punishment: -0.003603835735321045
+	reach_target_reward: 0.0018
+	push_reward: 0.0003211949660908431
+	ocb_reward: 0.0008395723205804825
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:09:58,856 [INFO] 
+	value_loss: 0.4720608204603195
+	policy_loss: -0.0004019449677450382
+	dist_entropy: 8.19630298614502
+	actor_grad_norm: 0.036600906401872635
+	critic_grad_norm: 0.8272258639335632
+	ratio: 0.9999824345111847
+
+2026-02-03 12:09:58,860 [INFO] Episode: 331/1500
+2026-02-03 12:10:25,890 [INFO] Episode: 332/1500
+2026-02-03 12:10:52,531 [INFO] Episode: 333/1500
+2026-02-03 12:11:18,739 [INFO] Episode: 334/1500
+2026-02-03 12:11:44,867 [INFO] Episode: 335/1500
+2026-02-03 12:12:11,156 [INFO] 
+	average_step_reward: -0.017676103860139847
+	distance_to_target_reward: -0.007365756202489138
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009803530135154724
+	collision_punishment: -0.003195188283920288
+	reach_target_reward: 0.0015
+	push_reward: 0.0003304800484329462
+	ocb_reward: 0.0008578920900821686
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:12:11,164 [INFO] 
+	value_loss: 0.38188621699810027
+	policy_loss: -0.0004949345036143526
+	dist_entropy: 8.254408073425292
+	actor_grad_norm: 0.028344545513391495
+	critic_grad_norm: 0.6754229664802551
+	ratio: 1.0000240981578827
+
+2026-02-03 12:12:11,168 [INFO] Episode: 336/1500
+2026-02-03 12:12:37,222 [INFO] Episode: 337/1500
+2026-02-03 12:13:03,704 [INFO] Episode: 338/1500
+2026-02-03 12:13:30,234 [INFO] Episode: 339/1500
+2026-02-03 12:13:56,704 [INFO] Episode: 340/1500
+2026-02-03 12:14:23,463 [INFO] 
+	average_step_reward: -0.016490086913108826
+	distance_to_target_reward: -0.007035698276013136
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.009149846148490905
+	collision_punishment: -0.003298233586549759
+	reach_target_reward: 0.0017
+	push_reward: 0.00035407504765316844
+	ocb_reward: 0.0009396148750185966
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:14:23,470 [INFO] 
+	value_loss: 0.4013040781021118
+	policy_loss: -0.0006511426699873368
+	dist_entropy: 8.328909301757813
+	actor_grad_norm: 0.040790263563394547
+	critic_grad_norm: 0.6589421033859253
+	ratio: 1.0000387191772462
+
+2026-02-03 12:14:23,474 [INFO] Episode: 341/1500
+2026-02-03 12:14:50,233 [INFO] Episode: 342/1500
+2026-02-03 12:15:16,897 [INFO] Episode: 343/1500
+2026-02-03 12:15:43,396 [INFO] Episode: 344/1500
+2026-02-03 12:16:10,273 [INFO] Episode: 345/1500
+2026-02-03 12:16:37,151 [INFO] 
+	average_step_reward: -0.01643473654985428
+	distance_to_target_reward: -0.007036163471639156
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008408435850143432
+	collision_punishment: -0.0034351270282268523
+	reach_target_reward: 0.0014
+	push_reward: 0.000345075037330389
+	ocb_reward: 0.0006999156931042671
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:16:37,160 [INFO] 
+	value_loss: 0.330471059679985
+	policy_loss: -0.0006280359864854201
+	dist_entropy: 8.395814800262452
+	actor_grad_norm: 0.041299767792224884
+	critic_grad_norm: 0.458980530500412
+	ratio: 0.999903428554535
+
+2026-02-03 12:16:37,163 [INFO] Episode: 346/1500
+2026-02-03 12:17:03,934 [INFO] Episode: 347/1500
+2026-02-03 12:17:30,717 [INFO] Episode: 348/1500
+2026-02-03 12:17:57,504 [INFO] Episode: 349/1500
+2026-02-03 12:18:24,431 [INFO] Episode: 350/1500
+2026-02-03 12:18:51,602 [INFO] 
+	average_step_reward: -0.016488252207636833
+	distance_to_target_reward: -0.0073796589858829975
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008074120044708252
+	collision_punishment: -0.003391890653371811
+	reach_target_reward: 0.0013
+	push_reward: 0.0003247649874538183
+	ocb_reward: 0.0007326517644524575
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:18:51,612 [INFO] 
+	value_loss: 0.2614689290523529
+	policy_loss: -0.0006710118521852326
+	dist_entropy: 8.470760440826416
+	actor_grad_norm: 0.04341300204396248
+	critic_grad_norm: 0.7705212235450745
+	ratio: 0.9999610662460328
+
+2026-02-03 12:18:51,615 [INFO] Episode: 351/1500
+2026-02-03 12:19:18,050 [INFO] Episode: 352/1500
+2026-02-03 12:19:44,303 [INFO] Episode: 353/1500
+2026-02-03 12:20:10,620 [INFO] Episode: 354/1500
+2026-02-03 12:20:37,002 [INFO] Episode: 355/1500
+2026-02-03 12:21:03,201 [INFO] 
+	average_step_reward: -0.01775103621184826
+	distance_to_target_reward: -0.0073980665765702724
+	exception_punishment: 0.0
+	approach_to_box_reward: -0.008888697247505187
+	collision_punishment: -0.0032152616119384765
+	reach_target_reward: 0.0011
+	push_reward: 0.00030552002135664225
+	ocb_reward: 0.0003454685024172068
+	goal_push_bonus: 0.0
+	engagement_bonus: 0.0
+	cooperation_bonus: 0.0
+	same_side_bonus: 0.0
+	blocking_penalty: 0.0
+	gating_factor: 0.0
+	dual_engagement_bonus: 0.0
+	synchronized_contact_bonus: 0.0
+	bilateral_push_bonus: 0.0
+	proximity_penalty: 0.0
+	dual_push_bonus: 0.0
+	gaussian_proximity_bonus: 0.0
+
+2026-02-03 12:21:03,208 [INFO] 
+	value_loss: 0.2488967075943947
+	policy_loss: -0.0004883161992335072
+	dist_entropy: 8.54676275253296
+	actor_grad_norm: 0.03823399543762207
+	critic_grad_norm: 0.3860945999622345
+	ratio: 0.9999785244464874
+
+2026-02-03 12:21:03,212 [INFO] Episode: 356/1500
+2026-02-03 12:21:29,310 [INFO] Episode: 357/1500

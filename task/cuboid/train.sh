@@ -1,4 +1,4 @@
-exp_name="heterogenMAPPObaseline_go1_anymal"
+exp_name="homogenMAPPObaseline_go1"
 current_dir=$(pwd)
 algo="ppo"
 script_path=$(realpath "${BASH_SOURCE[0]}")
@@ -8,7 +8,7 @@ test_mode=$1
 
 # Agent configuration (used in both train and test modes)
 agent0='go1'
-agent1='anymal_c' # or cassie, anymal_c or go1
+agent1='go1' # or cassie, anymal_c or go1
 
 # Set PYTHONPATH to include the project root
 export PYTHONPATH=/home/gvlab/new-universal-MAPush:$PYTHONPATH
@@ -44,8 +44,10 @@ if [ $test_mode = False ]; then
     for ((i=1; i<=num_steps/10000000; i++)); do
         steps+=("${i}0000000")
     done
-    target_dir=$current_dir/results
-    last_folder=$(ls -d $target_dir/*/ | sort | tail -n 1)
+
+    log_dir="$current_dir/log/MQE/go1push_mid/$exp_name"
+    last_folder=$(ls -dt $log_dir/*/ 2>/dev/null | head -n 1)
+
     echo "last_folder: $last_folder"
     for step in "${steps[@]}"; do
         filename="rl_model_${step}_steps/module.pt"
@@ -62,7 +64,7 @@ if [ $test_mode = False ]; then
 
 else
 # test
-test_checkpoint="/home/gvlab/new-universal-MAPush/log/MQE/go1push_mid/cuboid/run1/checkpoints/rl_model_150000000_steps/module.pt"
+test_checkpoint="log/MQE/go1push_mid/heterogenMAPPObaseline_go1_anymal/run1/checkpoints/rl_model_150000000_steps"
 python ./openrl_ws/test.py --num_envs 1 \
         --algo "$algo" \
         --task go1push_mid \

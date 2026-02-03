@@ -1,0 +1,107 @@
+Checkpoint Test Results (Every 10M Steps)
+================================================================================
+
+Checkpoint: 10000000 steps
+  success rate:         0.0
+  finished time:        20.020000457763672
+  collision degree:     nan
+  collaboration degree: nan
+--------------------------------------------------------------------------------
+
+Checkpoint: 20000000 steps
+  success rate:         0.09000000357627869
+  finished time:        19.16939926147461
+  collision degree:     0.0
+  collaboration degree: 0.0
+--------------------------------------------------------------------------------
+
+Checkpoint: 30000000 steps
+  success rate:         0.2199999988079071
+  finished time:        17.608333587646484
+  collision degree:     0.0
+  collaboration degree: 0.0
+--------------------------------------------------------------------------------
+
+Checkpoint: 40000000 steps
+  success rate:         0.6266666650772095
+  finished time:        14.021533966064453
+  collision degree:     0.0
+  collaboration degree: 0.00649188132956624
+--------------------------------------------------------------------------------
+
+Checkpoint: 50000000 steps
+  success rate:         0.6200000047683716
+  finished time:        13.053667068481445
+  collision degree:     0.0
+  collaboration degree: 0.00436773244291544
+--------------------------------------------------------------------------------
+
+Checkpoint: 60000000 steps
+  success rate:         0.7766667008399963
+  finished time:        10.743600845336914
+  collision degree:     0.0
+  collaboration degree: 0.018289754167199135
+--------------------------------------------------------------------------------
+
+Checkpoint: 70000000 steps
+  success rate:         0.846666693687439
+  finished time:        9.390933990478516
+  collision degree:     0.0
+  collaboration degree: 0.023801328614354134
+--------------------------------------------------------------------------------
+
+Checkpoint: 80000000 steps
+  success rate:         0.84333336353302
+  finished time:        8.982200622558594
+  collision degree:     0.0
+  collaboration degree: 0.02978977933526039
+--------------------------------------------------------------------------------
+
+Checkpoint: 90000000 steps
+  success rate:         0.8866667151451111
+  finished time:        8.333333969116211
+  collision degree:     0.0
+  collaboration degree: 0.027483349665999413
+--------------------------------------------------------------------------------
+
+Checkpoint: 100000000 steps
+  success rate:         0.84333336353302
+  finished time:        9.17573356628418
+  collision degree:     0.0
+  collaboration degree: 0.028585277497768402
+--------------------------------------------------------------------------------
+
+Checkpoint: 110000000 steps
+  success rate:         0.9333333373069763
+  finished time:        7.40333366394043
+  collision degree:     0.0
+  collaboration degree: 0.0272968802601099
+--------------------------------------------------------------------------------
+
+Checkpoint: 120000000 steps
+  success rate:         0.9600000381469727
+  finished time:        7.288733959197998
+  collision degree:     0.0
+  collaboration degree: 0.025584625080227852
+--------------------------------------------------------------------------------
+
+Checkpoint: 130000000 steps
+  success rate:         0.9600000381469727
+  finished time:        7.048666954040527
+  collision degree:     0.0
+  collaboration degree: 0.033228471875190735
+--------------------------------------------------------------------------------
+
+Checkpoint: 140000000 steps
+  success rate:         0.9466667175292969
+  finished time:        6.774333477020264
+  collision degree:     0.0
+  collaboration degree: 0.03077658824622631
+--------------------------------------------------------------------------------
+
+Checkpoint: 150000000 steps
+  success rate:         0.9766666889190674
+  finished time:        5.856866359710693
+  collision degree:     0.0
+  collaboration degree: 0.0336574912071228
+--------------------------------------------------------------------------------
