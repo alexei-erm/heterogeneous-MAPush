@@ -139,6 +139,21 @@ class OnPolicyHARunner(OnPolicyBaseRunner):
                     1,
                 )
             )
+
+            # Log HAPPO factor to TensorBoard (histogram + overlayed scalars)
+            if hasattr(self, 'logger') and self.logger is not None and hasattr(self.logger, 'writter') and self.logger.writter is not None:
+                step = self.total_num_steps
+                # Histogram showing full distribution
+                self.logger.writter.add_histogram(f'happo_factor/agent{agent_id}_distribution', factor.flatten(), step)
+                # Overlayed scalars (mean, min, max on same plot)
+                self.logger.writter.add_scalars(f'happo_factor/agent{agent_id}', {
+                    'mean': float(factor.mean()),
+                    'min': float(factor.min()),
+                    'max': float(factor.max()),
+                }, step)
+                # Also log std separately
+                self.logger.writter.add_scalar(f'happo_factor/agent{agent_id}_std', float(factor.std()), step)
+
             actor_train_infos.append(actor_train_info)
 
         # update critic

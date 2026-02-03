@@ -34,7 +34,9 @@ if [ $test_mode = False ]; then
     --agent1 $agent1 \
     --layer_N 2 \
     --hidden_size 128 \
-    --baseline_mappo_rewards True
+    --baseline_mappo_rewards True 
+    # important to keep baseline_mappo_rewards as OG repo! 
+    # + [128,128] is maximum to avoid OOM with anymal
 
     #   --checkpoint $current_dir$checkpoint \
 
