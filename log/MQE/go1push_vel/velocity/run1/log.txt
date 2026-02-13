@@ -1,0 +1,442 @@
+2026-02-13 17:20:46,144 [INFO] Episode: 0/2000
+2026-02-13 17:21:15,564 [INFO] 
+	average_step_reward: -0.00407956373139983
+	velocity_tracking_reward: 0.00018839701157063245
+	angular_velocity_penalty: -6.576901760417968e-06
+	velocity_ocb_reward: -0.00016328613698482513
+	approach_to_box_reward: -0.0023409175610542296
+	collision_punishment: -0.0017755770444869996
+	push_reward: 1.1819999555591495e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0030605579602718353
+	avg_speed_error: 0.0013028794914484024
+	avg_box_angular_vel: 2.630760854517575e-06
+
+2026-02-13 17:21:15,572 [INFO] 
+	value_loss: 0.609553188085556
+	policy_loss: -0.0006866824558898089
+	dist_entropy: 4.262595081329346
+	actor_grad_norm: 0.042829591780900955
+	critic_grad_norm: 2.431206226348877
+	ratio: 0.9999958157539368
+
+2026-02-13 17:21:15,574 [INFO] Episode: 1/2000
+2026-02-13 17:21:41,423 [INFO] Episode: 2/2000
+2026-02-13 17:22:07,485 [INFO] Episode: 3/2000
+2026-02-13 17:22:31,111 [INFO] Episode: 4/2000
+2026-02-13 17:22:53,673 [INFO] Episode: 5/2000
+2026-02-13 17:23:22,933 [INFO] 
+	average_step_reward: -0.003995529484509024
+	velocity_tracking_reward: -0.00010898722851648927
+	angular_velocity_penalty: -8.045245565008373e-06
+	velocity_ocb_reward: 0.00020576508983969689
+	approach_to_box_reward: -0.002315270535945892
+	collision_punishment: -0.0017897268098592757
+	push_reward: 1.2689999972935766e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.003159860473871231
+	avg_speed_error: 0.0012682908257842065
+	avg_box_angular_vel: 3.2180984038859604e-06
+
+2026-02-13 17:23:22,940 [INFO] 
+	value_loss: 0.23139020204544067
+	policy_loss: -0.00038864934797890884
+	dist_entropy: 4.310664224624634
+	actor_grad_norm: 0.05070885643362999
+	critic_grad_norm: 1.4025968313217163
+	ratio: 1.0000205218791962
+
+2026-02-13 17:23:22,944 [INFO] Episode: 6/2000
+2026-02-13 17:23:49,916 [INFO] Episode: 7/2000
+2026-02-13 17:24:15,492 [INFO] Episode: 8/2000
+2026-02-13 17:24:39,948 [INFO] Episode: 9/2000
+2026-02-13 17:25:03,287 [INFO] Episode: 10/2000
+2026-02-13 17:25:31,898 [INFO] 
+	average_step_reward: -0.003918419939071754
+	velocity_tracking_reward: 0.00033069288093422075
+	angular_velocity_penalty: -7.950476714977413e-06
+	velocity_ocb_reward: -0.00012178630873560905
+	approach_to_box_reward: -0.002410539411306381
+	collision_punishment: -0.0017295221000909805
+	push_reward: 1.2735000126995146e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0029890998685359956
+	avg_speed_error: 0.0012702487021684647
+	avg_box_angular_vel: 3.1801908356430885e-06
+
+2026-02-13 17:25:31,905 [INFO] 
+	value_loss: 0.15965629667043685
+	policy_loss: -0.0002978639007569228
+	dist_entropy: 4.369895362854004
+	actor_grad_norm: 0.03957153484225273
+	critic_grad_norm: 0.5054685473442078
+	ratio: 1.0000401973724364
+
+2026-02-13 17:25:31,908 [INFO] Episode: 11/2000
+2026-02-13 17:25:57,622 [INFO] Episode: 12/2000
+2026-02-13 17:26:22,013 [INFO] Episode: 13/2000
+2026-02-13 17:26:45,443 [INFO] Episode: 14/2000
+2026-02-13 17:27:07,821 [INFO] Episode: 15/2000
+2026-02-13 17:27:36,475 [INFO] 
+	average_step_reward: -0.0046468587942514565
+	velocity_tracking_reward: -0.00021704957341309636
+	angular_velocity_penalty: -8.593844397678368e-06
+	velocity_ocb_reward: -0.00021523057401180267
+	approach_to_box_reward: -0.002472337702512741
+	collision_punishment: -0.0017550359445810317
+	push_reward: 1.2795000267215073e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0032692863881587982
+	avg_speed_error: 0.0012798077729344367
+	avg_box_angular_vel: 3.4375379715879716e-06
+
+2026-02-13 17:27:36,482 [INFO] 
+	value_loss: 0.1452105924487114
+	policy_loss: -0.0006054133371225845
+	dist_entropy: 4.427731895446778
+	actor_grad_norm: 0.06033192202448845
+	critic_grad_norm: 0.5648430585861206
+	ratio: 1.0000045120716095
+
+2026-02-13 17:27:36,485 [INFO] Episode: 16/2000
+2026-02-13 17:28:02,530 [INFO] Episode: 17/2000
+2026-02-13 17:28:26,931 [INFO] Episode: 18/2000
+2026-02-13 17:28:49,861 [INFO] Episode: 19/2000
+2026-02-13 17:29:12,121 [INFO] Episode: 20/2000
+2026-02-13 17:29:40,422 [INFO] 
+	average_step_reward: -0.004506456865991931
+	velocity_tracking_reward: 0.0001119915697351098
+	angular_velocity_penalty: -9.099776236876665e-06
+	velocity_ocb_reward: -0.00026071213230490685
+	approach_to_box_reward: -0.002627248206138611
+	collision_punishment: -0.0017443930971622467
+	push_reward: 1.3904999878723174e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0030870699071884155
+	avg_speed_error: 0.001276746139228344
+	avg_box_angular_vel: 3.639910782587634e-06
+
+2026-02-13 17:29:40,429 [INFO] 
+	value_loss: 0.16225432455539704
+	policy_loss: -0.0005890866190326527
+	dist_entropy: 4.487351131439209
+	actor_grad_norm: 0.05945132300257683
+	critic_grad_norm: 0.737710177898407
+	ratio: 1.0000019669532776
+
+2026-02-13 17:29:40,431 [INFO] Episode: 21/2000
+2026-02-13 17:30:05,669 [INFO] Episode: 22/2000
+2026-02-13 17:30:29,367 [INFO] Episode: 23/2000
+2026-02-13 17:30:51,762 [INFO] Episode: 24/2000
+2026-02-13 17:31:13,441 [INFO] Episode: 25/2000
+2026-02-13 17:31:42,035 [INFO] 
+	average_step_reward: -0.004561905862060375
+	velocity_tracking_reward: -8.432561861351132e-05
+	angular_velocity_penalty: -1.1726693014043122e-05
+	velocity_ocb_reward: -0.00011400501614436508
+	approach_to_box_reward: -0.002679063740968704
+	collision_punishment: -0.0017001564860343933
+	push_reward: 1.5644999700598417e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0031874372720718386
+	avg_speed_error: 0.001294377827346325
+	avg_box_angular_vel: 4.690677507833243e-06
+
+2026-02-13 17:31:42,041 [INFO] 
+	value_loss: 0.17043093591928482
+	policy_loss: -0.0007707126020285671
+	dist_entropy: 4.540860652923584
+	actor_grad_norm: 0.05300731584429741
+	critic_grad_norm: 0.8186442255973816
+	ratio: 1.0000265121459961
+
+2026-02-13 17:31:42,044 [INFO] Episode: 26/2000
+2026-02-13 17:32:07,450 [INFO] Episode: 27/2000
+2026-02-13 17:32:31,490 [INFO] Episode: 28/2000
+2026-02-13 17:32:54,515 [INFO] Episode: 29/2000
+2026-02-13 17:33:16,617 [INFO] Episode: 30/2000
+2026-02-13 17:33:45,355 [INFO] 
+	average_step_reward: -0.004726262093076948
+	velocity_tracking_reward: -7.965411080978811e-05
+	angular_velocity_penalty: -1.6560986216863966e-05
+	velocity_ocb_reward: -0.00017888720681890846
+	approach_to_box_reward: -0.0028128841650485992
+	collision_punishment: -0.001674951609969139
+	push_reward: 2.0114999569486827e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0031672317159175873
+	avg_speed_error: 0.0012739111161231996
+	avg_box_angular_vel: 6.62439489665303e-06
+
+2026-02-13 17:33:45,361 [INFO] 
+	value_loss: 0.1632758840918541
+	policy_loss: -0.0009005562572312442
+	dist_entropy: 4.585032033920288
+	actor_grad_norm: 0.05201699957251549
+	critic_grad_norm: 0.8436364531517029
+	ratio: 0.9999917507171631
+
+2026-02-13 17:33:45,364 [INFO] Episode: 31/2000
+2026-02-13 17:34:10,368 [INFO] Episode: 32/2000
+2026-02-13 17:34:34,417 [INFO] Episode: 33/2000
+2026-02-13 17:34:57,722 [INFO] Episode: 34/2000
+2026-02-13 17:35:20,283 [INFO] Episode: 35/2000
+2026-02-13 17:35:51,380 [INFO] 
+	average_step_reward: -0.004763744548836257
+	velocity_tracking_reward: -4.447864621412009e-05
+	angular_velocity_penalty: -1.8758679165557624e-05
+	velocity_ocb_reward: -9.77473546937108e-05
+	approach_to_box_reward: -0.0029475856637954712
+	collision_punishment: -0.00169595288336277
+	push_reward: 2.2019999229814858e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0031733590972423554
+	avg_speed_error: 0.0012997973415255547
+	avg_box_angular_vel: 7.5034721995280055e-06
+
+2026-02-13 17:35:51,388 [INFO] 
+	value_loss: 0.16217015981674193
+	policy_loss: -0.0011149689134470008
+	dist_entropy: 4.636951732635498
+	actor_grad_norm: 0.07984265685081482
+	critic_grad_norm: 0.7748734354972839
+	ratio: 1.0000528693199158
+
+2026-02-13 17:35:51,391 [INFO] Episode: 36/2000
+2026-02-13 17:36:17,342 [INFO] Episode: 37/2000
+2026-02-13 17:36:42,300 [INFO] Episode: 38/2000
+2026-02-13 17:37:06,828 [INFO] Episode: 39/2000
+2026-02-13 17:37:30,462 [INFO] Episode: 40/2000
+2026-02-13 17:37:59,327 [INFO] 
+	average_step_reward: -0.004658514277774375
+	velocity_tracking_reward: -0.00013550492666196078
+	angular_velocity_penalty: -2.388923960775173e-05
+	velocity_ocb_reward: 0.00015114374660886825
+	approach_to_box_reward: -0.0029224106419086454
+	collision_punishment: -0.0017307524555921555
+	push_reward: 2.9009999779518694e-05
+	exception_punishment: -5e-05
+	avg_direction_error: 0.003213395810127258
+	avg_speed_error: 0.0013013773563504219
+	avg_box_angular_vel: 9.555696558647924e-06
+
+2026-02-13 17:37:59,332 [INFO] 
+	value_loss: 0.14430806487798692
+	policy_loss: -0.0008673651896344836
+	dist_entropy: 4.681787061691284
+	actor_grad_norm: 0.04828983172774315
+	critic_grad_norm: 0.740549623966217
+	ratio: 1.0000218033790589
+
+2026-02-13 17:37:59,336 [INFO] Episode: 41/2000
+2026-02-13 17:38:25,477 [INFO] Episode: 42/2000
+2026-02-13 17:38:50,316 [INFO] Episode: 43/2000
+2026-02-13 17:39:15,097 [INFO] Episode: 44/2000
+2026-02-13 17:39:39,074 [INFO] Episode: 45/2000
+2026-02-13 17:40:07,910 [INFO] 
+	average_step_reward: -0.004698579007517546
+	velocity_tracking_reward: -0.00011428967598825694
+	angular_velocity_penalty: -2.747640531819343e-05
+	velocity_ocb_reward: 0.00013001001127064228
+	approach_to_box_reward: -0.003028226230144501
+	collision_punishment: -0.0017183081126213075
+	push_reward: 3.223499996587634e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.00319778128862381
+	avg_speed_error: 0.0012919058474898338
+	avg_box_angular_vel: 1.0990562955157657e-05
+
+2026-02-13 17:40:07,915 [INFO] 
+	value_loss: 0.12175452783703804
+	policy_loss: -0.001004692945660679
+	dist_entropy: 4.71683177947998
+	actor_grad_norm: 0.060173988342285156
+	critic_grad_norm: 0.7719273567199707
+	ratio: 0.9999611794948577
+
+2026-02-13 17:40:07,919 [INFO] Episode: 46/2000
+2026-02-13 17:40:34,137 [INFO] Episode: 47/2000
+2026-02-13 17:41:00,002 [INFO] Episode: 48/2000
+2026-02-13 17:41:25,541 [INFO] Episode: 49/2000
+2026-02-13 17:41:50,670 [INFO] Episode: 50/2000
+2026-02-13 17:42:20,018 [INFO] 
+	average_step_reward: -0.004385427031684667
+	velocity_tracking_reward: -2.9316788613796232e-05
+	angular_velocity_penalty: -2.8135392039839646e-05
+	velocity_ocb_reward: 0.00017091144098900258
+	approach_to_box_reward: -0.002822370615005493
+	collision_punishment: -0.0017374860686063765
+	push_reward: 3.283499955199659e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.003159303216934204
+	avg_speed_error: 0.0012749422457814217
+	avg_box_angular_vel: 1.1254157729272264e-05
+
+2026-02-13 17:42:20,024 [INFO] 
+	value_loss: 0.09299182519316673
+	policy_loss: -0.0006034512930668257
+	dist_entropy: 4.774939489364624
+	actor_grad_norm: 0.07980456203222275
+	critic_grad_norm: 0.6811708807945251
+	ratio: 0.9999434649944305
+
+2026-02-13 17:42:20,028 [INFO] Episode: 51/2000
+2026-02-13 17:42:46,868 [INFO] Episode: 52/2000
+2026-02-13 17:43:13,488 [INFO] Episode: 53/2000
+2026-02-13 17:43:39,354 [INFO] Episode: 54/2000
+2026-02-13 17:44:05,239 [INFO] Episode: 55/2000
+2026-02-13 17:44:34,969 [INFO] 
+	average_step_reward: -0.00426473739514593
+	velocity_tracking_reward: -0.0001308390498906374
+	angular_velocity_penalty: -3.749383415211923e-05
+	velocity_ocb_reward: 0.00025571624984033404
+	approach_to_box_reward: -0.0026520362544059754
+	collision_punishment: -0.0017816633397340774
+	push_reward: 4.4084999044425787e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.003183928611278534
+	avg_speed_error: 0.0013033413350582123
+	avg_box_angular_vel: 1.4997534654685297e-05
+
+2026-02-13 17:44:34,975 [INFO] 
+	value_loss: 0.06492772661149501
+	policy_loss: -0.0009832871698323587
+	dist_entropy: 4.827286148071289
+	actor_grad_norm: 0.06422264873981476
+	critic_grad_norm: 0.5190169215202332
+	ratio: 1.0000229954719544
+
+2026-02-13 17:44:34,978 [INFO] Episode: 56/2000
+2026-02-13 17:45:02,089 [INFO] Episode: 57/2000
+2026-02-13 17:45:28,125 [INFO] Episode: 58/2000
+2026-02-13 17:45:53,875 [INFO] Episode: 59/2000
+2026-02-13 17:46:19,714 [INFO] Episode: 60/2000
+2026-02-13 17:46:50,198 [INFO] 
+	average_step_reward: -0.004223852713475936
+	velocity_tracking_reward: -9.306716040708125e-05
+	angular_velocity_penalty: -3.578149254317395e-05
+	velocity_ocb_reward: 0.00021773505240678788
+	approach_to_box_reward: -0.002586172003746033
+	collision_punishment: -0.0018060286009311676
+	push_reward: 4.367999920155853e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.00320201202750206
+	avg_speed_error: 0.0012751144069433212
+	avg_box_angular_vel: 1.4312598068936495e-05
+
+2026-02-13 17:46:50,204 [INFO] 
+	value_loss: 0.06921592131257057
+	policy_loss: -0.0009720275723882566
+	dist_entropy: 4.892036294937133
+	actor_grad_norm: 0.060204263776540756
+	critic_grad_norm: 0.5726222991943359
+	ratio: 0.9999360799789428
+
+2026-02-13 17:46:50,207 [INFO] Episode: 61/2000
+2026-02-13 17:47:18,449 [INFO] Episode: 62/2000
+2026-02-13 17:47:46,195 [INFO] Episode: 63/2000
+2026-02-13 17:48:13,219 [INFO] Episode: 64/2000
+2026-02-13 17:48:40,426 [INFO] Episode: 65/2000
+2026-02-13 17:49:10,444 [INFO] 
+	average_step_reward: -0.0037113803260866553
+	velocity_tracking_reward: 0.00019194737961515784
+	angular_velocity_penalty: -3.950091404723935e-05
+	velocity_ocb_reward: 0.0003921284329146147
+	approach_to_box_reward: -0.002604680691957474
+	collision_punishment: -0.0017386854457855224
+	push_reward: 4.790999912656844e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.003039751843214035
+	avg_speed_error: 0.0012608851128816604
+	avg_box_angular_vel: 1.5800366795738227e-05
+
+2026-02-13 17:49:10,449 [INFO] 
+	value_loss: 0.05728122889995575
+	policy_loss: -0.0009238617610634492
+	dist_entropy: 4.939540958404541
+	actor_grad_norm: 0.053331490606069565
+	critic_grad_norm: 0.5194346904754639
+	ratio: 0.9999682366847992
+
+2026-02-13 17:49:10,453 [INFO] Episode: 66/2000
+2026-02-13 17:49:40,116 [INFO] Episode: 67/2000
+2026-02-13 17:50:09,182 [INFO] Episode: 68/2000
+2026-02-13 17:50:38,395 [INFO] Episode: 69/2000
+2026-02-13 17:51:07,489 [INFO] Episode: 70/2000
+2026-02-13 17:51:40,155 [INFO] 
+	average_step_reward: -0.004140286378816234
+	velocity_tracking_reward: -3.2652991008944806e-05
+	angular_velocity_penalty: -4.880169907148229e-05
+	velocity_ocb_reward: 0.00038964982083067296
+	approach_to_box_reward: -0.002709814692735672
+	collision_punishment: -0.0017963585162162781
+	push_reward: 5.8890000313986095e-05
+	exception_punishment: -5e-05
+	avg_direction_error: 0.0031785258746147155
+	avg_speed_error: 0.0012981653064489365
+	avg_box_angular_vel: 1.952068106569641e-05
+
+2026-02-13 17:51:40,162 [INFO] 
+	value_loss: 0.06006268821656704
+	policy_loss: -0.0009597849734573671
+	dist_entropy: 5.000142669677734
+	actor_grad_norm: 0.06905638426542282
+	critic_grad_norm: 0.3534403145313263
+	ratio: 0.9999919772148133
+
+2026-02-13 17:51:40,164 [INFO] Episode: 71/2000
+2026-02-13 17:52:11,098 [INFO] Episode: 72/2000
+2026-02-13 17:52:39,872 [INFO] Episode: 73/2000
+2026-02-13 17:53:06,589 [INFO] Episode: 74/2000
+2026-02-13 17:53:32,663 [INFO] Episode: 75/2000
+2026-02-13 17:54:02,390 [INFO] 
+	average_step_reward: -0.003627963158071507
+	velocity_tracking_reward: 0.00041443518171086906
+	angular_velocity_penalty: -4.163042908010539e-05
+	velocity_ocb_reward: 0.0005819497512280941
+	approach_to_box_reward: -0.0029172373485565188
+	collision_punishment: -0.001761425741314888
+	push_reward: 5.431499886093661e-05
+	exception_punishment: 0.0
+	avg_direction_error: 0.0029753668892383575
+	avg_speed_error: 0.0012681700044870376
+	avg_box_angular_vel: 1.66521726056817e-05
+
+2026-02-13 17:54:02,395 [INFO] 
+	value_loss: 0.05786865316331387
+	policy_loss: -0.001158700273962765
+	dist_entropy: 5.050921201705933
+	actor_grad_norm: 0.07431858032941818
+	critic_grad_norm: 0.4784563183784485
+	ratio: 1.0000029146671294
+
+2026-02-13 17:54:02,399 [INFO] Episode: 76/2000
+2026-02-13 17:54:30,011 [INFO] Episode: 77/2000
+2026-02-13 17:54:56,954 [INFO] Episode: 78/2000
+2026-02-13 17:55:23,616 [INFO] Episode: 79/2000
+2026-02-13 17:55:49,774 [INFO] Episode: 80/2000
+2026-02-13 17:56:19,912 [INFO] 
+	average_step_reward: -0.003868517737234943
+	velocity_tracking_reward: 0.00026499320281669496
+	angular_velocity_penalty: -4.6679908101214097e-05
+	velocity_ocb_reward: 0.000621329229362309
+	approach_to_box_reward: -0.002983584988117218
+	collision_punishment: -0.001782230180501938
+	push_reward: 6.097499920520931e-05
+	exception_punishment: -5e-05
+	avg_direction_error: 0.003008207916021347
+	avg_speed_error: 0.001263970868587494
+	avg_box_angular_vel: 1.867196452760254e-05
+
+2026-02-13 17:56:19,918 [INFO] 
+	value_loss: 0.06521349102258682
+	policy_loss: -0.0009490240043513509
+	dist_entropy: 5.110843563079834
+	actor_grad_norm: 0.06691723316907883
+	critic_grad_norm: 0.46775269508361816
+	ratio: 0.9999778211116791
+
+2026-02-13 17:56:19,921 [INFO] Episode: 81/2000
+2026-02-13 17:56:48,329 [INFO] Episode: 82/2000
+2026-02-13 17:57:15,737 [INFO] Episode: 83/2000
+2026-02-13 17:57:41,769 [INFO] Episode: 84/2000

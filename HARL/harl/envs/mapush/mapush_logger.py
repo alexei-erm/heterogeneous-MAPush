@@ -121,12 +121,24 @@ class MAPushLogger(BaseLogger):
             self.writter.add_scalar('average_step_reward', avg_step_reward, self.total_num_steps)
 
         # ============================================================
-        # MAPush-specific statistics (success rate, etc.)
+        # MAPush-specific statistics
         # ============================================================
-        if self.envs is not None and hasattr(self.envs, 'get_statistics'):
-            stats = self.envs.get_statistics()
-            self.writter.add_scalar('mapush/success_rate', stats['success_rate'], self.total_num_steps)
-            print(f"  [MAPush] Success: {stats['success_rate']:.3f} ({stats['num_success']}/{stats['num_episodes']} eps)\n")
-            self.envs.reset_statistics()
+        is_velocity = self.env_args.get("task", "") == "go1push_vel"
+
+        if is_velocity:
+            # Velocity task: log direction/speed error and angular vel as primary metrics
+            # (success_rate is meaningless since THRESHOLD=-1.0)
+            if wrapper is not None and hasattr(wrapper, 'reward_buffer') and step_count > 0:
+                dir_err = reward_dict.get('avg_direction_error', 0)
+                spd_err = reward_dict.get('avg_speed_error', 0)
+                ang_vel = reward_dict.get('avg_box_angular_vel', 0)
+                print(f"  [Velocity] dir_err={dir_err:.4f} rad  spd_err={spd_err:.4f} m/s  box_wz={ang_vel:.4f} rad/s\n")
         else:
-            print()  # Newline for formatting
+            # Mid/upper task: log success rate
+            if self.envs is not None and hasattr(self.envs, 'get_statistics'):
+                stats = self.envs.get_statistics()
+                self.writter.add_scalar('mapush/success_rate', stats['success_rate'], self.total_num_steps)
+                print(f"  [MAPush] Success: {stats['success_rate']:.3f} ({stats['num_success']}/{stats['num_episodes']} eps)\n")
+                self.envs.reset_statistics()
+            else:
+                print()  # Newline for formatting

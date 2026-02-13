@@ -159,8 +159,9 @@ class MAPushEnv:
         # Share observation space (for centralized critic)
         from gym import spaces
         if self.is_velocity_task:
-            # Velocity task global state: [cmd(3), box_vel(3), agent0_rel(2), agent1_rel(2), inter_agent_dist(1)]
-            global_state_dim = 3 + 3 + 2 * self.n_agents + 1  # = 11 for 2 agents
+            # Velocity task global state (box-centered frame, 18 dims for 2 agents):
+            # cmd(3) + box_dynamics(3) + agents(5*n_agents) + vel_error(2)
+            global_state_dim = 3 + 3 + 5 * self.n_agents + 2  # = 18 for 2 agents
         elif self.use_relative_obs_critic:
             # CRITIC11: Relative observations with explicit inter-robot distance
             # Structure: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
@@ -572,53 +573,100 @@ class MAPushEnv:
         return global_state_np
 
     def _construct_vel_global_state(self) -> np.ndarray:
-        """Construct global state for velocity task.
+        """Construct global state for velocity task in box-centered frame.
 
-        Structure (11 dims for 2 agents):
-            [cos(cmd_dir), sin(cmd_dir), cmd_speed,   # velocity command (3)
-             box_vx, box_vy, box_ang_vel_z,           # box velocity (3)
-             agent0_rel_x, agent0_rel_y,              # agent0 relative to box (2)
-             agent1_rel_x, agent1_rel_y,              # agent1 relative to box (2)
-             inter_agent_dist]                         # distance between agents (1)
+        All quantities are expressed relative to the box position and orientation,
+        giving the critic translation and rotation invariance.
+
+        Structure (18 dims for 2 agents):
+            cmd(3):          [cos(θ_box), sin(θ_box), cmd_speed]          — command rotated to box frame
+            box_dynamics(3): [box_vx_box, box_vy_box, box_ωz]             — box velocity in box frame
+            a0(5):           [a0_dx, a0_dy, a0_dyaw, a0_vx, a0_vy]       — agent 0 pos+vel in box frame
+            a1(5):           [a1_dx, a1_dy, a1_dyaw, a1_vx, a1_vy]       — agent 1 pos+vel in box frame
+            vel_error(2):    [err_vx, err_vy]                             — (actual_v - cmd_v) in box frame
 
         Returns:
-            global_state_np: [n_envs, 11] numpy array
+            global_state_np: [n_envs, 18] numpy array
         """
         wrapper = self.env
 
         # Velocity command from wrapper
-        cmd_dir = wrapper.cmd_direction  # (n_envs,)
+        cmd_dir = wrapper.cmd_direction  # (n_envs,) — direction in world frame
         cmd_speed = wrapper.cmd_speed    # (n_envs,)
 
         # NPC states
         npc_states = wrapper.root_states_npc.reshape(self.n_envs, wrapper.num_npcs, -1)
-        box_pos_global = npc_states[:, 0, :3] - wrapper.env.env_origins
-        box_lin_vel = npc_states[:, 0, 7:10]   # (n_envs, 3)
-        box_ang_vel = npc_states[:, 0, 10:13]  # (n_envs, 3)
+        box_pos_global = npc_states[:, 0, :3] - wrapper.env.env_origins  # (n_envs, 3)
+        box_quat = npc_states[:, 0, 3:7]
+        box_lin_vel = npc_states[:, 0, 7:10]   # (n_envs, 3) — world frame
+        box_ang_vel = npc_states[:, 0, 10:13]  # (n_envs, 3) — world frame
+
+        # Box yaw from quaternion
+        from isaacgym.torch_utils import get_euler_xyz
+        box_rpy = torch.stack(get_euler_xyz(box_quat), dim=1)  # (n_envs, 3)
+        box_yaw = box_rpy[:, 2]  # (n_envs,)
+
+        # Rotation matrix: world → box frame (rotate by -box_yaw)
+        neg_box_yaw = -box_yaw
+        cos_b = torch.cos(neg_box_yaw)  # (n_envs,)
+        sin_b = torch.sin(neg_box_yaw)  # (n_envs,)
 
         # Agent states
         obs_buf = wrapper.env.obs_buf if hasattr(wrapper, 'env') else wrapper.obs_buf
         base_pos = obs_buf.base_pos.reshape(self.n_envs, self.n_agents, 3)
+        base_rpy = obs_buf.base_rpy.reshape(self.n_envs, self.n_agents, 3)
+        base_lin_vel = obs_buf.lin_vel.reshape(self.n_envs, self.n_agents, 3)
 
-        # Build state components
+        # --- 1. Command rotated to box frame (3 dims) ---
+        cmd_dir_box = cmd_dir - box_yaw  # direction relative to box orientation
         state_list = [
-            torch.cos(cmd_dir).unsqueeze(1),          # cos(cmd_dir) (n_envs, 1)
-            torch.sin(cmd_dir).unsqueeze(1),           # sin(cmd_dir) (n_envs, 1)
-            cmd_speed.unsqueeze(1),                     # cmd_speed (n_envs, 1)
-            box_lin_vel[:, :2],                         # box vx, vy (n_envs, 2)
-            box_ang_vel[:, 2:3],                        # box angular vel z (n_envs, 1)
+            torch.cos(cmd_dir_box).unsqueeze(1),   # cos(θ_box) (n_envs, 1)
+            torch.sin(cmd_dir_box).unsqueeze(1),   # sin(θ_box) (n_envs, 1)
+            cmd_speed.unsqueeze(1),                 # cmd_speed  (n_envs, 1)
         ]
 
-        # Agent positions relative to box
-        for agent_id in range(self.n_agents):
-            agent_rel = base_pos[:, agent_id, :2] - box_pos_global[:, :2]
-            state_list.append(agent_rel)  # (n_envs, 2)
+        # --- 2. Box dynamics in box frame (3 dims) ---
+        # Rotate box linear velocity from world to box frame
+        box_vx_box = box_lin_vel[:, 0] * cos_b - box_lin_vel[:, 1] * sin_b
+        box_vy_box = box_lin_vel[:, 0] * sin_b + box_lin_vel[:, 1] * cos_b
+        state_list.append(box_vx_box.unsqueeze(1))       # (n_envs, 1)
+        state_list.append(box_vy_box.unsqueeze(1))       # (n_envs, 1)
+        state_list.append(box_ang_vel[:, 2:3])            # box ωz (n_envs, 1)
 
-        # Inter-agent distance
-        inter_agent_dist = torch.norm(
-            base_pos[:, 0, :2] - base_pos[:, 1, :2], dim=1, keepdim=True
-        )
-        state_list.append(inter_agent_dist)  # (n_envs, 1)
+        # --- 3. Agent positions + velocities in box frame (5 dims each) ---
+        for agent_id in range(self.n_agents):
+            # Position relative to box, rotated to box frame
+            dx = base_pos[:, agent_id, 0] - box_pos_global[:, 0]
+            dy = base_pos[:, agent_id, 1] - box_pos_global[:, 1]
+            a_dx_box = dx * cos_b - dy * sin_b
+            a_dy_box = dx * sin_b + dy * cos_b
+            # Yaw relative to box
+            a_dyaw = base_rpy[:, agent_id, 2] - box_yaw
+
+            # Velocity rotated to box frame
+            a_vx = base_lin_vel[:, agent_id, 0]
+            a_vy = base_lin_vel[:, agent_id, 1]
+            a_vx_box = a_vx * cos_b - a_vy * sin_b
+            a_vy_box = a_vx * sin_b + a_vy * cos_b
+
+            state_list.append(a_dx_box.unsqueeze(1))   # (n_envs, 1)
+            state_list.append(a_dy_box.unsqueeze(1))   # (n_envs, 1)
+            state_list.append(a_dyaw.unsqueeze(1))     # (n_envs, 1)
+            state_list.append(a_vx_box.unsqueeze(1))   # (n_envs, 1)
+            state_list.append(a_vy_box.unsqueeze(1))   # (n_envs, 1)
+
+        # --- 4. 2D velocity error in box frame (2 dims) ---
+        # desired velocity in world frame
+        desired_vx = cmd_speed * torch.cos(cmd_dir)
+        desired_vy = cmd_speed * torch.sin(cmd_dir)
+        # error = actual - desired (world frame)
+        err_vx_world = box_lin_vel[:, 0] - desired_vx
+        err_vy_world = box_lin_vel[:, 1] - desired_vy
+        # Rotate error to box frame
+        err_vx_box = err_vx_world * cos_b - err_vy_world * sin_b
+        err_vy_box = err_vx_world * sin_b + err_vy_world * cos_b
+        state_list.append(err_vx_box.unsqueeze(1))   # (n_envs, 1)
+        state_list.append(err_vy_box.unsqueeze(1))   # (n_envs, 1)
 
         global_state_torch = torch.cat(state_list, dim=1)
         global_state_np = global_state_torch.cpu().numpy().astype(np.float32)
@@ -626,16 +674,16 @@ class MAPushEnv:
         # Diagnostic logging (first call only)
         if not hasattr(self, '_logged_global_state'):
             print("\n" + "=" * 80)
-            print("GLOBAL STATE DIAGNOSTIC (First Step) - Velocity Task")
+            print("GLOBAL STATE DIAGNOSTIC (First Step) - Velocity Task (Box-centered, 18 dims)")
             print("=" * 80)
             print(f"Global state shape: {global_state_np.shape}")
-            print(f"Expected: [{self.n_envs}, 11] for 2 agents")
-            print(f"\nEnvironment 0 global state (11 dims):")
-            print(f"  cmd: cos={global_state_np[0,0]:.3f}, sin={global_state_np[0,1]:.3f}, speed={global_state_np[0,2]:.3f}")
-            print(f"  box_vel: vx={global_state_np[0,3]:.3f}, vy={global_state_np[0,4]:.3f}, ang_z={global_state_np[0,5]:.3f}")
-            print(f"  agent0_rel: x={global_state_np[0,6]:.3f}, y={global_state_np[0,7]:.3f}")
-            print(f"  agent1_rel: x={global_state_np[0,8]:.3f}, y={global_state_np[0,9]:.3f}")
-            print(f"  inter_agent_dist: {global_state_np[0,10]:.3f}")
+            print(f"Expected: [{self.n_envs}, 18] for 2 agents")
+            print(f"\nEnvironment 0 global state (18 dims):")
+            print(f"  cmd (box frame):     cos={global_state_np[0,0]:.3f}, sin={global_state_np[0,1]:.3f}, speed={global_state_np[0,2]:.3f}")
+            print(f"  box dynamics (box):  vx={global_state_np[0,3]:.3f}, vy={global_state_np[0,4]:.3f}, ωz={global_state_np[0,5]:.3f}")
+            print(f"  agent0 (box frame):  dx={global_state_np[0,6]:.3f}, dy={global_state_np[0,7]:.3f}, dyaw={global_state_np[0,8]:.3f}, vx={global_state_np[0,9]:.3f}, vy={global_state_np[0,10]:.3f}")
+            print(f"  agent1 (box frame):  dx={global_state_np[0,11]:.3f}, dy={global_state_np[0,12]:.3f}, dyaw={global_state_np[0,13]:.3f}, vx={global_state_np[0,14]:.3f}, vy={global_state_np[0,15]:.3f}")
+            print(f"  vel error (box):     err_vx={global_state_np[0,16]:.3f}, err_vy={global_state_np[0,17]:.3f}")
             print("=" * 80 + "\n")
             self._logged_global_state = True
 

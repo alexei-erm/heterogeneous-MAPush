@@ -120,7 +120,7 @@ def train(args):
             print("*******************************************************************************************************")
 
         # initilize callback
-        callback=CheckpointCallback(save_freq=20000, save_path= run_dir + "/checkpoints", name_prefix="rl_model", save_replay_buffer=False, verbose=2)
+        callback=CheckpointCallback(save_freq=10000000, save_path= run_dir + "/checkpoints", name_prefix="rl_model", save_replay_buffer=False, verbose=2)
         agent.train(
             total_time_steps=args.train_timesteps,
             logger=logger,

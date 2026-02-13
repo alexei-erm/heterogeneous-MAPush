@@ -4,18 +4,22 @@ Task: Push box in a commanded direction at a commanded speed for the full episod
 Cooperation mechanism: Angular velocity penalty makes single-agent torque costly,
 while two agents from complementary positions cancel torques.
 
-Observation space (9 dims for 2 agents):
-    [cos_theta_local, sin_theta_local, speed,       # velocity command in agent's local frame
-     box_x, box_y, box_yaw,                         # box relative to agent (egocentric)
-     other_x, other_y, other_yaw]                    # other agent relative to this agent
+Observation space (16 dims for 2 agents, agent-centric):
+    cmd(3):       [cos_theta_local, sin_theta_local, cmd_speed]
+    box_pos(3):   [box_dx, box_dy, box_dyaw]           — box position relative to agent
+    box_vel(3):   [box_vx_local, box_vy_local, box_wz]  — box velocity in agent frame + angular vel
+    self_vel(2):  [self_vx, self_vy]                     — agent's own velocity in agent frame
+    other_pos(3): [other_dx, other_dy, other_dyaw]       — other agent relative to this agent
+    other_vel(2): [other_vx_local, other_vy_local]       — other agent velocity in agent frame
 
 Reward terms (all team rewards):
     1. velocity_tracking_reward   — cosine_similarity(box_vel, desired_vel) * exp(-|speed_error|)
     2. angular_velocity_penalty   — -|box_angular_vel_z| (COOPERATION KEY)
-    3. approach_reward            — -(distance_to_box + 0.5)^2 per agent, averaged
-    4. collision_punishment       — 1/(0.02 + agent_dist/3)
-    5. push_reward                — reward when box is moving
-    6. exception_punishment       — NaN/physics failure penalty
+    3. velocity_ocb_reward        — positioning: be on push side of box (continuous, averaged)
+    4. approach_reward            — -(distance_to_box + 0.5)^2 per agent, averaged
+    5. collision_punishment       — 1/(0.02 + agent_dist/3)
+    6. push_reward                — reward when box is moving
+    7. exception_punishment       — NaN/physics failure penalty
 """
 import gym
 from gym import spaces
@@ -49,8 +53,10 @@ class Go1PushVelWrapper(EmptyWrapper):
             self.num_envs, self.num_agents, 1
         )
 
-        # Observation space: 3 (vel cmd) + 3 (box) + 3*(num_agents-1) (other agents) = 9 for 2 agents
-        obs_dim = 3 + 3 * self.num_agents
+        # Observation space: 3(cmd) + 3(box pos) + 3(box vel+wz) + 2(self vel)
+        #   + (num_agents-1) * [3(other pos) + 2(other vel)]
+        # = 3 + 3 + 3 + 2 + (A-1)*5 = 11 + 5*(A-1) = 16 for 2 agents
+        obs_dim = 11 + 5 * (self.num_agents - 1)
         self.observation_space = spaces.Box(
             low=-float("inf"), high=float("inf"), shape=(obs_dim,), dtype=float
         )
@@ -73,6 +79,7 @@ class Go1PushVelWrapper(EmptyWrapper):
         # Reward scales
         self.velocity_tracking_scale = self.cfg.rewards.scales.velocity_tracking_scale
         self.angular_velocity_penalty_scale = self.cfg.rewards.scales.angular_velocity_penalty_scale
+        self.velocity_ocb_scale = self.cfg.rewards.scales.velocity_ocb_scale
         self.approach_reward_scale = self.cfg.rewards.scales.approach_reward_scale
         self.collision_punishment_scale = self.cfg.rewards.scales.collision_punishment_scale
         self.push_reward_scale = self.cfg.rewards.scales.push_reward_scale
@@ -82,6 +89,7 @@ class Go1PushVelWrapper(EmptyWrapper):
         self.reward_buffer = {
             "velocity_tracking_reward": 0,
             "angular_velocity_penalty": 0,
+            "velocity_ocb_reward": 0,
             "approach_to_box_reward": 0,
             "collision_punishment": 0,
             "push_reward": 0,
@@ -100,6 +108,7 @@ class Go1PushVelWrapper(EmptyWrapper):
         print(f"  Obs dim: {obs_dim}")
         print(f"  Reward scales: vel_track={self.velocity_tracking_scale}, "
               f"ang_vel_pen={self.angular_velocity_penalty_scale}, "
+              f"vel_ocb={self.velocity_ocb_scale}, "
               f"approach={self.approach_reward_scale}, "
               f"collision={self.collision_punishment_scale}, "
               f"push={self.push_reward_scale}, "
@@ -129,125 +138,183 @@ class Go1PushVelWrapper(EmptyWrapper):
         """Reposition the target NPC (index 1) to act as direction arrow.
 
         Places the target marker at box_pos + [cos(theta), sin(theta)] * arrow_offset
-        in world frame, using set_actor_root_state_tensor_indexed for efficiency.
+        in world frame.
+
+        IMPORTANT: In Isaac Gym GPU pipeline, set_actor_root_state_tensor_indexed
+        is buffered — a second call before simulate() REPLACES the first. Since
+        _reset_root_states() may have just queued state for ALL actors, we must
+        push ALL actors here too (not just the target), preserving the pending
+        reset state for box and agents while adding our target update.
         """
-        npc_states = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)
+        env_ids = torch.arange(self.num_envs, device=self.device)
 
-        # Box position in world frame (root_states_npc includes env_origins)
-        box_pos_world = npc_states[:, 0, :3].clone()  # (num_envs, 3)
+        # Read box position from all_root_states (live view into physics engine)
+        box_actor_ids = self.env.npc_indices[env_ids, 0].long()  # box = NPC index 0
+        box_pos_world = self.env.all_root_states[box_actor_ids, :3].clone()
 
-        # Arrow position: box + offset in commanded direction
-        arrow_x = box_pos_world[:, 0] + torch.cos(self.cmd_direction) * self.arrow_offset
-        arrow_y = box_pos_world[:, 1] + torch.sin(self.cmd_direction) * self.arrow_offset
+        # Arrow distance scales with commanded speed (faster = farther from box)
+        speed_scaled_offset = self.arrow_offset * (self.cmd_speed / self.speed_range[1])
+
+        # Arrow position: box + speed-scaled offset in commanded direction
+        arrow_x = box_pos_world[:, 0] + torch.cos(self.cmd_direction) * speed_scaled_offset
+        arrow_y = box_pos_world[:, 1] + torch.sin(self.cmd_direction) * speed_scaled_offset
         arrow_z = box_pos_world[:, 2]  # Same height as box
 
-        # Update target NPC (index 1) position in root_states_npc
-        npc_states[:, 1, 0] = arrow_x
-        npc_states[:, 1, 1] = arrow_y
-        npc_states[:, 1, 2] = arrow_z
-        self.root_states_npc[:] = npc_states.reshape(-1, 13)
+        # Quaternion to rotate arrow to point in cmd_direction (rotation around Z)
+        # Isaac Gym quaternion format: [x, y, z, w]
+        half_angle = self.cmd_direction * 0.5
+        qx = torch.zeros_like(self.cmd_direction)
+        qy = torch.zeros_like(self.cmd_direction)
+        qz = torch.sin(half_angle)
+        qw = torch.cos(half_angle)
 
-        # Write ONLY target NPC (index 1) state back to all_root_states
-        env_ids = torch.arange(self.num_envs, device=self.device)
-        target_npc_ids = self.env.env_npc_indices[env_ids, 1]  # target NPC flat indices
-        target_states = npc_states[:, 1, :]  # (num_envs, 13)
-        self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 1, :] = target_states
+        # Update target state in all_root_states
+        target_actor_ids = self.env.npc_indices[env_ids, 1].long()  # target = NPC index 1
+        self.env.all_root_states[target_actor_ids, 0] = arrow_x
+        self.env.all_root_states[target_actor_ids, 1] = arrow_y
+        self.env.all_root_states[target_actor_ids, 2] = arrow_z
+        self.env.all_root_states[target_actor_ids, 3] = qx
+        self.env.all_root_states[target_actor_ids, 4] = qy
+        self.env.all_root_states[target_actor_ids, 5] = qz
+        self.env.all_root_states[target_actor_ids, 6] = qw
+        self.env.all_root_states[target_actor_ids, 7:13] = 0  # Zero velocities
 
-        # Update all_root_states at the target actor positions
-        target_actor_ids = self.env.npc_indices[env_ids, 1]  # actor IDs in simulation
-        self.env.all_root_states[target_actor_ids.long()] = target_states
-
-        # Push to simulation
-        target_actor_ids_int32 = target_actor_ids.to(torch.int32)
+        # Push ALL actors to physics (not just target) to avoid overriding
+        # any pending reset state from _reset_root_states()
+        all_actor_ids = self.env.actor_indices[env_ids].view(-1)
         self.env.gym.set_actor_root_state_tensor_indexed(
             self.env.sim,
             gymtorch.unwrap_tensor(self.env.all_root_states),
-            gymtorch.unwrap_tensor(target_actor_ids_int32),
-            len(target_actor_ids_int32),
+            gymtorch.unwrap_tensor(all_actor_ids),
+            len(all_actor_ids),
         )
 
-    def _build_obs(self, base_pos, base_rpy):
-        """Build agent-centric observations.
+        # Also sync root_states_npc copy (used by observation/reward code)
+        npc_states = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)
+        npc_states[:, 1, 0] = arrow_x
+        npc_states[:, 1, 1] = arrow_y
+        npc_states[:, 1, 2] = arrow_z
+        npc_states[:, 1, 3] = qx
+        npc_states[:, 1, 4] = qy
+        npc_states[:, 1, 5] = qz
+        npc_states[:, 1, 6] = qw
+        npc_states[:, 1, 7:13] = 0
+        self.root_states_npc[:] = npc_states.reshape(-1, 13)
+
+    def _build_obs(self, base_pos, base_rpy, base_vel, box_lin_vel, box_ang_vel_z):
+        """Build agent-centric observations (16 dims for 2 agents).
 
         Args:
             base_pos: (num_envs*num_agents, 3) — agent positions in env frame
             base_rpy: (num_envs*num_agents, 3) — agent RPY in env frame
+            base_vel: (num_envs*num_agents, 3) — agent linear velocities in env frame
+            box_lin_vel: (num_envs, 3) — box linear velocity in env frame
+            box_ang_vel_z: (num_envs,) — box angular velocity around z-axis
 
         Returns:
             obs: (num_envs, num_agents, obs_dim) tensor
+
+        Obs layout (16 dims for 2 agents):
+            cmd(3):       [cos θ_local, sin θ_local, cmd_speed]
+            box_pos(3):   [box_dx, box_dy, box_dyaw]           — agent frame
+            box_vel(3):   [box_vx_local, box_vy_local, box_ωz] — agent frame + angular vel
+            self_vel(2):  [self_vx, self_vy]                    — agent frame
+            other_pos(3): [other_dx, other_dy, other_dyaw]      — agent frame
+            other_vel(2): [other_vx_local, other_vy_local]      — agent frame
         """
-        # Get box state in env frame
-        npc_pos = self.root_states_npc[:, :3].reshape(self.num_envs, self.num_npcs, -1)
-        box_pos = npc_pos[:, 0, :] - self.env.env_origins  # (num_envs, 3)
-        box_quat = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 0, 3:7]
-        box_rpy = torch.stack(get_euler_xyz(box_quat), dim=1)  # (num_envs, 3)
+        N, A = self.num_envs, self.num_agents
 
-        # Expand to per-agent
-        box_pos_exp = box_pos.repeat_interleave(self.num_agents, dim=0)  # (N*A, 3)
-        box_rpy_exp = box_rpy.repeat_interleave(self.num_agents, dim=0)  # (N*A, 3)
+        # --- Reshape agent data ---
+        base_pos_r = base_pos.reshape(N, A, 3)
+        base_rpy_r = base_rpy.reshape(N, A, 3)
+        base_vel_r = base_vel.reshape(N, A, 3)
+        agent_yaw = base_rpy_r[:, :, 2]  # (N, A)
+        neg_yaw = -agent_yaw
+        cos_y = torch.cos(neg_yaw)  # (N, A)
+        sin_y = torch.sin(neg_yaw)  # (N, A)
 
-        # Rotate box position to agent's local frame
-        neg_yaw = -base_rpy[:, 2]
-        cos_y = torch.cos(neg_yaw)
-        sin_y = torch.sin(neg_yaw)
+        # --- Get box state in env frame ---
+        npc_pos = self.root_states_npc[:, :3].reshape(N, self.num_npcs, -1)
+        box_pos = npc_pos[:, 0, :] - self.env.env_origins  # (N, 3)
+        box_quat = self.root_states_npc.reshape(N, self.num_npcs, -1)[:, 0, 3:7]
+        box_rpy = torch.stack(get_euler_xyz(box_quat), dim=1)  # (N, 3)
 
-        dx = box_pos_exp[:, 0] - base_pos[:, 0]
-        dy = box_pos_exp[:, 1] - base_pos[:, 1]
+        # --- 1. Velocity command in agent's local frame (3 dims) ---
+        cmd_dir_exp = self.cmd_direction.unsqueeze(1).expand(-1, A)  # (N, A)
+        local_dir = cmd_dir_exp - agent_yaw
+        cmd_speed_exp = self.cmd_speed.unsqueeze(1).expand(-1, A)  # (N, A)
+
+        vel_cmd = torch.stack([
+            torch.cos(local_dir),
+            torch.sin(local_dir),
+            cmd_speed_exp,
+        ], dim=2)  # (N, A, 3)
+
+        # --- 2. Box position relative to agent in agent's frame (3 dims) ---
+        box_pos_xy_exp = box_pos[:, :2].unsqueeze(1).expand(-1, A, -1)  # (N, A, 2)
+        dx = box_pos_xy_exp[:, :, 0] - base_pos_r[:, :, 0]  # (N, A)
+        dy = box_pos_xy_exp[:, :, 1] - base_pos_r[:, :, 1]  # (N, A)
 
         rotated_box_x = dx * cos_y - dy * sin_y
         rotated_box_y = dx * sin_y + dy * cos_y
-        rotated_box_yaw = normalize_angle(box_rpy_exp[:, 2] - base_rpy[:, 2])
+        box_yaw_exp = box_rpy[:, 2].unsqueeze(1).expand(-1, A)  # (N, A)
+        rotated_box_yaw = normalize_angle(box_yaw_exp - agent_yaw)
 
-        # Reshape to (num_envs, num_agents, 3)
-        rotated_box = torch.stack([rotated_box_x, rotated_box_y, rotated_box_yaw], dim=1)
-        rotated_box = rotated_box.reshape(self.num_envs, self.num_agents, 3)
+        box_pos_obs = torch.stack([rotated_box_x, rotated_box_y, rotated_box_yaw], dim=2)  # (N, A, 3)
 
-        # Velocity command in agent's local frame
-        # cmd_direction is in world frame, rotate to each agent's local frame
-        base_rpy_reshaped = base_rpy.reshape(self.num_envs, self.num_agents, 3)
-        agent_yaw = base_rpy_reshaped[:, :, 2]  # (num_envs, num_agents)
-        cmd_dir_exp = self.cmd_direction.unsqueeze(1).repeat(1, self.num_agents)  # (N, A)
-        local_dir = cmd_dir_exp - agent_yaw  # direction in agent's local frame
+        # --- 3. Box velocity in agent's frame + angular velocity (3 dims) ---
+        box_vx_exp = box_lin_vel[:, 0].unsqueeze(1).expand(-1, A)  # (N, A)
+        box_vy_exp = box_lin_vel[:, 1].unsqueeze(1).expand(-1, A)  # (N, A)
 
-        cmd_speed_exp = self.cmd_speed.unsqueeze(1).repeat(1, self.num_agents)  # (N, A)
+        rotated_box_vx = box_vx_exp * cos_y - box_vy_exp * sin_y  # (N, A)
+        rotated_box_vy = box_vx_exp * sin_y + box_vy_exp * cos_y  # (N, A)
+        box_wz_exp = box_ang_vel_z.unsqueeze(1).expand(-1, A)  # (N, A)
 
-        vel_cmd = torch.stack([
-            torch.cos(local_dir),   # cos(theta_local)
-            torch.sin(local_dir),   # sin(theta_local)
-            cmd_speed_exp,          # speed
-        ], dim=2)  # (num_envs, num_agents, 3)
+        box_vel_obs = torch.stack([rotated_box_vx, rotated_box_vy, box_wz_exp], dim=2)  # (N, A, 3)
 
-        # Other agents relative to this agent (egocentric)
-        base_pos_r = base_pos.reshape(self.num_envs, self.num_agents, 3)
-        base_rpy_r = base_rpy.reshape(self.num_envs, self.num_agents, 3)
-        base_info = torch.cat([base_pos_r, base_rpy_r], dim=2)  # (N, A, 6)
+        # --- 4. Self velocity in agent's frame (2 dims) ---
+        self_vx_world = base_vel_r[:, :, 0]  # (N, A)
+        self_vy_world = base_vel_r[:, :, 1]  # (N, A)
 
+        self_vx_local = self_vx_world * cos_y - self_vy_world * sin_y  # (N, A)
+        self_vy_local = self_vx_world * sin_y + self_vy_world * cos_y  # (N, A)
+
+        self_vel_obs = torch.stack([self_vx_local, self_vy_local], dim=2)  # (N, A, 2)
+
+        # --- 5. Other agents: position (3 dims) + velocity (2 dims) each ---
         all_other_info = []
-        for i in range(1, self.num_agents):
-            other = deepcopy(torch.roll(base_info, i, dims=1))
+        for i in range(1, A):
+            other_idx = torch.roll(torch.arange(A, device=self.device), -i)
 
-            o_dx = other[:, :, 0] - base_pos_r[:, :, 0]
-            o_dy = other[:, :, 1] - base_pos_r[:, :, 1]
-            neg_yaw_r = -base_rpy_r[:, :, 2]
-            cos_yr = torch.cos(neg_yaw_r)
-            sin_yr = torch.sin(neg_yaw_r)
+            # Other agent positions (rolled)
+            other_pos = base_pos_r[:, other_idx, :]  # (N, A, 3)
+            other_rpy = base_rpy_r[:, other_idx, :]  # (N, A, 3)
+            other_vel = base_vel_r[:, other_idx, :]  # (N, A, 3)
 
-            rot_ox = o_dx * cos_yr - o_dy * sin_yr
-            rot_oy = o_dx * sin_yr + o_dy * cos_yr
-            rot_oyaw = normalize_angle(other[:, :, 5] - base_rpy_r[:, :, 2])
+            # Position: rotate to ego frame
+            o_dx = other_pos[:, :, 0] - base_pos_r[:, :, 0]  # (N, A)
+            o_dy = other_pos[:, :, 1] - base_pos_r[:, :, 1]  # (N, A)
 
-            other_info = torch.stack([rot_ox, rot_oy, rot_oyaw], dim=2)  # (N, A, 3)
+            rot_ox = o_dx * cos_y - o_dy * sin_y
+            rot_oy = o_dx * sin_y + o_dy * cos_y
+            rot_oyaw = normalize_angle(other_rpy[:, :, 2] - agent_yaw)
+
+            # Velocity: rotate to ego frame
+            o_vx = other_vel[:, :, 0]  # (N, A)
+            o_vy = other_vel[:, :, 1]  # (N, A)
+            rot_ovx = o_vx * cos_y - o_vy * sin_y
+            rot_ovy = o_vx * sin_y + o_vy * cos_y
+
+            other_info = torch.stack([rot_ox, rot_oy, rot_oyaw, rot_ovx, rot_ovy], dim=2)  # (N, A, 5)
             all_other_info.append(other_info)
 
         if all_other_info:
-            all_other_info = torch.cat(all_other_info, dim=2)  # (N, A, 3*(A-1))
+            all_other_info = torch.cat(all_other_info, dim=2)  # (N, A, 5*(A-1))
         else:
-            all_other_info = torch.zeros(
-                self.num_envs, self.num_agents, 0, device=self.device
-            )
+            all_other_info = torch.zeros(N, A, 0, device=self.device)
 
-        # Concatenate: [vel_cmd(3), box(3), others(3*(A-1))]
-        obs = torch.cat([vel_cmd, rotated_box, all_other_info], dim=2)
+        # --- Concatenate: [cmd(3), box_pos(3), box_vel(3), self_vel(2), others(5*(A-1))] ---
+        obs = torch.cat([vel_cmd, box_pos_obs, box_vel_obs, self_vel_obs, all_other_info], dim=2)
 
         return obs
 
@@ -259,13 +326,18 @@ class Go1PushVelWrapper(EmptyWrapper):
         all_ids = torch.arange(self.num_envs, device=self.device)
         self._sample_velocity_commands(all_ids)
 
-        # Update arrow marker to reflect new commands
+        # Update arrow marker — this now pushes ALL actors (not just target)
+        # to avoid overriding pending reset state in Isaac Gym GPU pipeline
         self._update_arrow_marker()
 
-        # Build observations
+        # Build observations — velocities are zero on first step after reset
         base_pos = deepcopy(obs_buf.base_pos)
         base_rpy = deepcopy(obs_buf.base_rpy)
-        obs = self._build_obs(base_pos, base_rpy)
+        base_vel = torch.zeros_like(obs_buf.base_pos)  # (N*A, 3) zeros
+        box_lin_vel = torch.zeros(self.num_envs, 3, device=self.device)
+        box_ang_vel_z = torch.zeros(self.num_envs, device=self.device)
+
+        obs = self._build_obs(base_pos, base_rpy, base_vel, box_lin_vel, box_ang_vel_z)
 
         return obs
 
@@ -299,8 +371,17 @@ class Go1PushVelWrapper(EmptyWrapper):
         base_rpy = deepcopy(obs_buf.base_rpy)
         base_vel = deepcopy(obs_buf.lin_vel)
 
+        # Get box velocity from NPC root states (before NaN cleaning)
+        npc_full = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)
+        box_lin_vel_raw = npc_full[:, 0, 7:10].clone()   # (num_envs, 3)
+        box_ang_vel_raw = npc_full[:, 0, 10:13].clone()  # (num_envs, 3)
+        box_lin_vel_raw[torch.isnan(box_lin_vel_raw)] = 0
+        box_lin_vel_raw[torch.isinf(box_lin_vel_raw)] = 0
+        box_ang_vel_raw[torch.isnan(box_ang_vel_raw)] = 0
+        box_ang_vel_raw[torch.isinf(box_ang_vel_raw)] = 0
+
         # Build observation
-        obs = self._build_obs(base_pos, base_rpy)
+        obs = self._build_obs(base_pos, base_rpy, base_vel, box_lin_vel_raw, box_ang_vel_raw[:, 2])
 
         # --- NaN/Inf detection ---
         obs_nan_mask = (
@@ -341,16 +422,9 @@ class Go1PushVelWrapper(EmptyWrapper):
         self.reward_buffer["step_count"] += 1
         reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
 
-        # Get box velocity and angular velocity from root_states_npc
-        npc_full = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)
-        box_lin_vel = npc_full[:, 0, 7:10]   # (num_envs, 3) — linear velocity
-        box_ang_vel = npc_full[:, 0, 10:13]  # (num_envs, 3) — angular velocity
-
-        # Clean NaN
-        box_lin_vel[torch.isnan(box_lin_vel)] = 0
-        box_lin_vel[torch.isinf(box_lin_vel)] = 0
-        box_ang_vel[torch.isnan(box_ang_vel)] = 0
-        box_ang_vel[torch.isinf(box_ang_vel)] = 0
+        # Reuse box velocity already extracted above (cleaned of NaN/Inf)
+        box_lin_vel = box_lin_vel_raw   # (num_envs, 3) — linear velocity
+        box_ang_vel = box_ang_vel_raw   # (num_envs, 3) — angular velocity
 
         # --- 1. Velocity tracking reward (PRIMARY) ---
         if self.velocity_tracking_scale != 0:
@@ -408,7 +482,35 @@ class Go1PushVelWrapper(EmptyWrapper):
                 torch.mean(box_ang_vel_z).cpu().item()
             )
 
-        # --- 3. Approach reward (approach to box) ---
+        # --- 3. Velocity OCB reward (positioning: be on push side of box) ---
+        if self.velocity_ocb_scale != 0:
+            # Push direction in world frame (unit vector)
+            push_dir = torch.stack([
+                torch.cos(self.cmd_direction),
+                torch.sin(self.cmd_direction),
+            ], dim=1)  # (N, 2)
+
+            # For each agent: dot(agent_pos - box_pos, push_dir)
+            # Negative dot = agent is behind box (correct push side) → raw_ocb < 0
+            # We negate so positive = correct side
+            total_ocb = torch.zeros(self.num_envs, device=self.device)
+            for i in range(self.num_agents):
+                agent_to_box = base_pos_r[:, i, :2] - box_pos[:, :2]  # (N, 2)
+                raw_dot = torch.sum(agent_to_box * push_dir, dim=1)   # (N,)
+                # raw_dot < 0 means agent is behind box (good) → negate for positive reward
+                ocb_i = -raw_dot * self.velocity_ocb_scale
+                total_ocb += ocb_i
+
+            # Average across agents (continuous, teamified)
+            total_ocb = total_ocb / self.num_agents
+
+            reward[:, :] += total_ocb.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["velocity_ocb_reward"] += (
+                torch.sum(total_ocb).cpu().item()
+            )
+
+        # --- 4. Approach reward (approach to box) ---
+        # (renumbered: was #3 before OCB insertion)
         if self.approach_reward_scale != 0:
             total_approach = torch.zeros(self.num_envs, device=self.device)
             for i in range(self.num_agents):

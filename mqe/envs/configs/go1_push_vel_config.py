@@ -14,6 +14,26 @@ class Go1PushVelCfg(Go1PushMidCfg):
     while two agents from complementary positions achieve clean linear motion.
     """
 
+    class asset(Go1PushMidCfg.asset):
+        """Override box mass — 8kg is lighter and easier to push for faster learning.
+        Override target NPC to use arrow marker URDF (green elongated box) instead
+        of the red circle. Unfix base link so we can reposition + rotate it each
+        step, and disable gravity so it floats in place."""
+        npc_mass_override = 8
+        _file_npc = "{LEGGED_GYM_ROOT_DIR}/resources/objects/arrow.urdf"
+        _fix_npc_base_link = False  # Allow teleporting target NPC (arrow marker)
+        _npc_gravity = False        # Prevent target NPC from falling
+
+    class termination(Go1PushMidCfg.termination):
+        """Override termination: remove z_wave since arrow marker (target NPC)
+        gets repositioned each step, which would always trigger z_wave."""
+        termination_terms = [
+            "roll",
+            "pitch",
+            # "z_wave",  — REMOVED: arrow marker repositioning triggers false z_wave on target NPC
+            "collision",
+        ]
+
     class velocity_command:
         """Velocity command parameters sampled per episode."""
         speed_range = [0.3, 1.0]        # [min, max] m/s commanded speed
@@ -45,7 +65,7 @@ class Go1PushVelCfg(Go1PushMidCfg):
         ]
         general_dist = False
         yaw_active = True
-        THRESHOLD = 99999.0  # Effectively disables finished_buf (box never "reaches" target)
+        THRESHOLD = -1.0  # Negative → distance is never < -1 → finished_buf always False
         # NOTE: No check_setting validation — all four goal modes are False by design
 
     class rewards(Go1PushMidCfg.rewards):
@@ -54,10 +74,11 @@ class Go1PushVelCfg(Go1PushMidCfg):
             # Velocity-specific rewards
             velocity_tracking_scale = 0.01
             angular_velocity_penalty_scale = -0.005
+            velocity_ocb_scale = 0.004          # Positioning: be on push side of box
 
             # Reuse from mid task
             approach_reward_scale = 0.00075
-            collision_punishment_scale = -0.0025
+            collision_punishment_scale = -0.001  # Lightened (was -0.0025)
             push_reward_scale = 0.0015
             exception_punishment_scale = -5
 

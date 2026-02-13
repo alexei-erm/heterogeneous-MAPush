@@ -99,7 +99,7 @@ class mqe_openrl_wrapper(gym.Wrapper):
         for k in self.env.reward_buffer.keys():
             if k == "step_count":
                 continue
-            reward_dict[k] = self.env.reward_buffer[k] / (self.num_envs * step_count)
+            reward_dict[k] = self.env.reward_buffer[k] / (self.env.num_envs * step_count)
             if hasattr(self.env, "single_agent_reward_scale"):
                 reward_dict[k] *= self.env.single_agent_reward_scale
             if "reward" in k or "punishment" in k:
