@@ -7,12 +7,14 @@ from mqe.envs.npc.go1_object import Go1Object
 from mqe.envs.field.legged_robot_field_config import LeggedRobotFieldCfg
 from mqe.envs.configs.go1_push_mid_config import Go1PushMidCfg
 from mqe.envs.configs.go1_push_upper_config import Go1PushUpperCfg
+from mqe.envs.configs.go1_push_vel_config import Go1PushVelCfg
 
 
 # wrappers
 from mqe.envs.wrappers.empty_wrapper import EmptyWrapper
 from mqe.envs.wrappers.go1_push_mid_wrapper import Go1PushMidWrapper
 from mqe.envs.wrappers.go1_push_upper_wrapper import Go1PushUpperWrapper
+from mqe.envs.wrappers.go1_push_vel_wrapper import Go1PushVelWrapper
 
 from mqe.utils import make_env
 
@@ -28,6 +30,11 @@ ENV_DICT = {
         "class": Go1Object,
         "config": Go1PushUpperCfg,
         "wrapper": Go1PushUpperWrapper
+    },
+    "go1push_vel": {
+        "class": Go1Object,
+        "config": Go1PushVelCfg,
+        "wrapper": Go1PushVelWrapper
     },
 }
 
@@ -207,7 +214,7 @@ def _merge_configs_for_homogeneous(base_config, robot_config_class, robot_type):
 
     return MergedConfig
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False, vel_speed_min=None, vel_speed_max=None, vel_tracking_scale=None, vel_angular_penalty_scale=None):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -292,6 +299,17 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
         # COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents are in contact
         if require_both_contact_for_success and hasattr(cfg, 'rewards'):
             cfg.rewards.require_both_contact_for_success = True
+
+        # Velocity task overrides
+        if hasattr(cfg, 'velocity_command'):
+            if vel_speed_min is not None:
+                cfg.velocity_command.speed_range[0] = vel_speed_min
+            if vel_speed_max is not None:
+                cfg.velocity_command.speed_range[1] = vel_speed_max
+            if vel_tracking_scale is not None and hasattr(cfg, 'rewards'):
+                cfg.rewards.scales.velocity_tracking_scale = vel_tracking_scale
+            if vel_angular_penalty_scale is not None and hasattr(cfg, 'rewards'):
+                cfg.rewards.scales.angular_velocity_penalty_scale = vel_angular_penalty_scale
 
         return cfg
 

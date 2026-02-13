@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--exp_name", type=str, default="cuboid_happo",
                        help="Experiment name")
     parser.add_argument("--task", type=str, default="go1push_mid",
-                       choices=["go1push_mid"],
+                       choices=["go1push_mid", "go1push_vel"],
                        help="MAPush task variant")
     parser.add_argument("--individualized_rewards", action="store_true", default=False,
                        help="Enable individualized rewards for HAPPO (prevents freeloading)")
@@ -65,6 +65,15 @@ def main():
                        help="Robot type for agent 0. Options: go1, anymal_c. DEFAULT: go1")
     parser.add_argument("--agent1", type=str, default="go1",
                        help="Robot type for agent 1. Options: go1, anymal_c. DEFAULT: go1")
+    # Velocity task arguments
+    parser.add_argument("--vel_speed_min", type=float, default=None,
+                       help="Velocity task: minimum commanded speed (m/s). DEFAULT: config value (0.3)")
+    parser.add_argument("--vel_speed_max", type=float, default=None,
+                       help="Velocity task: maximum commanded speed (m/s). DEFAULT: config value (1.0)")
+    parser.add_argument("--vel_tracking_scale", type=float, default=None,
+                       help="Velocity task: velocity tracking reward scale. DEFAULT: config value (0.01)")
+    parser.add_argument("--vel_angular_penalty_scale", type=float, default=None,
+                       help="Velocity task: angular velocity penalty scale. DEFAULT: config value (-0.005)")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -116,6 +125,12 @@ def main():
     use_positive_approach = args.get("positive_approachtobox_reward", False)
     use_require_both_contact = args.get("require_both_contact_for_success", False)
 
+    # Velocity task parameters
+    vel_speed_min = args.get("vel_speed_min", None)
+    vel_speed_max = args.get("vel_speed_max", None)
+    vel_tracking_scale = args.get("vel_tracking_scale", None)
+    vel_angular_penalty_scale = args.get("vel_angular_penalty_scale", None)
+
     # Agent types for heterogeneous training
     agent0 = args.get("agent0", "go1")
     agent1 = args.get("agent1", "go1")
@@ -141,6 +156,11 @@ def main():
         "agent0": agent0,  # Robot type for agent 0
         "agent1": agent1,  # Robot type for agent 1
         "require_both_contact_for_success": use_require_both_contact,  # COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents in contact
+        # Velocity task parameters
+        "vel_speed_min": vel_speed_min,
+        "vel_speed_max": vel_speed_max,
+        "vel_tracking_scale": vel_tracking_scale,
+        "vel_angular_penalty_scale": vel_angular_penalty_scale,
     }
 
     # Override training parameters only if specified on command line
@@ -178,6 +198,14 @@ def main():
         print(f"  → 7 rewards: reach_target, distance_to_target, approach_to_box (avg),")
         print(f"               collision (-0.0025), push, ocb (±0.004), exception")
         print(f"  → Disabled: goal_push_bonus, proximity_penalty")
+    if env_args['task'] == 'go1push_vel':
+        print(f"Task type: VELOCITY (push box in commanded direction/speed)")
+        if vel_speed_min is not None or vel_speed_max is not None:
+            print(f"  Speed range override: [{vel_speed_min}, {vel_speed_max}]")
+        if vel_tracking_scale is not None:
+            print(f"  Tracking scale override: {vel_tracking_scale}")
+        if vel_angular_penalty_scale is not None:
+            print(f"  Angular penalty scale override: {vel_angular_penalty_scale}")
     print(f"Seed: {algo_args['seed']['seed']}")
     print(f"Parallel envs: {algo_args['train']['n_rollout_threads']}")
     print(f"Total steps: {algo_args['train']['num_env_steps']:,}")

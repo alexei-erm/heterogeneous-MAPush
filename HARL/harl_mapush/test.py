@@ -198,18 +198,43 @@ def test_calculator_mode(actors, env, num_episodes, seed):
     print(f"\n{'='*70}")
     print(f"Statistics Summary (over {stats['num_episodes']} episodes)")
     print(f"{'='*70}")
-    print(f"  Success Rate:         {stats['success_rate']:.4f} ({stats['success_rate']*100:.2f}%)")
-    print(f"                        [{stats['num_success']}/{stats['num_episodes']} episodes succeeded]")
-    print(f"\n  Episode Metrics (high-level task only):")
-    print(f"    Avg Episode Length:   {stats['avg_episode_length']:.1f} steps ({avg_time:.2f}s)")
-    print(f"    Collision Rate:       {stats['collision_rate']:.4f}")
-    print(f"    Collaboration Degree: {stats['collaboration_degree']:.4f}")
+
+    # Check if this is a velocity task
+    is_vel_task = getattr(env, 'is_velocity_task', False)
+    if is_vel_task:
+        # Velocity task metrics
+        # Get reward_buffer from wrapper for velocity-specific metrics
+        wrapper = env.env
+        rb = wrapper.reward_buffer
+        sc = rb["step_count"] if rb["step_count"] > 0 else 1
+
+        avg_dir_err = rb["avg_direction_error"] / sc
+        avg_spd_err = rb["avg_speed_error"] / sc
+        avg_ang_vel = rb["avg_box_angular_vel"] / sc
+        avg_vel_track = rb["velocity_tracking_reward"] / (sc * env.n_envs)
+        avg_ang_pen = rb["angular_velocity_penalty"] / (sc * env.n_envs)
+
+        print(f"  Task: Velocity-MAPush (no success/failure metric)")
+        print(f"\n  Velocity Metrics (averaged over {sc} steps):")
+        print(f"    Avg Direction Error:     {avg_dir_err:.4f} rad ({np.degrees(avg_dir_err):.2f} deg)")
+        print(f"    Avg Speed Error:         {avg_spd_err:.4f} m/s")
+        print(f"    Avg Box Angular Vel:     {avg_ang_vel:.4f} rad/s")
+        print(f"    Avg Velocity Track Rwd:  {avg_vel_track:.6f}")
+        print(f"    Avg Angular Vel Penalty: {avg_ang_pen:.6f}")
+    else:
+        print(f"  Success Rate:         {stats['success_rate']:.4f} ({stats['success_rate']*100:.2f}%)")
+        print(f"                        [{stats['num_success']}/{stats['num_episodes']} episodes succeeded]")
+        print(f"\n  Episode Metrics (high-level task only):")
+        print(f"    Avg Episode Length:   {stats['avg_episode_length']:.1f} steps ({avg_time:.2f}s)")
+        print(f"    Collision Rate:       {stats['collision_rate']:.4f}")
+        print(f"    Collaboration Degree: {stats['collaboration_degree']:.4f}")
+
     print(f"{'='*70}\n")
 
     return stats
 
 
-def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1"):
+def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1", task="go1push_mid"):
     """Run viewer mode to visualize episodes sequentially.
 
     Args:
@@ -236,7 +261,7 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
 
     # Create args for visualization
     args = argparse.Namespace()
-    args.task = "go1push_mid"
+    args.task = task
     args.num_envs = 1
     args.seed = seed
     args.headless = False  # Enable rendering
@@ -395,6 +420,11 @@ def main():
     parser.add_argument("--num_envs", type=int, default=300,
                        help="Number of parallel environments (calculator mode only)")
 
+    # Task selection
+    parser.add_argument("--task", type=str, default="go1push_mid",
+                       choices=["go1push_mid", "go1push_vel"],
+                       help="MAPush task variant")
+
     # Other
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
@@ -487,7 +517,7 @@ def main():
             # Create multi-env environment (only once for all checkpoints)
             if idx == 0:
                 env_args = {
-                    "task": "go1push_mid",
+                    "task": args.task,
                     "n_threads": args.num_envs,
                     "headless": True,
                     "agent0": args.agent0,
@@ -524,7 +554,7 @@ def main():
                 print("This may take a long time. Consider using calculator mode instead.\n")
 
             # Run viewer mode (creates its own single-env environment)
-            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1)
+            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1, task=args.task)
 
     # Clean up
     if args.mode == "calculator":

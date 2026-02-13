@@ -54,7 +54,19 @@ def train(args):
     else:
         print(f"[MAPPO Training] Reward mode: EXTENDED (includes HAPPO-specific rewards)")
 
-    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1, baseline_mappo_rewards=baseline_mappo_rewards, mappo_heavybox_rewards=mappo_heavybox_rewards), single_agent, agent0=agent0, agent1=agent1)
+    # Velocity task parameters (from CLI)
+    vel_speed_min = getattr(args, 'vel_speed_min', None)
+    vel_speed_max = getattr(args, 'vel_speed_max', None)
+    vel_tracking_scale = getattr(args, 'vel_tracking_scale', None)
+    vel_angular_penalty_scale = getattr(args, 'vel_angular_penalty_scale', None)
+
+    # For velocity task, disable incompatible reward flags
+    if getattr(args, 'task', '') == 'go1push_vel':
+        baseline_mappo_rewards = False
+        mappo_heavybox_rewards = False
+        print(f"[MAPPO Training] Task: VELOCITY (go1push_vel)")
+
+    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1, baseline_mappo_rewards=baseline_mappo_rewards, mappo_heavybox_rewards=mappo_heavybox_rewards, vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max, vel_tracking_scale=vel_tracking_scale, vel_angular_penalty_scale=vel_angular_penalty_scale), single_agent, agent0=agent0, agent1=agent1)
     
     if args.algo == "ppo":
         # or use --config ./openrl_ws/cfgs/ppo.yaml in terminal
@@ -82,7 +94,7 @@ def train(args):
         run_dir = str(logger.run_dir)
 
         # add config to log
-        if args.task == "go1push_mid":
+        if args.task in ("go1push_mid", "go1push_vel"):
             source_folder = "./task/"+args.exp_name+"/"
             target_folder = run_dir + "/task/"
             if os.path.exists(source_folder):
@@ -118,7 +130,7 @@ def train(args):
         agent.train(total_time_steps=args.train_timesteps)
 
     # move run_folder to result folder if training mid layer
-    if args.task == "go1push_mid":
+    if args.task in ("go1push_mid", "go1push_vel"):
         source_folder = run_dir
         target_folder = "./results/"+start_time_str+"_"+args.exp_name+"/"
         shutil.copytree(source_folder, target_folder)

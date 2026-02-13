@@ -74,6 +74,12 @@ class MAPushEnv:
         positive_approachtobox_reward = env_args.get("positive_approachtobox_reward", False)
         require_both_contact_for_success = env_args.get("require_both_contact_for_success", False)
 
+        # Velocity task parameters
+        vel_speed_min = env_args.get("vel_speed_min", None)
+        vel_speed_max = env_args.get("vel_speed_max", None)
+        vel_tracking_scale = env_args.get("vel_tracking_scale", None)
+        vel_angular_penalty_scale = env_args.get("vel_angular_penalty_scale", None)
+
         if self.is_hetero:
             # Use make_hetero_env for heterogeneous agents
             from mqe.envs.utils import make_hetero_env
@@ -91,7 +97,10 @@ class MAPushEnv:
                                       collaboration_rewards=collaboration_rewards,
                                       positive_approachtobox_reward=positive_approachtobox_reward,
                                       agent0=agent0, agent1=agent1,
-                                      require_both_contact_for_success=require_both_contact_for_success)
+                                      require_both_contact_for_success=require_both_contact_for_success,
+                                      vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
+                                      vel_tracking_scale=vel_tracking_scale,
+                                      vel_angular_penalty_scale=vel_angular_penalty_scale)
             )
         else:
             # Standard homogeneous environment
@@ -106,11 +115,17 @@ class MAPushEnv:
                                       collaboration_rewards=collaboration_rewards,
                                       positive_approachtobox_reward=positive_approachtobox_reward,
                                       agent0=agent0, agent1=agent1,
-                                      require_both_contact_for_success=require_both_contact_for_success)
+                                      require_both_contact_for_success=require_both_contact_for_success,
+                                      vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
+                                      vel_tracking_scale=vel_tracking_scale,
+                                      vel_angular_penalty_scale=vel_angular_penalty_scale)
             )
 
         self.n_envs = self.env.num_envs
         self.n_agents = self.env.num_agents
+
+        # Detect velocity task
+        self.is_velocity_task = (args.task == "go1push_vel")
 
         # HARL expects list of spaces (one per agent)
         # In hetero mode, spaces are already lists; in homo mode, we need to duplicate
@@ -143,7 +158,10 @@ class MAPushEnv:
 
         # Share observation space (for centralized critic)
         from gym import spaces
-        if self.use_relative_obs_critic:
+        if self.is_velocity_task:
+            # Velocity task global state: [cmd(3), box_vel(3), agent0_rel(2), agent1_rel(2), inter_agent_dist(1)]
+            global_state_dim = 3 + 3 + 2 * self.n_agents + 1  # = 11 for 2 agents
+        elif self.use_relative_obs_critic:
             # CRITIC11: Relative observations with explicit inter-robot distance
             # Structure: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
             #
@@ -553,6 +571,80 @@ class MAPushEnv:
 
         return global_state_np
 
+    def _construct_vel_global_state(self) -> np.ndarray:
+        """Construct global state for velocity task.
+
+        Structure (11 dims for 2 agents):
+            [cos(cmd_dir), sin(cmd_dir), cmd_speed,   # velocity command (3)
+             box_vx, box_vy, box_ang_vel_z,           # box velocity (3)
+             agent0_rel_x, agent0_rel_y,              # agent0 relative to box (2)
+             agent1_rel_x, agent1_rel_y,              # agent1 relative to box (2)
+             inter_agent_dist]                         # distance between agents (1)
+
+        Returns:
+            global_state_np: [n_envs, 11] numpy array
+        """
+        wrapper = self.env
+
+        # Velocity command from wrapper
+        cmd_dir = wrapper.cmd_direction  # (n_envs,)
+        cmd_speed = wrapper.cmd_speed    # (n_envs,)
+
+        # NPC states
+        npc_states = wrapper.root_states_npc.reshape(self.n_envs, wrapper.num_npcs, -1)
+        box_pos_global = npc_states[:, 0, :3] - wrapper.env.env_origins
+        box_lin_vel = npc_states[:, 0, 7:10]   # (n_envs, 3)
+        box_ang_vel = npc_states[:, 0, 10:13]  # (n_envs, 3)
+
+        # Agent states
+        obs_buf = wrapper.env.obs_buf if hasattr(wrapper, 'env') else wrapper.obs_buf
+        base_pos = obs_buf.base_pos.reshape(self.n_envs, self.n_agents, 3)
+
+        # Build state components
+        state_list = [
+            torch.cos(cmd_dir).unsqueeze(1),          # cos(cmd_dir) (n_envs, 1)
+            torch.sin(cmd_dir).unsqueeze(1),           # sin(cmd_dir) (n_envs, 1)
+            cmd_speed.unsqueeze(1),                     # cmd_speed (n_envs, 1)
+            box_lin_vel[:, :2],                         # box vx, vy (n_envs, 2)
+            box_ang_vel[:, 2:3],                        # box angular vel z (n_envs, 1)
+        ]
+
+        # Agent positions relative to box
+        for agent_id in range(self.n_agents):
+            agent_rel = base_pos[:, agent_id, :2] - box_pos_global[:, :2]
+            state_list.append(agent_rel)  # (n_envs, 2)
+
+        # Inter-agent distance
+        inter_agent_dist = torch.norm(
+            base_pos[:, 0, :2] - base_pos[:, 1, :2], dim=1, keepdim=True
+        )
+        state_list.append(inter_agent_dist)  # (n_envs, 1)
+
+        global_state_torch = torch.cat(state_list, dim=1)
+        global_state_np = global_state_torch.cpu().numpy().astype(np.float32)
+
+        # Diagnostic logging (first call only)
+        if not hasattr(self, '_logged_global_state'):
+            print("\n" + "=" * 80)
+            print("GLOBAL STATE DIAGNOSTIC (First Step) - Velocity Task")
+            print("=" * 80)
+            print(f"Global state shape: {global_state_np.shape}")
+            print(f"Expected: [{self.n_envs}, 11] for 2 agents")
+            print(f"\nEnvironment 0 global state (11 dims):")
+            print(f"  cmd: cos={global_state_np[0,0]:.3f}, sin={global_state_np[0,1]:.3f}, speed={global_state_np[0,2]:.3f}")
+            print(f"  box_vel: vx={global_state_np[0,3]:.3f}, vy={global_state_np[0,4]:.3f}, ang_z={global_state_np[0,5]:.3f}")
+            print(f"  agent0_rel: x={global_state_np[0,6]:.3f}, y={global_state_np[0,7]:.3f}")
+            print(f"  agent1_rel: x={global_state_np[0,8]:.3f}, y={global_state_np[0,9]:.3f}")
+            print(f"  inter_agent_dist: {global_state_np[0,10]:.3f}")
+            print("=" * 80 + "\n")
+            self._logged_global_state = True
+
+        # Handle NaN/Inf
+        global_state_np[np.isnan(global_state_np)] = 0.0
+        global_state_np[np.isinf(global_state_np)] = 0.0
+
+        return global_state_np
+
     def step(self, actions: np.ndarray) -> Tuple:
         """Step the environment.
 
@@ -599,8 +691,10 @@ class MAPushEnv:
         rewards_np = rewards.cpu().numpy()  # [n_envs, n_agents]
         dones_np = dones.cpu().numpy()  # [n_envs]
 
-        # Construct global state based on critic mode
-        if self.use_relative_obs_critic:
+        # Construct global state based on task type and critic mode
+        if self.is_velocity_task:
+            global_state_np = self._construct_vel_global_state()
+        elif self.use_relative_obs_critic:
             # CRITIC11: Relative observations with inter-robot distance
             # Construct: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
             global_state_np = self._construct_relative_obs_state()
@@ -633,12 +727,15 @@ class MAPushEnv:
         # Track statistics for episodes that just finished
         for env_idx in range(self.n_envs):
             if dones_np[env_idx, 0]:  # Episode done
-                # Track success (finished_buf from wrapper)
-                success = False
-                if hasattr(self.env, 'finished_buf'):
-                    success = bool(self.env.finished_buf[env_idx].item())
-
-                self.episode_success.append(success)
+                if self.is_velocity_task:
+                    # Velocity task: no success/failure, just track episode completion
+                    self.episode_success.append(False)  # No binary success metric
+                else:
+                    # Track success (finished_buf from wrapper)
+                    success = False
+                    if hasattr(self.env, 'finished_buf'):
+                        success = bool(self.env.finished_buf[env_idx].item())
+                    self.episode_success.append(success)
 
                 # Note: Episode length, collision, and collaboration stats are not tracked
                 # for mid-level task. High-level task will implement these.
@@ -657,8 +754,10 @@ class MAPushEnv:
         obs = self.env.reset()
         obs_np = obs.cpu().numpy()
 
-        # Construct global state based on critic mode
-        if self.use_relative_obs_critic:
+        # Construct global state based on task type and critic mode
+        if self.is_velocity_task:
+            global_state_np = self._construct_vel_global_state()
+        elif self.use_relative_obs_critic:
             # CRITIC11: Relative observations with inter-robot distance
             # Construct: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
             global_state_np = self._construct_relative_obs_state()
