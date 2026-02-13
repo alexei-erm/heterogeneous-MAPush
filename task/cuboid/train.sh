@@ -1,4 +1,4 @@
-exp_name="homogenMAPPObaseline_go1"
+exp_name="heavyrewards_homogen_MAPPObaseline_go1_longrun5"
 current_dir=$(pwd)
 algo="ppo"
 script_path=$(realpath "${BASH_SOURCE[0]}")
@@ -19,7 +19,7 @@ python ./openrl_ws/update_config.py --filepath $script_dir/config.py
 if [ $test_mode = False ]; then
     # train
     num_envs=500
-    num_steps=150000000
+    num_steps=200000000
     checkpoint=/None  # "/results/07-28-13_task1/checkpoints/rl_model_100000000_steps/module.pt"
 
     python ./openrl_ws/train.py  --num_envs $num_envs --train_timesteps $num_steps\
@@ -66,7 +66,7 @@ if [ $test_mode = False ]; then
 
 else
 # test
-test_checkpoint="log/MQE/go1push_mid/heterogenMAPPObaseline_go1_anymal/run1/checkpoints/rl_model_150000000_steps"
+test_checkpoint="log/MQE/go1push_mid/heavyrewards_homogen_MAPPObaseline_go1_longrun5/run1/checkpoints/rl_model_100000000_steps/module.pt"
 python ./openrl_ws/test.py --num_envs 1 \
         --algo "$algo" \
         --task go1push_mid \

@@ -28,21 +28,33 @@ def train(args):
     is_hetero = (agent0 != agent1)
 
     # Baseline MAPPO rewards mode (default: True for MAPPO)
-    # When True, uses ONLY original 7 MAPush rewards with original scales
+    # When True, uses ONLY original 7 MAPush rewards with TRUE ORIGINAL scales
+    # Uses ORIGINAL distance formula WITH penalty term
     # Disables all HAPPO-specific rewards (proximity_penalty, goal_push_bonus, etc.)
     baseline_mappo_rewards = getattr(args, 'baseline_mappo_rewards', True)
+
+    # Heavy box rewards mode (default: False)
+    # When True, uses adjusted Exp 7 scales for 8kg box training
+    # Uses 3x target, 2.5x push, 2x OCB, distance penalty REMOVED
+    mappo_heavybox_rewards = getattr(args, 'mappo_heavybox_rewards', False)
+
+    # Heavy box mode overrides baseline mode
+    if mappo_heavybox_rewards:
+        baseline_mappo_rewards = False
 
     if is_hetero:
         print(f"[MAPPO Training] Agent types: HETEROGENEOUS (agent0={agent0}, agent1={agent1})")
     else:
         print(f"[MAPPO Training] Agent types: HOMOGENEOUS ({agent0})")
 
-    if baseline_mappo_rewards:
-        print(f"[MAPPO Training] Reward mode: BASELINE (original 7 MAPush rewards)")
+    if mappo_heavybox_rewards:
+        print(f"[MAPPO Training] Reward mode: HEAVY BOX (Exp 7 scales, distance penalty removed)")
+    elif baseline_mappo_rewards:
+        print(f"[MAPPO Training] Reward mode: BASELINE (TRUE ORIGINAL 7 MAPush rewards)")
     else:
         print(f"[MAPPO Training] Reward mode: EXTENDED (includes HAPPO-specific rewards)")
 
-    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1, baseline_mappo_rewards=baseline_mappo_rewards), single_agent, agent0=agent0, agent1=agent1)
+    env, env_cfg = make_env(args, custom_cfg(args, agent0=agent0, agent1=agent1, baseline_mappo_rewards=baseline_mappo_rewards, mappo_heavybox_rewards=mappo_heavybox_rewards), single_agent, agent0=agent0, agent1=agent1)
     
     if args.algo == "ppo":
         # or use --config ./openrl_ws/cfgs/ppo.yaml in terminal

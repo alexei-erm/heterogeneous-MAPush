@@ -47,6 +47,7 @@ class MAPushHAPPORunner(OnPolicyHARunner):
 
         # Track total steps across all episodes
         self.total_steps = 0
+        self.total_num_steps = 0  # Alias for parent class compatibility (used in happo factor logging)
 
         # Save run configuration (command, args, env config)
         env_cfg = getattr(self.envs, 'env_cfg', None)
@@ -149,6 +150,7 @@ class MAPushHAPPORunner(OnPolicyHARunner):
 
                 # Update total steps
                 self.total_steps += self.algo_args["train"]["n_rollout_threads"]
+                self.total_num_steps = self.total_steps  # Keep alias in sync
 
                 # Check if we should save checkpoint
                 if self.total_steps - self.last_checkpoint_step >= self.checkpoint_interval:

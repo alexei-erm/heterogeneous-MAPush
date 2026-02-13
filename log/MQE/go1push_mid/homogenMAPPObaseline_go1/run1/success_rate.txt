@@ -1,0 +1,644 @@
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_10000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 0
+  NaN/Inf exceptions: 0
+  Total: 0
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 0
+  NaN/Inf exceptions: 0
+  Total: 0
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.009999999776482582
+finished time: 19.96860122680664
+collision degree: 0.0
+collaboration degree: 0.0
+success rate: 0.009999999776482582
+finished time: 19.96860122680664
+collision degree: 0.0
+collaboration degree: 0.0
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_20000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 0
+  NaN/Inf exceptions: 0
+  Total: 0
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 0
+  NaN/Inf exceptions: 0
+  Total: 0
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.07000000029802322
+finished time: 19.436132431030273
+collision degree: 0.0
+collaboration degree: 0.005880318116396666
+success rate: 0.07000000029802322
+finished time: 19.436132431030273
+collision degree: 0.0
+collaboration degree: 0.005880318116396666
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_30000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 1
+  NaN/Inf exceptions: 0
+  Total: 1
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 1
+  NaN/Inf exceptions: 0
+  Total: 1
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.18666666746139526
+finished time: 18.412334442138672
+collision degree: 0.0
+collaboration degree: 0.011249654926359653
+success rate: 0.18666666746139526
+finished time: 18.412334442138672
+collision degree: 0.0
+collaboration degree: 0.011249654926359653
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_40000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 4
+  NaN/Inf exceptions: 0
+  Total: 4
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 1
+  NaN/Inf exceptions: 0
+  Total: 1
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.28333333134651184
+finished time: 17.292665481567383
+collision degree: 0.0
+collaboration degree: 0.07488571852445602
+success rate: 0.28333333134651184
+finished time: 17.292665481567383
+collision degree: 0.0
+collaboration degree: 0.07488571852445602
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_50000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 1
+  NaN/Inf exceptions: 0
+  Total: 1
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 3
+  NaN/Inf exceptions: 0
+  Total: 3
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.6200000047683716
+finished time: 13.550933837890625
+collision degree: 0.0
+collaboration degree: 0.07247224450111389
+success rate: 0.6200000047683716
+finished time: 13.550933837890625
+collision degree: 0.0
+collaboration degree: 0.07247224450111389
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_60000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 3
+  NaN/Inf exceptions: 0
+  Total: 3
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 8
+  NaN/Inf exceptions: 0
+  Total: 8
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.8633333444595337
+finished time: 10.836333274841309
+collision degree: 0.0
+collaboration degree: 0.08035161346197128
+success rate: 0.8633333444595337
+finished time: 10.836333274841309
+collision degree: 0.0
+collaboration degree: 0.08035161346197128
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_70000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 1
+  NaN/Inf exceptions: 0
+  Total: 1
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 1
+  NaN/Inf exceptions: 0
+  Total: 1
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.9100000262260437
+finished time: 10.371399879455566
+collision degree: 0.0
+collaboration degree: 0.0931117907166481
+success rate: 0.9100000262260437
+finished time: 10.371399879455566
+collision degree: 0.0
+collaboration degree: 0.0931117907166481
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_80000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 5
+  NaN/Inf exceptions: 0
+  Total: 5
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 10
+  NaN/Inf exceptions: 0
+  Total: 10
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.8833333253860474
+finished time: 10.105999946594238
+collision degree: 0.0
+collaboration degree: 0.1383666843175888
+success rate: 0.8833333253860474
+finished time: 10.105999946594238
+collision degree: 0.0
+collaboration degree: 0.1383666843175888
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_90000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 3
+  NaN/Inf exceptions: 0
+  Total: 3
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 5
+  NaN/Inf exceptions: 0
+  Total: 5
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.9300000071525574
+finished time: 9.019599914550781
+collision degree: 0.0
+collaboration degree: 0.14497223496437073
+success rate: 0.9300000071525574
+finished time: 9.019599914550781
+collision degree: 0.0
+collaboration degree: 0.14497223496437073
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_100000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 4
+  NaN/Inf exceptions: 0
+  Total: 4
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 6
+  NaN/Inf exceptions: 0
+  Total: 6
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.9233333468437195
+finished time: 8.927533149719238
+collision degree: 0.0
+collaboration degree: 0.130288228392601
+success rate: 0.9233333468437195
+finished time: 8.927533149719238
+collision degree: 0.0
+collaboration degree: 0.130288228392601
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_110000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 3
+  NaN/Inf exceptions: 0
+  Total: 3
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 4
+  NaN/Inf exceptions: 0
+  Total: 4
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.9200000166893005
+finished time: 9.442933082580566
+collision degree: 0.0
+collaboration degree: 0.13595697283744812
+success rate: 0.9200000166893005
+finished time: 9.442933082580566
+collision degree: 0.0
+collaboration degree: 0.13595697283744812
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_120000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 1
+  NaN/Inf exceptions: 0
+  Total: 1
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 7
+  NaN/Inf exceptions: 0
+  Total: 7
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.9200000166893005
+finished time: 8.730466842651367
+collision degree: 0.0
+collaboration degree: 0.13097620010375977
+success rate: 0.9200000166893005
+finished time: 8.730466842651367
+collision degree: 0.0
+collaboration degree: 0.13097620010375977
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_130000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 5
+  NaN/Inf exceptions: 0
+  Total: 5
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 5
+  NaN/Inf exceptions: 0
+  Total: 5
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.8066666722297668
+finished time: 9.888066291809082
+collision degree: 0.0
+collaboration degree: 0.17337355017662048
+success rate: 0.8066666722297668
+finished time: 9.888066291809082
+collision degree: 0.0
+collaboration degree: 0.17337355017662048
+-----------------------------------------------------
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+record_video False
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1/checkpoints/rl_model_140000000_steps/module.pt
+[DEBUG Exception Step 500] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 3
+  NaN/Inf exceptions: 0
+  Total: 3
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+[DEBUG Exception Step 1000] Over last 500 steps:
+  Simulation exceptions (roll/pitch/z/collision): 7
+  NaN/Inf exceptions: 0
+  Total: 7
+  Config has termination: YES, terms=['roll', 'pitch', 'z_wave', 'collision']
+success rate: 0.8700000047683716
+finished time: 9.415066719055176
+collision degree: 0.0
+collaboration degree: 0.1547490954399109
+success rate: 0.8700000047683716
+finished time: 9.415066719055176
+collision degree: 0.0
+collaboration degree: 0.1547490954399109
+-----------------------------------------------------

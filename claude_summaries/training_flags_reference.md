@@ -111,13 +111,29 @@ conda run -n mapush python HARL/harl_mapush/train.py \
 | `--mapush_og_rewards_teamified` | bool | `False` | - | **Use original 7 MAPush rewards converted to team rewards**. Disables goal_push_bonus, proximity_penalty. Uses symmetric OCB ±0.004, original collision scale -0.0025 |
 | `--cooperation_rewards` | bool | `False` | **CRITIC12** | Three-tier cooperation bonuses: dual_engagement, synchronized_contact, bilateral_push |
 | `--collaboration_rewards` | bool | `False` | **CRITIC15 v4** | Dual pushing bonus when both agents push toward goal simultaneously. **Use with --mapush_og_rewards_teamified True** |
-| `--reward_scale_testing` | bool | `False` | - | Reserved for future reward scale experiments (currently no effect) |
+| `--reward_scale_testing` | bool | `False` | **Exp7** | **Uses same 7 rewards as mapush_og_rewards_teamified** but with heavy_cuboid Exp 7 scales: target=0.01 (3x), push=0.004 (2.5x), ocb=0.008 (2x). Penalty term in distance_reward REMOVED. |
 
-**Recommended Combination:**
+**Recommended Combinations:**
 ```bash
 # Original MAPush rewards (teamified) + collaboration bonus
 --mapush_og_rewards_teamified True --collaboration_rewards True
+
+# Heavy-box optimized scales (from Exp 7: ~60% SR with 8kg box)
+# Uses same 7 rewards as OG MAPush but with tuned scales
+--reward_scale_testing True
 ```
+
+**Exp 7 Reward Scales (--reward_scale_testing):**
+| Reward | Original | Exp 7 Scale | Multiplier |
+|--------|----------|-------------|------------|
+| `target_reward_scale` | 0.00325 | 0.01 | 3x |
+| `push_reward_scale` | 0.0015 | 0.004 | 2.5x |
+| `ocb_reward_scale` | 0.004 | 0.008 | 2x |
+| `reach_target_reward_scale` | 10 | 10 | 1x |
+| `approach_reward_scale` | 0.00075 | 0.00075 | 1x |
+| `collision_punishment_scale` | -0.0025 | -0.0025 | 1x |
+| `exception_punishment_scale` | -5 | -5 | 1x |
+| **distance_reward penalty** | Yes | **REMOVED** | - |
 
 ---
 

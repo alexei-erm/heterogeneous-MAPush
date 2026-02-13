@@ -275,7 +275,8 @@ def get_args():
         {"name": "--hie",  "type": bool, "action": "store_true", "default": False},
         {"name": "--agent0", "type": str, "default": "go1", "help": "Robot type for agent 0 (default: go1)"},
         {"name": "--agent1", "type": str, "default": "go1", "help": "Robot type for agent 1 (default: go1)"},
-        {"name": "--baseline_mappo_rewards", "type": lambda x: (str(x).lower() == 'true'), "default": True, "help": "Use original MAPush baseline rewards only (7 rewards, original scales). Disables all HAPPO-specific rewards. DEFAULT: True"},
+        {"name": "--baseline_mappo_rewards", "type": lambda x: (str(x).lower() == 'true'), "default": True, "help": "Use TRUE ORIGINAL MAPush baseline rewards (7 rewards, original scales, original distance formula WITH penalty). DEFAULT: True"},
+        {"name": "--mappo_heavybox_rewards", "type": lambda x: (str(x).lower() == 'true'), "default": False, "help": "Use adjusted scales for 8kg heavy box: 3x target, 2.5x push, 2x OCB, distance penalty REMOVED. Use with npc_mass_override=8. DEFAULT: False"},
     ]
     # parse arguments
     args = parse_arguments(

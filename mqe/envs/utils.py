@@ -207,7 +207,7 @@ def _merge_configs_for_homogeneous(base_config, robot_config_class, robot_type):
 
     return MergedConfig
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -223,22 +223,43 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
             cfg.hetero.hetero_agent_types = [agent0, agent1]
             print(f"[custom_cfg] Enabled hetero mode: agent0={agent0}, agent1={agent1}")
 
-        # MAPPO BASELINE MODE: Use original MAPush rewards only
-        # When enabled, disables ALL HAPPO-specific rewards and uses original scales
+        # MAPPO BASELINE MODE: Use TRUE ORIGINAL MAPush rewards only
+        # When enabled, disables ALL HAPPO-specific rewards and uses ORIGINAL scales
+        # This is the actual baseline from the original MAPush paper/repo
         if baseline_mappo_rewards and hasattr(cfg, 'rewards'):
             cfg.rewards.baseline_mappo_rewards = True
-            # Override scales to original MAPush values
-            cfg.rewards.scales.target_reward_scale = 0.00325
-            cfg.rewards.scales.approach_reward_scale = 0.00075
-            cfg.rewards.scales.collision_punishment_scale = -0.0025
-            cfg.rewards.scales.push_reward_scale = 0.0015
-            cfg.rewards.scales.ocb_reward_scale = 0.004  # Original was 0.004, not 0.01
-            cfg.rewards.scales.reach_target_reward_scale = 10
-            cfg.rewards.scales.exception_punishment_scale = -5
+            # TRUE ORIGINAL baseline values from MAPush
+            cfg.rewards.scales.target_reward_scale = 0.00325     # original
+            cfg.rewards.scales.approach_reward_scale = 0.00075   # original
+            cfg.rewards.scales.collision_punishment_scale = -0.0025  # original
+            cfg.rewards.scales.push_reward_scale = 0.0015        # original
+            cfg.rewards.scales.ocb_reward_scale = 0.004          # original
+            cfg.rewards.scales.reach_target_reward_scale = 10    # original
+            cfg.rewards.scales.exception_punishment_scale = -5   # original
             # Disable HAPPO-specific reward scales
             if hasattr(cfg.rewards.scales, 'proximity_penalty_scale'):
                 cfg.rewards.scales.proximity_penalty_scale = 0.0
-            print(f"[custom_cfg] BASELINE MAPPO REWARDS MODE: Using original 7 rewards with original scales")
+            print(f"[custom_cfg] BASELINE MAPPO REWARDS MODE: Using TRUE ORIGINAL 7 rewards with original scales")
+            print(f"  target=0.00325, approach=0.00075, collision=-0.0025, push=0.0015, ocb=0.004, reach=10, exception=-5")
+
+        # MAPPO HEAVY BOX MODE: Adjusted scales for 8kg box (from heavy_cuboid_testing_mappo.md Exp 7)
+        # Use this when training with heavier box that requires collaboration
+        # Key changes: 3x target, 2.5x push, 2x OCB, distance penalty term REMOVED
+        if mappo_heavybox_rewards and hasattr(cfg, 'rewards'):
+            cfg.rewards.mappo_heavybox_rewards = True
+            # Exp 7 scales from heavy_cuboid_testing_mappo.md
+            cfg.rewards.scales.target_reward_scale = 0.01        # 3x increase (penalty term removed in wrapper)
+            cfg.rewards.scales.approach_reward_scale = 0.00075   # original
+            cfg.rewards.scales.collision_punishment_scale = -0.0025  # original
+            cfg.rewards.scales.push_reward_scale = 0.004         # 2.5x increase
+            cfg.rewards.scales.ocb_reward_scale = 0.008          # 2x increase
+            cfg.rewards.scales.reach_target_reward_scale = 10    # original
+            cfg.rewards.scales.exception_punishment_scale = -5   # original
+            # Disable HAPPO-specific reward scales
+            if hasattr(cfg.rewards.scales, 'proximity_penalty_scale'):
+                cfg.rewards.scales.proximity_penalty_scale = 0.0
+            print(f"[custom_cfg] MAPPO HEAVY BOX REWARDS MODE: Using Exp 7 scales for 8kg box")
+            print(f"  target=0.01 (3x), push=0.004 (2.5x), ocb=0.008 (2x), distance penalty REMOVED")
 
         # Enable individualized rewards for HAPPO if requested
         if individualized_rewards and hasattr(cfg, 'rewards'):
@@ -267,6 +288,10 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
         # CRITIC17: Positive approach_to_box reward (inverse distance instead of quadratic penalty)
         if positive_approachtobox_reward and hasattr(cfg, 'rewards'):
             cfg.rewards.positive_approachtobox_reward = True
+
+        # COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents are in contact
+        if require_both_contact_for_success and hasattr(cfg, 'rewards'):
+            cfg.rewards.require_both_contact_for_success = True
 
         return cfg
 

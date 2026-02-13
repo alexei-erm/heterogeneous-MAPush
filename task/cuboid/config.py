@@ -37,7 +37,9 @@ class Go1PushMidCfg(Go1Cfg):
         npc_gravity = True
         # Box mass override: None = use URDF default (4kg)
         # Box dimensions: 1.2m x 1.2m x 0.5m
-        npc_mass_override = None # does not control anything !!!!
+        # task/cuboid/config.py for MAPPO
+        # mqe/envs/configs/go1_push_mid_config.py for HAPPO
+        npc_mass_override = 8 
         # target area
         _terminate_after_contacts_on = []
         _file_npc = "{LEGGED_GYM_ROOT_DIR}/resources/objects/target.urdf"
@@ -118,9 +120,11 @@ class Go1PushMidCfg(Go1Cfg):
         individualized_rewards = False
         contact_threshold = 0.8  # meters - agents within this distance are considered "in contact"
         class scales:
+            # NOTE: When using --baseline_mappo_rewards flag, these values are OVERRIDDEN by mqe/envs/utils.py
+            # See custom_cfg() function for actual values used with that flag
             target_reward_scale = 0.00325
             approach_reward_scale = 0.00075
-            collision_punishment_scale = -0.0025 
+            collision_punishment_scale = -0.0025
             push_reward_scale = 0.0015
             ocb_reward_scale = 0.01  # v5b: 2.5x increase for stronger positioning signal (joint binary OCB)
             reach_target_reward_scale = 10

@@ -131,6 +131,16 @@ class Go1PushMidWrapper(EmptyWrapper):
         # Contact threshold for individualized rewards (distance to box center)
         # Agents within this distance are considered "in contact" with box
         self.contact_threshold = getattr(self.cfg.rewards, "contact_threshold", 0.8)
+
+        # COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents are in contact
+        # This forces collaboration - solo pushing to goal gives NO success reward
+        # Box is 1.2m x 1.2m, so contact_threshold of 0.8m means agent is touching the edge
+        self.require_both_contact_for_success = getattr(self.cfg.rewards, "require_both_contact_for_success", False)
+        if self.require_both_contact_for_success:
+            print(f"[Go1PushMidWrapper] COLLABORATION ENFORCEMENT ENABLED")
+            print(f"  reach_target_reward ONLY given if BOTH agents within {self.contact_threshold}m of box at success")
+            print(f"  Solo pushing to goal = NO reward!")
+
         # Whether to use individualized rewards (for HAPPO)
         self.individualized_rewards = getattr(self.cfg.rewards, "individualized_rewards", False)
         # Iter8: Gated shared rewards - all rewards multiplied by min engagement of both agents
@@ -148,17 +158,55 @@ class Go1PushMidWrapper(EmptyWrapper):
         # CRITIC12 v7b: Directional push reward - rewards box velocity toward goal, punishes away
         # Increased from 0.003 to 0.01 to strongly discourage pushing in wrong direction
 
-        # CRITIC15 v3: Reward scale testing (currently unused - placeholder for future experiments)
+        # Original MAPush rewards (teamified) - uses vanilla reward structure
+        # When enabled: 7 original rewards, goal_push_bonus and proximity_penalty disabled
+        # approach_to_box uses AVERAGE (not sum), collision uses -0.0025, OCB uses ±0.004
+        self.mapush_og_rewards_teamified = getattr(self.cfg.rewards, "mapush_og_rewards_teamified", False)
+
+        # CRITIC15 v3: Reward scale testing - uses adjusted scales from heavy_cuboid Exp 7
+        # IMPORTANT: For HAPPO, distance_to_target_reward is DISABLED (found to hurt performance)
+        # See claude_summaries/heavy_cuboid_testing_happo.md for details
         self.reward_scale_testing = getattr(self.cfg.rewards, "reward_scale_testing", False)
         self.goal_push_bonus_scale = getattr(self.cfg.rewards, "goal_push_bonus_scale", 0.01)
 
-        # CRITIC16: When reward_scale_testing enabled, increase approach_to_box penalty
-        # This amplifies the gradient for agents to stay near the box
+        # When reward_scale_testing is enabled:
+        # - Applies adjusted scales from heavy_cuboid Exp 7 (best MAPPO results)
+        # - Does NOT enable mapush_og_rewards_teamified (keeps distance_to_target DISABLED for HAPPO)
+        # - HAPPO Exp 2/3 showed >95% SR without distance_to_target, Exp 4 with it was worse
         if self.reward_scale_testing:
-            # Increase from 0.00075 to 0.003 (4x multiplier)
-            # This makes being far from box much more costly
-            self.approach_reward_scale = 0.003
-            print(f"[REWARD_SCALE_TESTING] approach_reward_scale increased to {self.approach_reward_scale}")
+            # NOTE: Do NOT set mapush_og_rewards_teamified = True here!
+            # This keeps distance_to_target_reward disabled, which works better for HAPPO
+            # See heavy_cuboid_testing_happo.md Exp 4 results
+
+            # Apply Exp 7 scales:
+            # - push_reward_scale: 0.004 (2.5x from 0.0015) - encourages pushing
+            # - ocb_reward_scale: 0.008 (2x from 0.004) - optimal contact positioning
+            # - reach_target_reward_scale: 10 (1x) - original sparse success bonus
+            # - approach_reward_scale: 0.00075 (1x) - original
+            # - collision_punishment_scale: -0.0025 (1x) - original
+            # - exception_punishment_scale: -5 (1x) - original
+            # - target_reward_scale: SET but distance_to_target_reward NOT COMPUTED (disabled)
+            self.target_reward_scale = 0.01      # 3x (but reward disabled for HAPPO)
+            self.push_reward_scale = 0.004       # 2.5x increase
+            self.ocb_reward_scale = 0.008        # 2x increase
+            self.reach_target_reward_scale = 10  # 1x (original)
+            self.approach_reward_scale = 0.00075 # 1x (original)
+            self.collision_punishment_scale = -0.0025  # 1x (original)
+            self.exception_punishment_scale = -5 # 1x (original)
+
+            # Disable HAPPO-specific reward additions
+            self.proximity_penalty_scale = 0.0
+            self.goal_push_bonus_scale = 0.0
+            self.dual_push_bonus_scale = 0.0
+
+            print(f"[REWARD_SCALE_TESTING] Using heavy_cuboid Exp 7 scales (HAPPO optimized)")
+            print(f"  push_reward_scale: {self.push_reward_scale} (2.5x)")
+            print(f"  ocb_reward_scale: {self.ocb_reward_scale} (2x)")
+            print(f"  reach_target_reward_scale: {self.reach_target_reward_scale} (1x)")
+            print(f"  approach_reward_scale: {self.approach_reward_scale} (1x)")
+            print(f"  collision_punishment_scale: {self.collision_punishment_scale} (1x)")
+            print(f"  exception_punishment_scale: {self.exception_punishment_scale} (1x)")
+            print(f"  distance_to_target_reward: DISABLED (hurts HAPPO performance)")
 
         # CRITIC15 v4: Collaboration rewards - dual pushing bonus
         # Works in conjunction with mapush_og_rewards_teamified
@@ -166,13 +214,9 @@ class Go1PushMidWrapper(EmptyWrapper):
         self.dual_push_velocity_threshold = 0.05  # m/s - minimum velocity toward goal to count as "pushing"
         self.dual_push_bonus_scale = 0.005  # per step when both agents pushing toward goal
 
-        # Original MAPush rewards (teamified) - uses vanilla reward structure
-        # When enabled: 7 original rewards, goal_push_bonus and proximity_penalty disabled
-        # approach_to_box uses AVERAGE (not sum), collision uses -0.0025, OCB uses ±0.004
-        self.mapush_og_rewards_teamified = getattr(self.cfg.rewards, "mapush_og_rewards_teamified", False)
-
-        # BASELINE MAPPO REWARDS MODE: Uses ONLY original 7 MAPush rewards with original scales
+        # BASELINE MAPPO REWARDS MODE: Uses ONLY original 7 MAPush rewards with TRUE ORIGINAL scales
         # Disables ALL HAPPO-specific rewards (proximity_penalty, goal_push_bonus, cooperation, etc.)
+        # Uses ORIGINAL distance_to_target formula WITH penalty term
         self.baseline_mappo_rewards = getattr(self.cfg.rewards, "baseline_mappo_rewards", False)
         if self.baseline_mappo_rewards:
             # Force disable all HAPPO-specific reward flags
@@ -192,11 +236,39 @@ class Go1PushMidWrapper(EmptyWrapper):
             self.directional_progress_scale = 0.0
             self.dual_push_bonus_scale = 0.0
             self.gaussian_proximity_amplitude = 0.0
-            print(f"[Go1PushMidWrapper] BASELINE MAPPO REWARDS MODE ACTIVE")
-            print(f"  Using ONLY 7 original rewards: target, approach, collision, push, ocb, reach_target, exception")
+            print(f"[Go1PushMidWrapper] BASELINE MAPPO REWARDS MODE ACTIVE (TRUE ORIGINAL)")
+            print(f"  Using ONLY 7 original rewards with ORIGINAL scales and ORIGINAL distance formula (with penalty)")
             print(f"  Scales: target={self.target_reward_scale}, approach={self.approach_reward_scale}, "
                   f"collision={self.collision_punishment_scale}, push={self.push_reward_scale}, "
                   f"ocb={self.ocb_reward_scale}, reach={self.reach_target_reward_scale}, exception={self.exception_punishment_scale}")
+
+        # MAPPO HEAVY BOX REWARDS MODE: Uses adjusted scales for 8kg box training
+        # Uses 6 rewards (distance_to_target COMPLETELY DISABLED)
+        # See claude_summaries/heavy_cuboid_testing_mappo.md for details
+        self.mappo_heavybox_rewards = getattr(self.cfg.rewards, "mappo_heavybox_rewards", False)
+        if self.mappo_heavybox_rewards:
+            # Force disable all HAPPO-specific reward flags
+            self.individualized_rewards = False
+            self.shared_gated_rewards = False
+            self.cooperation_rewards = False
+            self.collaboration_rewards = False
+            self.reward_scale_testing = False
+            self.positive_approachtobox_reward = False
+            # Force HAPPO-specific scales to 0
+            self.proximity_penalty_scale = 0.0
+            self.goal_push_bonus_scale = 0.0
+            self.engagement_bonus_scale = 0.0
+            self.cooperation_bonus_scale = 0.0
+            self.same_side_bonus_scale = 0.0
+            self.blocking_penalty_scale = 0.0
+            self.directional_progress_scale = 0.0
+            self.dual_push_bonus_scale = 0.0
+            self.gaussian_proximity_amplitude = 0.0
+            print(f"[Go1PushMidWrapper] MAPPO HEAVY BOX REWARDS MODE ACTIVE")
+            print(f"  Using 6 rewards (distance_to_target DISABLED), Exp 7 scales")
+            print(f"  Scales: push={self.push_reward_scale} (2.5x), ocb={self.ocb_reward_scale} (2x), "
+                  f"approach={self.approach_reward_scale}, collision={self.collision_punishment_scale}, "
+                  f"reach={self.reach_target_reward_scale}, exception={self.exception_punishment_scale}")
 
         # CRITIC17: Positive approach_to_box bonus (Gaussian with steep falloff)
         # When enabled: ADDS positive Gaussian bonus on top of original negative penalty
@@ -520,22 +592,43 @@ class Go1PushMidWrapper(EmptyWrapper):
         # calculate reach target reward and set finish task termination
         # Iter5: INDIVIDUAL - only agents near box get credit for completion
         # Iter8: GATED - reward multiplied by min engagement (both must be near)
+        # COLLABORATION ENFORCEMENT: Only reward if BOTH agents in contact at success time
         if self.reach_target_reward_scale != 0:
+            # Determine which environments get success reward
+            if self.require_both_contact_for_success:
+                # COLLABORATION MODE: Both agents must be within contact_threshold of box
+                dist_agent0 = torch.norm(box_pos[:, :2] - base_pos[:, 0, :2], dim=1)
+                dist_agent1 = torch.norm(box_pos[:, :2] - base_pos[:, 1, :2], dim=1)
+                both_in_contact = (dist_agent0 < self.contact_threshold) & (dist_agent1 < self.contact_threshold)
+
+                # Only give reward if task finished AND both agents contributed
+                valid_success = self.finished_buf & both_in_contact
+
+                # Log collaboration stats periodically
+                if self.finished_buf.sum() > 0:
+                    solo_successes = (self.finished_buf & ~both_in_contact).sum().item()
+                    collab_successes = valid_success.sum().item()
+                    if solo_successes > 0:
+                        print(f"[COLLAB] Blocked {solo_successes} solo successes, rewarded {collab_successes} collaborative successes")
+            else:
+                # Original: all finished environments get reward
+                valid_success = self.finished_buf
+
             if self.individualized_rewards:
                 for i in range(self.num_agents):
                     agent_box_dist = torch.norm(box_pos - base_pos[:, i, :], dim=1)
                     contact_weight = torch.clamp(1.0 - (agent_box_dist - self.contact_threshold) / self.contact_threshold, 0.0, 1.0)
-                    reward[self.finished_buf, i] += self.reach_target_reward_scale * contact_weight[self.finished_buf]
-                self.reward_buffer["reach_target_reward"] += self.reach_target_reward_scale * self.finished_buf.sum().item()
+                    reward[valid_success, i] += self.reach_target_reward_scale * contact_weight[valid_success]
+                self.reward_buffer["reach_target_reward"] += self.reach_target_reward_scale * valid_success.sum().item()
             elif self.shared_gated_rewards:
                 # Iter8: Gated - only get full reward if BOTH agents engaged
-                gated_reward = self.reach_target_reward_scale * gating_factor[self.finished_buf]
-                reward[self.finished_buf, :] += gated_reward.unsqueeze(1)
+                gated_reward = self.reach_target_reward_scale * gating_factor[valid_success]
+                reward[valid_success, :] += gated_reward.unsqueeze(1)
                 self.reward_buffer["reach_target_reward"] += torch.sum(gated_reward).cpu().item()
             else:
                 # Original: shared
-                reward[self.finished_buf, :] += self.reach_target_reward_scale
-                self.reward_buffer["reach_target_reward"] += self.reach_target_reward_scale * self.finished_buf.sum().item()
+                reward[valid_success, :] += self.reach_target_reward_scale
+                self.reward_buffer["reach_target_reward"] += self.reach_target_reward_scale * valid_success.sum().item()
         
         # calculate exception punishment
         if self.exception_punishment_scale != 0:
@@ -575,14 +668,24 @@ class Go1PushMidWrapper(EmptyWrapper):
         # distance_to_target_reward: Progress shaping based on box-to-goal distance
         # CRITIC13 v2: Disabled for HAPPO experiments (redundant with goal_push_bonus)
         # mapush_og_rewards_teamified: RE-ENABLED with original formula
-        # baseline_mappo_rewards: ENABLED (one of the original 7 MAPush rewards) - SHARED reward
-        if (self.mapush_og_rewards_teamified or self.baseline_mappo_rewards) and self.target_reward_scale != 0:
+        # baseline_mappo_rewards: ENABLED with ORIGINAL formula (includes penalty term)
+        # mappo_heavybox_rewards: DISABLED - distance reward hurts heavy box training
+        # reward_scale_testing: DISABLED - distance reward hurts HAPPO (see heavy_cuboid_testing_happo.md)
+        #
+        # IMPORTANT: For heavy box (8kg) training, distance_to_target_reward should be COMPLETELY DISABLED
+        # Both MAPPO (mappo_heavybox_rewards) and HAPPO (reward_scale_testing) perform better without it
+        # See heavy_cuboid_testing_happo.md Exp 2 vs Exp 4 results
+        skip_distance_reward = self.mappo_heavybox_rewards or self.reward_scale_testing
+
+        if not skip_distance_reward and (self.mapush_og_rewards_teamified or self.baseline_mappo_rewards) and self.target_reward_scale != 0:
             if self.last_box_state is None:
                 self.last_box_state = copy(box_state)
             past_distance = self.env.dist_calculator.cal_dist(self.last_box_state, target_state)
             distance = self.env.dist_calculator.cal_dist(box_state, target_state)
-            # Original MAPush formula: progress shaping + distance penalty
+
+            # ORIGINAL MAPush formula: progress shaping + distance penalty
             distance_reward = self.target_reward_scale * 100 * (2 * (past_distance - distance) - 0.01 * distance)
+
             # Iter8: Apply gating if enabled (NOT for baseline_mappo_rewards)
             if self.shared_gated_rewards and not self.baseline_mappo_rewards:
                 distance_reward = distance_reward * gating_factor

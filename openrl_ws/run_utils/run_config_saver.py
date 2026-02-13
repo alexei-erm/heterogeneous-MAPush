@@ -127,7 +127,8 @@ def save_run_config(
 
     config["rewards"] = {
         "baseline_mappo_rewards": getattr(args, 'baseline_mappo_rewards', True),
-        "description": "baseline_mappo_rewards=True uses ONLY original 7 MAPush rewards with original scales",
+        "mappo_heavybox_rewards": getattr(args, 'mappo_heavybox_rewards', False),
+        "description": "baseline_mappo_rewards=True uses TRUE ORIGINAL 7 rewards. mappo_heavybox_rewards=True uses Exp 7 scales for 8kg box (3x target, 2.5x push, 2x OCB, penalty removed)",
     }
 
     # -------------------------------------------------------------------------

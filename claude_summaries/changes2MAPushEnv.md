@@ -95,7 +95,8 @@ Set to `0` to disable (not recommended).
 - `mqe/envs/configs/go1_push_mid_config.py` - added `npc_mass_override` parameter (this is the config used by ENV_DICT)
 - `mqe/envs/npc/go1_object.py` - implemented runtime mass override
 
-**Note:** The config in `task/cuboid/config.py` is NOT used by the hetero environment. The actual config used is `mqe/envs/configs/go1_push_mid_config.py`.
+**Note:** The config in `task/cuboid/config.py` is NOT used by the hetero environment. The actual config used is `mqe/envs/configs/go1_push_mid_config.py`. 
+FOR MAPPO runs, its the opposite! `task/cuboid/config.py` is used!!
 
 ### Problem
 

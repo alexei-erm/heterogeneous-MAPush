@@ -1,85 +1,54 @@
 #!/bin/bash
-# Test all checkpoints in a directory by calling single-checkpoint test repeatedly
+# MAPPO: Test all checkpoints in a run folder (calculator mode)
+# Automatically extracts agent0, agent1, algo, task from command.txt
+# Usage: ./test_all_checkpoints.sh <run_folder>
+# Example: ./test_all_checkpoints.sh log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1
 
-if [ "$#" -lt 1 ]; then
-    echo "Usage: ./test_all_checkpoints.sh <checkpoints_dir> [num_episodes] [num_envs]"
-    echo "Example: ./test_all_checkpoints.sh results/.../checkpoints 50 300"
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <run_folder>"
+    echo "Example: $0 log/MQE/go1push_mid/homogenMAPPObaseline_go1/run1"
     exit 1
 fi
 
-CKPT_DIR="$1"
-NUM_EPISODES="${2:-100}"
-NUM_ENVS="${3:-300}"
+run_folder=$1
 
-if [ ! -d "$CKPT_DIR" ]; then
-    echo "ERROR: Directory not found: $CKPT_DIR"
+cd /home/gvlab/new-universal-MAPush
+export PYTHONPATH=/home/gvlab/new-universal-MAPush:$PYTHONPATH
+
+# Check if command.txt exists
+if [ ! -f "$run_folder/command.txt" ]; then
+    echo "ERROR: $run_folder/command.txt not found"
     exit 1
 fi
 
-# Find all checkpoint subdirectories (10M, 20M, etc.)
-CHECKPOINTS=$(find "$CKPT_DIR" -maxdepth 1 -type d -name "*M" | sort -V)
+# Parse agent0, agent1, algo, task from command.txt
+agent0=$(grep -oP '(?<=--agent0 )\S+' "$run_folder/command.txt" | head -1)
+agent1=$(grep -oP '(?<=--agent1 )\S+' "$run_folder/command.txt" | head -1)
+algo=$(grep -oP '(?<=--algo )\S+' "$run_folder/command.txt" | head -1)
+task=$(grep -oP '(?<=--task )\S+' "$run_folder/command.txt" | head -1)
 
-if [ -z "$CHECKPOINTS" ]; then
-    echo "ERROR: No checkpoint directories found in $CKPT_DIR"
-    exit 1
-fi
-
-echo "Found checkpoints:"
-echo "$CHECKPOINTS" | while read ckpt; do echo "  - $(basename $ckpt)"; done
+echo "============================================"
+echo "Run folder: $run_folder"
+echo "Parsed from command.txt:"
+echo "  agent0: $agent0"
+echo "  agent1: $agent1"
+echo "  algo: $algo"
+echo "  task: $task"
+echo "Results: $run_folder/success_rate.txt"
+echo "============================================"
 echo ""
 
-# Output file
-OUTPUT_FILE="$CKPT_DIR/test_results.txt"
-echo "======================================================================" > "$OUTPUT_FILE"
-echo "MAPush HAPPO Testing Results" >> "$OUTPUT_FILE"
-echo "======================================================================" >> "$OUTPUT_FILE"
-echo "Test Date: $(date '+%Y-%m-%d %H:%M:%S')" >> "$OUTPUT_FILE"
-echo "Num Episodes per Checkpoint: $NUM_EPISODES" >> "$OUTPUT_FILE"
-echo "Num Parallel Envs: $NUM_ENVS" >> "$OUTPUT_FILE"
-echo "======================================================================" >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-echo "Results by Checkpoint:" >> "$OUTPUT_FILE"
-echo "----------------------------------------------------------------------" >> "$OUTPUT_FILE"
-
-# Test each checkpoint
-echo "$CHECKPOINTS" | while read CKPT_PATH; do
-    CKPT_NAME=$(basename "$CKPT_PATH")
-
-    echo "Testing checkpoint: $CKPT_NAME"
-
-    # Run single checkpoint test and capture output
-    OUTPUT=$(./run_testing.sh \
-        --checkpoint "$CKPT_PATH" \
-        --mode calculator \
-        --num_episodes "$NUM_EPISODES" \
-        --num_envs "$NUM_ENVS" 2>&1)
-
-    # Extract success rate from output
-    SUCCESS_RATE=$(echo "$OUTPUT" | grep "Success Rate:" | grep -oP '\d+\.\d+' | head -1)
-    SUCCESS_PCT=$(echo "$OUTPUT" | grep "Success Rate:" | grep -oP '\(\d+\.\d+%\)' | head -1 | tr -d '()')
-    NUM_SUCCESS=$(echo "$OUTPUT" | grep "episodes succeeded" | grep -oP '\[\d+' | tr -d '[')
-
-    if [ -z "$SUCCESS_RATE" ]; then
-        SUCCESS_RATE="0.0000"
-        SUCCESS_PCT="0.00%"
-        NUM_SUCCESS="0"
-    fi
-
-    # Append to results file
-    printf "%-8s  Success Rate: %s (%s)  [%s/%s episodes]\n" \
-        "$CKPT_NAME" "$SUCCESS_RATE" "$SUCCESS_PCT" "$NUM_SUCCESS" "$NUM_EPISODES" >> "$OUTPUT_FILE"
-
-    echo "  Success Rate: $SUCCESS_RATE ($SUCCESS_PCT)"
-    echo ""
+for ckpt in $(ls -d $run_folder/checkpoints/rl_model_*_steps 2>/dev/null | sort -V); do
+    echo "Testing: $ckpt"
+    python ./openrl_ws/test.py --num_envs 300 \
+            --algo "$algo" \
+            --task "$task" \
+            --checkpoint "$ckpt/module.pt" \
+            --agent0 $agent0 \
+            --agent1 $agent1 \
+            --test_mode calculator \
+            --headless  >> $run_folder/success_rate.txt 2>&1
 done
 
-echo "======================================================================" >> "$OUTPUT_FILE"
-
 echo ""
-echo "======================================================================"
-echo "Summary of All Checkpoints"
-echo "======================================================================"
-cat "$OUTPUT_FILE" | grep -A 100 "Results by Checkpoint:"
-echo ""
-echo "Results saved to: $OUTPUT_FILE"
-echo ""
+echo "Done! Results in: $run_folder/success_rate.txt"

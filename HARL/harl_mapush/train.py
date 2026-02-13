@@ -56,9 +56,11 @@ def main():
     parser.add_argument("--mapush_og_rewards_teamified", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="Use original MAPush rewards (7 total) converted to team rewards. Disables goal_push_bonus, proximity_penalty. Uses symmetric OCB ±0.004, original collision scale -0.0025. DEFAULT: False")
     parser.add_argument("--reward_scale_testing", type=lambda x: (str(x).lower() == 'true'), default=False,
-                       help="Reserved for future reward scale experiments. Currently has no effect. DEFAULT: False")
+                       help="Use same 7 rewards as mapush_og_rewards_teamified but with heavy_cuboid Exp 7 scales: target=0.01(3x), push=0.004(2.5x), ocb=0.008(2x). Penalty term REMOVED. DEFAULT: False")
     parser.add_argument("--collaboration_rewards", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="CRITIC15 v4: Add dual pushing bonus. Rewards when both agents push toward goal simultaneously. Use with --mapush_og_rewards_teamified True. DEFAULT: False")
+    parser.add_argument("--require_both_contact_for_success", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents are within contact_threshold of box at success. Solo pushing = NO reward. DEFAULT: False")
     parser.add_argument("--agent0", type=str, default="go1",
                        help="Robot type for agent 0. Options: go1, anymal_c. DEFAULT: go1")
     parser.add_argument("--agent1", type=str, default="go1",
@@ -112,6 +114,7 @@ def main():
     use_reward_testing = args.get("reward_scale_testing", False)
     use_collaboration = args.get("collaboration_rewards", False)
     use_positive_approach = args.get("positive_approachtobox_reward", False)
+    use_require_both_contact = args.get("require_both_contact_for_success", False)
 
     # Agent types for heterogeneous training
     agent0 = args.get("agent0", "go1")
@@ -137,6 +140,7 @@ def main():
         "positive_approachtobox_reward": use_positive_approach,  # CRITIC17: Positive inverse distance reward instead of negative penalty
         "agent0": agent0,  # Robot type for agent 0
         "agent1": agent1,  # Robot type for agent 1
+        "require_both_contact_for_success": use_require_both_contact,  # COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents in contact
     }
 
     # Override training parameters only if specified on command line

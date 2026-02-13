@@ -72,6 +72,7 @@ class MAPushEnv:
         reward_scale_testing = env_args.get("reward_scale_testing", False)
         collaboration_rewards = env_args.get("collaboration_rewards", False)
         positive_approachtobox_reward = env_args.get("positive_approachtobox_reward", False)
+        require_both_contact_for_success = env_args.get("require_both_contact_for_success", False)
 
         if self.is_hetero:
             # Use make_hetero_env for heterogeneous agents
@@ -89,7 +90,8 @@ class MAPushEnv:
                                       reward_scale_testing=reward_scale_testing,
                                       collaboration_rewards=collaboration_rewards,
                                       positive_approachtobox_reward=positive_approachtobox_reward,
-                                      agent0=agent0, agent1=agent1)
+                                      agent0=agent0, agent1=agent1,
+                                      require_both_contact_for_success=require_both_contact_for_success)
             )
         else:
             # Standard homogeneous environment
@@ -103,7 +105,8 @@ class MAPushEnv:
                                       reward_scale_testing=reward_scale_testing,
                                       collaboration_rewards=collaboration_rewards,
                                       positive_approachtobox_reward=positive_approachtobox_reward,
-                                      agent0=agent0, agent1=agent1)
+                                      agent0=agent0, agent1=agent1,
+                                      require_both_contact_for_success=require_both_contact_for_success)
             )
 
         self.n_envs = self.env.num_envs

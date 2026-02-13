@@ -1,0 +1,17 @@
+# MAPPO Training command - copy-paste to reproduce
+# Generated: 2026-02-08 13:34:35
+# Run directory: log/MQE/go1push_mid/heavyrewards_homogen_MAPPObaseline_go1_longrun5/run2
+
+cd /home/gvlab/new-universal-MAPush
+export PYTHONPATH=/home/gvlab/new-universal-MAPush:$PYTHONPATH
+./openrl_ws/train.py --num_envs 500 --train_timesteps 200000000 --algo ppo --config ./openrl_ws/cfgs/ppo.yaml --seed 1 --exp_name heavyrewards_homogen_MAPPObaseline_go1_longrun5 --task go1push_mid --use_tensorboard --headless --agent0 go1 --agent1 go1 --layer_N 2 --hidden_size 128 --baseline_mappo_rewards True
+
+# Testing command template (update checkpoint path):
+# python ./openrl_ws/test.py \
+#   --checkpoint log/MQE/go1push_mid/heavyrewards_homogen_MAPPObaseline_go1_longrun5/run2/checkpoints/rl_model_XXXXX_steps/module.pt \
+#   --agent0 go1 \
+#   --agent1 go1 \
+#   --algo ppo \
+#   --task go1push_mid \
+#   --num_envs 1 \
+#   --test_mode viewer

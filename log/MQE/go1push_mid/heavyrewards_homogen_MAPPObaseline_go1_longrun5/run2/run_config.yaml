@@ -1,0 +1,51 @@
+# MAPPO/OpenRL Training Configuration
+# Auto-generated at training start - DO NOT EDIT
+# Timestamp: 2026-02-08 13:34:35
+
+_meta:
+  generated: '2026-02-08 13:34:35'
+  command: ./openrl_ws/train.py --num_envs 500 --train_timesteps 200000000 --algo
+    ppo --config ./openrl_ws/cfgs/ppo.yaml --seed 1 --exp_name heavyrewards_homogen_MAPPObaseline_go1_longrun5
+    --task go1push_mid --use_tensorboard --headless --agent0 go1 --agent1 go1 --layer_N
+    2 --hidden_size 128 --baseline_mappo_rewards True
+  run_dir: log/MQE/go1push_mid/heavyrewards_homogen_MAPPObaseline_go1_longrun5/run2
+  framework: MAPPO/OpenRL
+agents:
+  agent0: go1
+  agent1: go1
+  is_heterogeneous: false
+algorithm:
+  name: ppo
+  seed: 1
+network:
+  hidden_size: 128
+  layer_N: 2
+  use_recurrent_policy: false
+training:
+  train_timesteps: 200000000
+  num_envs: 500
+  episode_length: 200
+  lr: 0.0005
+  critic_lr: 0.0005
+logging:
+  use_wandb: false
+  use_tensorboard: true
+  exp_name: heavyrewards_homogen_MAPPObaseline_go1_longrun5
+rewards:
+  baseline_mappo_rewards: true
+  description: baseline_mappo_rewards=True uses ONLY original 7 MAPush rewards with
+    original scales
+environment:
+  box:
+    mass_override_kg: 8
+    effective_mass_kg: 8
+  episode:
+    num_agents: 2
+    episode_length_s: 20
+  hetero:
+    use_hetero: false
+    hetero_agent_types:
+    - go1
+    - go1
+  rewards:
+    individualized_rewards: false
