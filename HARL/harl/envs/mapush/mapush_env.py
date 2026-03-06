@@ -76,6 +76,8 @@ class MAPushEnv:
         collaboration_rewards = env_args.get("collaboration_rewards", False)
         positive_approachtobox_reward = env_args.get("positive_approachtobox_reward", False)
         require_both_contact_for_success = env_args.get("require_both_contact_for_success", False)
+        contact_force_gating = env_args.get("contact_force_gating", False)
+        contact_force_gating_alpha = env_args.get("contact_force_gating_alpha", 0.3)
 
         # Velocity task parameters
         vel_speed_min = env_args.get("vel_speed_min", None)
@@ -101,6 +103,8 @@ class MAPushEnv:
                                       positive_approachtobox_reward=positive_approachtobox_reward,
                                       agent0=agent0, agent1=agent1,
                                       require_both_contact_for_success=require_both_contact_for_success,
+                                      contact_force_gating=contact_force_gating,
+                                      contact_force_gating_alpha=contact_force_gating_alpha,
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
                                       vel_angular_penalty_scale=vel_angular_penalty_scale)
@@ -119,6 +123,8 @@ class MAPushEnv:
                                       positive_approachtobox_reward=positive_approachtobox_reward,
                                       agent0=agent0, agent1=agent1,
                                       require_both_contact_for_success=require_both_contact_for_success,
+                                      contact_force_gating=contact_force_gating,
+                                      contact_force_gating_alpha=contact_force_gating_alpha,
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
                                       vel_angular_penalty_scale=vel_angular_penalty_scale)

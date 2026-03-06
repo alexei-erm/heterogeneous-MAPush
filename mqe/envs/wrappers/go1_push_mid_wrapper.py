@@ -120,13 +120,11 @@ class Go1PushMidWrapper(EmptyWrapper):
             "dual_push_bonus": 0,
             # CRITIC17 v2: Gaussian proximity bonus
             "gaussian_proximity_bonus": 0,
+            # Contact-force gating metrics
+            "avg_dual_push_balance": 0,
+            "avg_dual_push_gate": 0,
             "step_count": 0,
         }
-
-        # DEBUG: Exception tracking counters
-        # self.debug_step_counter = 0
-        # self.debug_sim_exception_count = 0
-        # self.debug_nan_exception_count = 0
 
         # Contact threshold for individualized rewards (distance to box center)
         # Agents within this distance are considered "in contact" with box
@@ -140,6 +138,62 @@ class Go1PushMidWrapper(EmptyWrapper):
             print(f"[Go1PushMidWrapper] COLLABORATION ENFORCEMENT ENABLED")
             print(f"  reach_target_reward ONLY given if BOTH agents within {self.contact_threshold}m of box at success")
             print(f"  Solo pushing to goal = NO reward!")
+
+        # Contact-force gating: gate push_reward and target_reward by contact-force balance
+        self.contact_force_gating = getattr(self.cfg.rewards, "contact_force_gating", False)
+        self.contact_force_gating_alpha = getattr(self.cfg.rewards, "contact_force_gating_alpha", 1.0)
+        if self.contact_force_gating:
+            # Compute per-agent total mass from Isaac Gym rigid body properties
+            self.cf_agent_masses = self._compute_agent_masses()
+
+            # Pre-compute per-agent body offsets and non-foot body indices
+            robot_num_bodies = getattr(self.env, 'robot_num_bodies', None)
+            if robot_num_bodies is None:
+                robot_num_bodies = [self.env.num_bodies] * self.num_agents
+
+            self.cf_agent_body_offsets = []
+            offset = 0
+            for nb in robot_num_bodies:
+                self.cf_agent_body_offsets.append(offset)
+                offset += nb
+
+            self.cf_per_agent_non_foot_indices = []
+            hetero_types = getattr(self.env, 'hetero_agent_types', None)
+            for agent_idx in range(self.num_agents):
+                nb = robot_num_bodies[agent_idx]
+                agent_handle = self.env.actor_handles[0][agent_idx]
+                body_names = self.env.gym.get_actor_rigid_body_names(
+                    self.env.envs[0], agent_handle
+                )
+                if hetero_types is not None:
+                    from mqe.envs.robot_registry import get_robot_config
+                    robot_cfg = get_robot_config(hetero_types[agent_idx])
+                    foot_name = robot_cfg.asset.foot_name
+                else:
+                    foot_name = self.cfg.asset.foot_name
+                feet_local = set()
+                for bi, bname in enumerate(body_names):
+                    if foot_name in bname:
+                        feet_local.add(bi)
+                non_foot = torch.tensor(
+                    [i for i in range(nb) if i not in feet_local],
+                    dtype=torch.long, device=self.device
+                )
+                self.cf_per_agent_non_foot_indices.append(non_foot)
+                agent_label = hetero_types[agent_idx] if hetero_types else "agent"
+                print(f"  Agent {agent_idx} ({agent_label}): {nb} bodies, "
+                      f"feet={sorted(feet_local)}, non-foot count={len(non_foot)}")
+
+            self.cf_push_force_threshold = 5.0  # Newtons
+
+            print(f"[Go1PushMidWrapper] CONTACT-FORCE GATING ENABLED")
+            print(f"  alpha={self.contact_force_gating_alpha}, "
+                  f"agent_masses={[m.item() for m in self.cf_agent_masses]}, "
+                  f"body_offsets={self.cf_agent_body_offsets}, "
+                  f"force_threshold={self.cf_push_force_threshold}N")
+            # Add per-agent contribution metrics to reward_buffer
+            for i in range(self.num_agents):
+                self.reward_buffer[f"avg_push_contribution_agent{i}"] = 0
 
         # Whether to use individualized rewards (for HAPPO)
         self.individualized_rewards = getattr(self.cfg.rewards, "individualized_rewards", False)
@@ -285,6 +339,50 @@ class Go1PushMidWrapper(EmptyWrapper):
         self.same_side_bonus_scale = getattr(self.cfg.rewards, "same_side_bonus_scale", 0.0004)  # Both on push side
         self.blocking_penalty_scale = getattr(self.cfg.rewards, "blocking_penalty_scale", -0.001)  # Between box and goal
         self.directional_progress_scale = getattr(self.cfg.rewards, "directional_progress_scale", 0.003)  # Shared: box toward goal
+
+    def _compute_agent_masses(self):
+        """Compute total mass for each agent by summing all rigid body masses."""
+        masses = []
+        env_handle = self.env.envs[0]
+        for agent_idx in range(self.num_agents):
+            agent_handle = self.env.actor_handles[0][agent_idx]
+            body_props = self.env.gym.get_actor_rigid_body_properties(env_handle, agent_handle)
+            total_mass = sum(p.mass for p in body_props)
+            masses.append(torch.tensor(total_mass, device=self.device))
+        return masses
+
+    def _compute_dual_push_balance(self):
+        """Compute dual-push balance using contact forces from Isaac Gym.
+
+        Measures each agent's horizontal contact forces on non-foot bodies.
+        Mass-weighted so heavier robots' contributions are normalized.
+
+        Returns:
+            balance: (N,) tensor in [0, 1]. 1.0 = balanced, 0.0 = one agent idle
+            contributions: (N, A) tensor — per-agent contact force (mass-normalized)
+        """
+        eps = 1e-6
+        N = self.num_envs
+        contact_forces = self.env.contact_forces
+        M_total = sum(m for m in self.cf_agent_masses)
+
+        contributions = torch.zeros(N, self.num_agents, device=self.device)
+        for i in range(self.num_agents):
+            body_indices = self.cf_agent_body_offsets[i] + self.cf_per_agent_non_foot_indices[i]
+            agent_contact = contact_forces[:, body_indices, :]
+            horiz_force = torch.norm(agent_contact[:, :, :2], dim=2)
+            push_force_i = horiz_force.sum(dim=1)
+            mass_fraction = self.cf_agent_masses[i] / M_total
+            contributions[:, i] = push_force_i * mass_fraction
+
+        max_c = contributions.max(dim=1).values
+        min_c = contributions.min(dim=1).values
+
+        someone_pushing = max_c > self.cf_push_force_threshold
+        balance = torch.ones(N, device=self.device)
+        balance[someone_pushing] = min_c[someone_pushing] / (max_c[someone_pushing] + eps)
+
+        return balance, contributions
 
     def _init_extras(self, obs):
         return
@@ -572,6 +670,20 @@ class Go1PushMidWrapper(EmptyWrapper):
         else:
             gating_factor = None
 
+        # ============================================================
+        # Contact-Force Gating: Compute balance and gate value
+        # ============================================================
+        if self.contact_force_gating:
+            cf_balance, cf_contributions = self._compute_dual_push_balance()
+            cf_gate = self.contact_force_gating_alpha + (1.0 - self.contact_force_gating_alpha) * cf_balance
+            # Log metrics
+            self.reward_buffer["avg_dual_push_balance"] += cf_balance.mean().item()
+            self.reward_buffer["avg_dual_push_gate"] += cf_gate.mean().item()
+            for i in range(self.num_agents):
+                self.reward_buffer[f"avg_push_contribution_agent{i}"] += cf_contributions[:, i].mean().item()
+        else:
+            cf_gate = None
+
         # =================================================================
         # CRITIC14: ALL TEAM REWARDS (centralized critic compatibility)
         # Key Change: Converted ALL rewards to team rewards for centralized critic
@@ -689,6 +801,9 @@ class Go1PushMidWrapper(EmptyWrapper):
             # Iter8: Apply gating if enabled (NOT for baseline_mappo_rewards)
             if self.shared_gated_rewards and not self.baseline_mappo_rewards:
                 distance_reward = distance_reward * gating_factor
+            # Contact-force gating: reduce target reward when contributions unbalanced
+            if cf_gate is not None:
+                distance_reward = distance_reward * cf_gate
             # Shared reward (both agents get same reward - original behavior)
             reward[:, :] += distance_reward.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["distance_to_target_reward"] += torch.sum(distance_reward).cpu()
@@ -803,6 +918,9 @@ class Go1PushMidWrapper(EmptyWrapper):
                 # Iter8: Apply gating if enabled
                 if self.shared_gated_rewards:
                     push_reward = push_reward * gating_factor
+                # Contact-force gating: reduce push_reward when contributions unbalanced
+                if cf_gate is not None:
+                    push_reward = push_reward * cf_gate
                 reward[:, :] += push_reward.unsqueeze(1).repeat(1, self.num_agents)
                 self.reward_buffer["push_reward"] += torch.sum(push_reward).cpu()
 

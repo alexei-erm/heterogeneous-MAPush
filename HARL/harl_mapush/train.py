@@ -61,6 +61,10 @@ def main():
                        help="CRITIC15 v4: Add dual pushing bonus. Rewards when both agents push toward goal simultaneously. Use with --mapush_og_rewards_teamified True. DEFAULT: False")
     parser.add_argument("--require_both_contact_for_success", type=lambda x: (str(x).lower() == 'true'), default=False,
                        help="COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents are within contact_threshold of box at success. Solo pushing = NO reward. DEFAULT: False")
+    parser.add_argument("--contact_force_gating", type=lambda x: (str(x).lower() == 'true'), default=False,
+                       help="Gate push_reward and target_reward by contact-force balance ratio. Prevents freeloading in heterogeneous teams. DEFAULT: False")
+    parser.add_argument("--contact_force_gating_alpha", type=float, default=0.3,
+                       help="Minimum gate value when balance=0 (freeloader gets alpha fraction of gated rewards). 1.0=disabled, 0.0=full gating. DEFAULT: 0.3")
     parser.add_argument("--agent0", type=str, default="go1",
                        help="Robot type for agent 0. Options: go1, anymal_c. DEFAULT: go1")
     parser.add_argument("--agent1", type=str, default="go1",
@@ -124,6 +128,8 @@ def main():
     use_collaboration = args.get("collaboration_rewards", False)
     use_positive_approach = args.get("positive_approachtobox_reward", False)
     use_require_both_contact = args.get("require_both_contact_for_success", False)
+    use_contact_force_gating = args.get("contact_force_gating", False)
+    contact_force_gating_alpha = args.get("contact_force_gating_alpha", 0.3)
 
     # Velocity task parameters
     vel_speed_min = args.get("vel_speed_min", None)
@@ -156,6 +162,8 @@ def main():
         "agent0": agent0,  # Robot type for agent 0
         "agent1": agent1,  # Robot type for agent 1
         "require_both_contact_for_success": use_require_both_contact,  # COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents in contact
+        "contact_force_gating": use_contact_force_gating,  # Gate push/target rewards by contact-force balance
+        "contact_force_gating_alpha": contact_force_gating_alpha,  # Min gate value (0.3 = freeloader gets 30%)
         # Velocity task parameters
         "vel_speed_min": vel_speed_min,
         "vel_speed_max": vel_speed_max,
