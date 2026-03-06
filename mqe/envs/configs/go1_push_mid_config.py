@@ -39,7 +39,7 @@ class Go1PushMidCfg(Go1Cfg):
         # Box dimensions: 1.2m x 1.2m x 0.5m
         # task/cuboid/config.py for MAPPO
         # mqe/envs/configs/go1_push_mid_config.py for HAPPO
-        npc_mass_override = 35 
+        npc_mass_override = 8
         # target area
         _terminate_after_contacts_on = []
         _file_npc = "{LEGGED_GYM_ROOT_DIR}/resources/objects/target.urdf"

@@ -106,6 +106,11 @@ class mqe_openrl_wrapper(gym.Wrapper):
                 reward_dict["average_step_reward"] += reward_dict[k]
             self.env.reward_buffer[k] = 0
         self.env.reward_buffer["step_count"] = 0
+        # Compute velocity tracking success rate from config values
+        if hasattr(self.env, 'velocity_tracking_scale') and self.env.velocity_tracking_scale != 0:
+            max_per_step = self.env.velocity_tracking_scale  # perfect tracking = scale * 1 * 1
+            actual_per_step = reward_dict.get("velocity_tracking_reward", 0)
+            reward_dict["velocity_tracking_success_rate"] = actual_per_step / max_per_step
         return reward_dict
 
 class MATWrapper(gym.Wrapper):

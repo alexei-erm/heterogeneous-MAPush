@@ -1,0 +1,710 @@
+============================================
+Velocity-MAPush Calculator Results
+Run: ./log/MQE/go1push_vel/velocity/run2
+Date: 2026年  2月 14日 土曜日 12:11:02 JST
+============================================
+
+--- rl_model_10000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_10000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.0048 (0.48%)
+  avg_direction_error:   1.5538 rad (89.03 deg)
+  avg_speed_error:       0.6406 m/s
+  avg_box_angular_vel:   0.0164 rad/s
+  avg_vel_track_reward:  0.000048
+  avg_ang_vel_penalty:   -0.000082
+=====================================================
+
+--- rl_model_20000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_20000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.1349 (13.49%)
+  avg_direction_error:   1.3011 rad (74.55 deg)
+  avg_speed_error:       0.5935 m/s
+  avg_box_angular_vel:   0.0490 rad/s
+  avg_vel_track_reward:  0.001349
+  avg_ang_vel_penalty:   -0.000245
+=====================================================
+
+--- rl_model_30000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_30000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.1467 (14.67%)
+  avg_direction_error:   1.2751 rad (73.06 deg)
+  avg_speed_error:       0.5682 m/s
+  avg_box_angular_vel:   0.0701 rad/s
+  avg_vel_track_reward:  0.001467
+  avg_ang_vel_penalty:   -0.000350
+=====================================================
+
+--- rl_model_40000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_40000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.2030 (20.30%)
+  avg_direction_error:   1.1740 rad (67.27 deg)
+  avg_speed_error:       0.5464 m/s
+  avg_box_angular_vel:   0.0858 rad/s
+  avg_vel_track_reward:  0.002030
+  avg_ang_vel_penalty:   -0.000429
+=====================================================
+
+--- rl_model_50000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_50000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.2229 (22.29%)
+  avg_direction_error:   1.1356 rad (65.06 deg)
+  avg_speed_error:       0.5379 m/s
+  avg_box_angular_vel:   0.0966 rad/s
+  avg_vel_track_reward:  0.002229
+  avg_ang_vel_penalty:   -0.000483
+=====================================================
+
+--- rl_model_60000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_60000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.2524 (25.24%)
+  avg_direction_error:   1.0823 rad (62.01 deg)
+  avg_speed_error:       0.5277 m/s
+  avg_box_angular_vel:   0.0975 rad/s
+  avg_vel_track_reward:  0.002524
+  avg_ang_vel_penalty:   -0.000488
+=====================================================
+
+--- rl_model_70000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_70000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.2797 (27.97%)
+  avg_direction_error:   1.0253 rad (58.75 deg)
+  avg_speed_error:       0.5184 m/s
+  avg_box_angular_vel:   0.1056 rad/s
+  avg_vel_track_reward:  0.002797
+  avg_ang_vel_penalty:   -0.000528
+=====================================================
+
+--- rl_model_80000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_80000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.2743 (27.43%)
+  avg_direction_error:   1.0397 rad (59.57 deg)
+  avg_speed_error:       0.5190 m/s
+  avg_box_angular_vel:   0.1060 rad/s
+  avg_vel_track_reward:  0.002743
+  avg_ang_vel_penalty:   -0.000530
+=====================================================
+
+--- rl_model_90000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_90000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.2994 (29.94%)
+  avg_direction_error:   0.9951 rad (57.01 deg)
+  avg_speed_error:       0.5122 m/s
+  avg_box_angular_vel:   0.1053 rad/s
+  avg_vel_track_reward:  0.002994
+  avg_ang_vel_penalty:   -0.000526
+=====================================================
+
+--- rl_model_100000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_100000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.3148 (31.48%)
+  avg_direction_error:   0.9682 rad (55.47 deg)
+  avg_speed_error:       0.5020 m/s
+  avg_box_angular_vel:   0.1142 rad/s
+  avg_vel_track_reward:  0.003148
+  avg_ang_vel_penalty:   -0.000571
+=====================================================
+
+--- rl_model_110000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_110000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.3306 (33.06%)
+  avg_direction_error:   0.9352 rad (53.58 deg)
+  avg_speed_error:       0.5046 m/s
+  avg_box_angular_vel:   0.1144 rad/s
+  avg_vel_track_reward:  0.003306
+  avg_ang_vel_penalty:   -0.000572
+=====================================================
+
+--- rl_model_120000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_120000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.3308 (33.08%)
+  avg_direction_error:   0.9273 rad (53.13 deg)
+  avg_speed_error:       0.5059 m/s
+  avg_box_angular_vel:   0.1091 rad/s
+  avg_vel_track_reward:  0.003308
+  avg_ang_vel_penalty:   -0.000546
+=====================================================
+
+--- rl_model_130000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_130000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.3320 (33.20%)
+  avg_direction_error:   0.9314 rad (53.36 deg)
+  avg_speed_error:       0.5057 m/s
+  avg_box_angular_vel:   0.1109 rad/s
+  avg_vel_track_reward:  0.003320
+  avg_ang_vel_penalty:   -0.000555
+=====================================================
+
+--- rl_model_140000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_140000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.3219 (32.19%)
+  avg_direction_error:   0.9501 rad (54.44 deg)
+  avg_speed_error:       0.5067 m/s
+  avg_box_angular_vel:   0.1099 rad/s
+  avg_vel_track_reward:  0.003219
+  avg_ang_vel_penalty:   -0.000549
+=====================================================
+
+--- rl_model_150000000_steps ---
+Importing module 'gym_38' (/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu116
+Device count 1
+/home/gvlab/isaac_gym/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+Using /home/gvlab/.cache/torch_extensions/py38_cu116 as PyTorch extensions root...
+Emitting ninja build file /home/gvlab/.cache/torch_extensions/py38_cu116/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+[MAPPO Testing] Agent types: HOMOGENEOUS (go1)
+Setting seed: 0
+Using LeggedRobotField.__init__, num_obs and num_privileged_obs will be computed instead of assigned.
+[Box Mass Override] Box mass set to 8.0 kg (URDF default: 4 kg)
+record_video False
+[Go1PushVelWrapper] Velocity-MAPush task initialized
+  Speed range: [0.3, 1.0]
+  Direction range: [0, 6.283185307179586]
+  Arrow offset: 2.0
+  Obs dim: 16
+  Reward scales: vel_track=0.01, ang_vel_pen=-0.005, vel_ocb=0.004, approach=0.00075, collision=-0.001, push=0.0015, exception=-5
+[DEBUG _reset_dofs] Using EXACT default DOF positions (no randomization)
+---------------------------------------------------------------------------
+Loaded checkpoint from:  ./log/MQE/go1push_vel/velocity/run2/checkpoints/rl_model_150000000_steps/module.pt
+=====================================================
+Velocity-MAPush Calculator Results
+  Steps: 400, Envs: 300
+-----------------------------------------------------
+  vel_tracking_success:  0.3380 (33.80%)
+  avg_direction_error:   0.9214 rad (52.79 deg)
+  avg_speed_error:       0.4999 m/s
+  avg_box_angular_vel:   0.1140 rad/s
+  avg_vel_track_reward:  0.003380
+  avg_ang_vel_penalty:   -0.000570
+=====================================================

@@ -223,8 +223,9 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
 
         cfg.env.record_video = args.record_video
 
-        # Enable heterogeneous agents if agent types differ
-        is_hetero = (agent0 != agent1)
+        # Enable heterogeneous agents if any agent is non-Go1
+        # (even same-type pairs like anymal_c+anymal_c need the hetero config path)
+        is_hetero = (agent0 != agent1) or (agent0 != 'go1')
         if is_hetero and hasattr(cfg, 'hetero'):
             cfg.hetero.use_hetero = True
             cfg.hetero.hetero_agent_types = [agent0, agent1]

@@ -61,7 +61,10 @@ class MAPushEnv:
         # Check for heterogeneous agent mode using agent0/agent1 flags
         agent0 = env_args.get("agent0", "go1")
         agent1 = env_args.get("agent1", "go1")
-        self.is_hetero = (agent0 != agent1)
+        # Use hetero path whenever any agent is non-Go1 (even if both are the same type,
+        # e.g. anymal_c + anymal_c), because make_mqe_env always uses Go1Object.
+        # make_hetero_env handles same-type non-Go1 pairs correctly.
+        self.is_hetero = (agent0 != agent1) or (agent0 != 'go1')
         self.agent_types = [agent0, agent1]
 
         # Create MQE environment with custom config

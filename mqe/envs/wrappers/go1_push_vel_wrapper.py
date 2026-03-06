@@ -13,7 +13,7 @@ Observation space (16 dims for 2 agents, agent-centric):
     other_vel(2): [other_vx_local, other_vy_local]       — other agent velocity in agent frame
 
 Reward terms (all team rewards):
-    1. velocity_tracking_reward   — cosine_similarity(box_vel, desired_vel) * exp(-|speed_error|)
+    1. velocity_tracking_reward   — cosine_similarity(box_vel, desired_vel) [direction-only, no speed penalty]
     2. angular_velocity_penalty   — -|box_angular_vel_z| (COOPERATION KEY)
     3. velocity_ocb_reward        — positioning: be on push side of box (continuous, averaged)
     4. approach_reward            — -(distance_to_box + 0.5)^2 per agent, averaged
@@ -85,6 +85,61 @@ class Go1PushVelWrapper(EmptyWrapper):
         self.push_reward_scale = self.cfg.rewards.scales.push_reward_scale
         self.exception_punishment_scale = self.cfg.rewards.scales.exception_punishment_scale
 
+        # Dual-push balance config
+        self.dual_push_alpha = getattr(self.cfg.rewards, 'dual_push_balance_alpha', 1.0)
+
+        # Compute per-agent total mass from Isaac Gym rigid body properties
+        self.agent_masses = self._compute_agent_masses()
+
+        # Pre-compute per-agent body offsets and non-foot body indices for contact
+        # force push detection. Handles heterogeneous agents with different body counts.
+        # robot_num_bodies: [n_bodies_agent0, n_bodies_agent1, ...]
+        robot_num_bodies = getattr(self.env, 'robot_num_bodies', None)
+        if robot_num_bodies is None:
+            # Homogeneous: all agents have same body count
+            robot_num_bodies = [self.env.num_bodies] * self.num_agents
+
+        # Cumulative body offsets in the contact_forces tensor
+        self.agent_body_offsets = []
+        offset = 0
+        for nb in robot_num_bodies:
+            self.agent_body_offsets.append(offset)
+            offset += nb
+
+        # Per-agent non-foot body indices (local, relative to agent's own bodies)
+        # For heterogeneous agents, each robot type has different body count and feet.
+        self.per_agent_non_foot_indices = []
+        hetero_types = getattr(self.env, 'hetero_agent_types', None)
+        for agent_idx in range(self.num_agents):
+            nb = robot_num_bodies[agent_idx]
+            # Query body names for this agent from Isaac Gym
+            agent_handle = self.env.actor_handles[0][agent_idx]
+            body_names = self.env.gym.get_actor_rigid_body_names(
+                self.env.envs[0], agent_handle
+            )
+            # Get foot_name: from per-agent robot config if hetero, else from task config
+            if hetero_types is not None:
+                from mqe.envs.robot_registry import get_robot_config
+                robot_cfg = get_robot_config(hetero_types[agent_idx])
+                foot_name = robot_cfg.asset.foot_name
+            else:
+                foot_name = self.cfg.asset.foot_name
+            feet_local = set()
+            for bi, bname in enumerate(body_names):
+                if foot_name in bname:
+                    feet_local.add(bi)
+            non_foot = torch.tensor(
+                [i for i in range(nb) if i not in feet_local],
+                dtype=torch.long, device=self.device
+            )
+            self.per_agent_non_foot_indices.append(non_foot)
+            agent_label = hetero_types[agent_idx] if hetero_types else "agent"
+            print(f"  Agent {agent_idx} ({agent_label}): {nb} bodies, "
+                  f"feet={sorted(feet_local)}, non-foot count={len(non_foot)}")
+
+        # Force threshold: below this, consider no meaningful push happening
+        self.push_force_threshold = 5.0  # Newtons
+
         # Reward buffer for tensorboard logging
         self.reward_buffer = {
             "velocity_tracking_reward": 0,
@@ -98,8 +153,15 @@ class Go1PushVelWrapper(EmptyWrapper):
             "avg_direction_error": 0,
             "avg_speed_error": 0,
             "avg_box_angular_vel": 0,
+            "avg_dual_push_balance": 0,
+            "avg_dual_push_gate": 0,
             "step_count": 0,
         }
+        # Per-agent distance metrics (separate from reward_buffer so they don't
+        # get mixed into average_step_reward calculations)
+        for i in range(self.num_agents):
+            self.reward_buffer[f"avg_dist_to_box_agent{i}"] = 0
+            self.reward_buffer[f"avg_push_contribution_agent{i}"] = 0
 
         print(f"[Go1PushVelWrapper] Velocity-MAPush task initialized")
         print(f"  Speed range: {self.speed_range}")
@@ -113,6 +175,85 @@ class Go1PushVelWrapper(EmptyWrapper):
               f"collision={self.collision_punishment_scale}, "
               f"push={self.push_reward_scale}, "
               f"exception={self.exception_punishment_scale}")
+        print(f"  Dual-push balance: alpha={self.dual_push_alpha}, "
+              f"agent_masses={[m.item() for m in self.agent_masses]}, "
+              f"body_offsets={self.agent_body_offsets}, "
+              f"force_threshold={self.push_force_threshold}N")
+
+    def _compute_agent_masses(self):
+        """Compute total mass for each agent type by summing all rigid body masses.
+
+        Returns:
+            list of tensors: [mass_agent0, mass_agent1, ...] on self.device
+        """
+        masses = []
+        env_handle = self.env.envs[0]
+        for agent_idx in range(self.num_agents):
+            agent_handle = self.env.actor_handles[0][agent_idx]
+            body_props = self.env.gym.get_actor_rigid_body_properties(env_handle, agent_handle)
+            total_mass = sum(p.mass for p in body_props)
+            masses.append(torch.tensor(total_mass, device=self.device))
+        return masses
+
+    def _compute_dual_push_balance(self):
+        """Compute dual-push balance using contact forces from Isaac Gym.
+
+        Measures each agent's push contribution by reading the horizontal contact
+        forces on the agent's non-foot bodies (base, hips, thighs, calves).
+        When an agent pushes the box, the box exerts a reaction force on the
+        agent's body — this is what we measure.
+
+        We exclude feet (always in contact with ground) and the Z component
+        (vertical ground normal). What remains is horizontal contact on the
+        body — almost exclusively from the box when the agent is near it.
+
+        Mass-weighted so heavier robots' force contributions are normalized.
+
+        Supports heterogeneous agents with different body counts and feet indices
+        via per-agent body offsets (self.agent_body_offsets) and per-agent
+        non-foot index lists (self.per_agent_non_foot_indices).
+
+        Returns:
+            balance: (N,) tensor in [0, 1]. 1.0 = perfectly balanced, 0.0 = one agent idle
+            contributions: (N, A) tensor — per-agent horizontal contact force (Newtons)
+        """
+        eps = 1e-6
+        N = self.num_envs
+
+        # contact_forces shape: (num_envs, total_bodies_in_env, 3)
+        contact_forces = self.env.contact_forces
+
+        M_total = sum(m for m in self.agent_masses)
+
+        contributions = torch.zeros(N, self.num_agents, device=self.device)
+
+        for i in range(self.num_agents):
+            # Global body indices for agent i's non-foot bodies
+            body_indices = self.agent_body_offsets[i] + self.per_agent_non_foot_indices[i]
+
+            # Contact forces on agent i's non-foot bodies: (N, num_non_foot_i, 3)
+            agent_contact = contact_forces[:, body_indices, :]
+
+            # Horizontal force magnitude per body: (N, num_non_foot_i)
+            horiz_force = torch.norm(agent_contact[:, :, :2], dim=2)
+
+            # Sum across all non-foot bodies: (N,)
+            push_force_i = horiz_force.sum(dim=1)
+
+            # Mass-normalize: lighter robot's force counts proportionally more
+            mass_fraction = self.agent_masses[i] / M_total
+            contributions[:, i] = push_force_i * mass_fraction
+
+        # Balance ratio
+        max_c = contributions.max(dim=1).values  # (N,)
+        min_c = contributions.min(dim=1).values  # (N,)
+
+        # Only gate when someone is actually pushing
+        someone_pushing = max_c > self.push_force_threshold
+        balance = torch.ones(N, device=self.device)
+        balance[someone_pushing] = min_c[someone_pushing] / (max_c[someone_pushing] + eps)
+
+        return balance, contributions
 
     def _sample_velocity_commands(self, env_ids):
         """Sample new velocity commands for the given environment IDs."""
@@ -418,6 +559,11 @@ class Go1PushVelWrapper(EmptyWrapper):
         base_vel_r[torch.isnan(base_vel_r)] = 0
         base_vel_r[torch.isinf(base_vel_r)] = 0
 
+        # --- Per-agent distance to box (monitoring metric) ---
+        for i in range(self.num_agents):
+            dist_i = torch.norm(box_pos[:, :2] - base_pos_r[:, i, :2], dim=1)  # (N,)
+            self.reward_buffer[f"avg_dist_to_box_agent{i}"] += torch.mean(dist_i).cpu().item()
+
         # --- Reward computation ---
         self.reward_buffer["step_count"] += 1
         reward = torch.zeros(self.num_envs, self.num_agents, device=self.device)
@@ -443,16 +589,31 @@ class Go1PushVelWrapper(EmptyWrapper):
                 desired_norm.squeeze() * actual_norm.squeeze()
             )  # (N,) in [-1, 1]
 
-            # Speed error
+            # Speed (tracked for monitoring only, not used in reward)
             actual_speed = actual_norm.squeeze()  # (N,)
             speed_error = torch.abs(actual_speed - self.cmd_speed)  # (N,)
 
-            # Combined: direction match * speed match
+            # Direction-only reward: cosine similarity with desired direction.
+            # No speed magnitude penalty — agents are rewarded for pushing the box
+            # in the right direction regardless of speed. This prevents the weaker
+            # agent from giving up when the team can't reach commanded speed.
             vel_track_reward = (
                 self.velocity_tracking_scale
                 * cos_sim
-                * torch.exp(-speed_error)
             )  # (N,)
+
+            # Dual-push balance gating: multiplicatively reduce tracking reward
+            # when push effort is unbalanced (one agent freeloading)
+            # tracking_reward *= alpha + (1 - alpha) * balance
+            # alpha=1.0 → no gating, alpha=0.0 → full gating
+            if self.dual_push_alpha < 1.0:
+                balance, contribs = self._compute_dual_push_balance()
+                gate = self.dual_push_alpha + (1.0 - self.dual_push_alpha) * balance
+                vel_track_reward = vel_track_reward * gate
+                self.reward_buffer["avg_dual_push_balance"] += torch.mean(balance).cpu().item()
+                self.reward_buffer["avg_dual_push_gate"] += torch.mean(gate).cpu().item()
+                for i in range(self.num_agents):
+                    self.reward_buffer[f"avg_push_contribution_agent{i}"] += torch.mean(contribs[:, i]).cpu().item()
 
             # Team reward
             reward[:, :] += vel_track_reward.unsqueeze(1).repeat(1, self.num_agents)
@@ -531,7 +692,7 @@ class Go1PushVelWrapper(EmptyWrapper):
                 base_pos_r[:, 0, :] - base_pos_r[:, 1, :], dim=1
             )
             collision_punishment = (
-                (1 / (0.02 + agent_distance / 3)) * self.collision_punishment_scale
+                (1 / (0.02 + agent_distance / 0.5)) * self.collision_punishment_scale
             )
             reward[:, :] += collision_punishment.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["collision_punishment"] += (

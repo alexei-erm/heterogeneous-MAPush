@@ -214,7 +214,12 @@ def test_calculator_mode(actors, env, num_episodes, seed):
         avg_vel_track = rb["velocity_tracking_reward"] / (sc * env.n_envs)
         avg_ang_pen = rb["angular_velocity_penalty"] / (sc * env.n_envs)
 
-        print(f"  Task: Velocity-MAPush (no success/failure metric)")
+        # Success rate: actual tracking reward / theoretical max (from config)
+        max_per_step = wrapper.velocity_tracking_scale
+        vel_success_rate = avg_vel_track / max_per_step if max_per_step != 0 else 0
+
+        print(f"  Task: Velocity-MAPush")
+        print(f"  Velocity Tracking Success: {vel_success_rate:.4f} ({vel_success_rate*100:.2f}%)")
         print(f"\n  Velocity Metrics (averaged over {sc} steps):")
         print(f"    Avg Direction Error:     {avg_dir_err:.4f} rad ({np.degrees(avg_dir_err):.2f} deg)")
         print(f"    Avg Speed Error:         {avg_spd_err:.4f} m/s")
@@ -374,19 +379,40 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
                 masks = np.zeros((1, n_agents, 1), dtype=np.float32)
 
         # Print episode results
-        success = env_raw.finished_buf[0].item() if hasattr(env_raw, 'finished_buf') else False
+        is_vel_viewer = (task == "go1push_vel")
 
         print(f"  Steps:   {step_count}")
         print(f"  Reward:  {episode_reward:.2f}")
-        print(f"  Result:  {'✓ SUCCESS' if success else '✗ FAILED'}")
 
-        if hasattr(env_raw, 'collision_degree_buf') and success:
-            collision = env_raw.collision_degree_buf[0].item() / step_count
-            print(f"  Collision Rate: {collision:.4f}")
+        if is_vel_viewer:
+            # Velocity task: print metrics from reward_buffer
+            if hasattr(env_raw, 'reward_buffer'):
+                rb = env_raw.reward_buffer
+                sc = rb["step_count"] if rb["step_count"] > 0 else 1
+                avg_dir_err = rb["avg_direction_error"] / sc
+                avg_spd_err = rb["avg_speed_error"] / sc
+                avg_ang_vel = rb["avg_box_angular_vel"] / sc
+                avg_vel_track = rb["velocity_tracking_reward"] / (sc * env_raw.num_envs) if hasattr(env_raw, 'num_envs') else 0
+                max_per_step = env_raw.velocity_tracking_scale if hasattr(env_raw, 'velocity_tracking_scale') else 0
+                sr = avg_vel_track / max_per_step if max_per_step != 0 else 0
+                print(f"  Success: {sr:.4f} ({sr*100:.2f}%)")
+                print(f"  Dir Err: {avg_dir_err:.4f} rad ({np.degrees(avg_dir_err):.1f} deg)")
+                print(f"  Spd Err: {avg_spd_err:.4f} m/s")
+                print(f"  Box wz:  {avg_ang_vel:.4f} rad/s")
+                # Reset for next episode
+                for k in rb:
+                    rb[k] = 0
+        else:
+            success = env_raw.finished_buf[0].item() if hasattr(env_raw, 'finished_buf') else False
+            print(f"  Result:  {'SUCCESS' if success else 'FAILED'}")
 
-        if hasattr(env_raw, 'collaboration_degree_buf') and success:
-            collab = env_raw.collaboration_degree_buf[0].item() / step_count
-            print(f"  Collaboration:  {collab:.4f}")
+            if hasattr(env_raw, 'collision_degree_buf') and success:
+                collision = env_raw.collision_degree_buf[0].item() / step_count
+                print(f"  Collision Rate: {collision:.4f}")
+
+            if hasattr(env_raw, 'collaboration_degree_buf') and success:
+                collab = env_raw.collaboration_degree_buf[0].item() / step_count
+                print(f"  Collaboration:  {collab:.4f}")
 
     print(f"\n{'='*70}\n")
 
@@ -542,11 +568,32 @@ def main():
 
             # Run calculator mode
             stats = test_calculator_mode(actors, env, args.num_episodes, args.seed)
-            all_results.append({
+
+            result_entry = {
                 'checkpoint': checkpoint_name,
                 'success_rate': stats['success_rate'],
-                'num_episodes': stats['num_episodes']
-            })
+                'num_episodes': stats['num_episodes'],
+            }
+
+            # Add velocity-specific metrics if available
+            is_vel_task = getattr(env, 'is_velocity_task', False)
+            if is_vel_task:
+                wrapper = env.env
+                rb = wrapper.reward_buffer
+                sc = rb["step_count"] if rb["step_count"] > 0 else 1
+                result_entry['avg_dir_err'] = rb["avg_direction_error"] / sc
+                result_entry['avg_spd_err'] = rb["avg_speed_error"] / sc
+                result_entry['avg_ang_vel'] = rb["avg_box_angular_vel"] / sc
+                avg_vel_track = rb["velocity_tracking_reward"] / (sc * env.n_envs)
+                result_entry['avg_vel_track'] = avg_vel_track
+                result_entry['avg_ang_pen'] = rb["angular_velocity_penalty"] / (sc * env.n_envs)
+                max_per_step = wrapper.velocity_tracking_scale
+                result_entry['vel_success_rate'] = avg_vel_track / max_per_step if max_per_step != 0 else 0
+                result_entry['is_velocity'] = True
+            else:
+                result_entry['is_velocity'] = False
+
+            all_results.append(result_entry)
 
         else:  # viewer mode
             if len(checkpoints_to_test) > 1:
@@ -565,11 +612,20 @@ def main():
 
     # Print summary if testing multiple checkpoints
     if len(checkpoints_to_test) > 1 and args.mode == "calculator":
+        is_velocity = all_results[0].get('is_velocity', False) if all_results else False
+
         print("\n" + "="*70)
         print("Summary of All Checkpoints")
         print("="*70)
-        for result in all_results:
-            print(f"  {result['checkpoint']:8s}  Success Rate: {result['success_rate']:.4f} ({result['success_rate']*100:.2f}%)  [{int(result['success_rate']*result['num_episodes'])}/{result['num_episodes']} episodes]")
+
+        if is_velocity:
+            print(f"  {'Checkpoint':8s}  {'success%':>8s}  {'dir_err(rad)':>12s}  {'spd_err(m/s)':>12s}  {'ang_vel(r/s)':>12s}  {'vel_track':>10s}")
+            print(f"  {'-'*8}  {'-'*8}  {'-'*12}  {'-'*12}  {'-'*12}  {'-'*10}")
+            for result in all_results:
+                print(f"  {result['checkpoint']:8s}  {result['vel_success_rate']*100:7.2f}%  {result['avg_dir_err']:12.4f}  {result['avg_spd_err']:12.4f}  {result['avg_ang_vel']:12.4f}  {result['avg_vel_track']:10.6f}")
+        else:
+            for result in all_results:
+                print(f"  {result['checkpoint']:8s}  Success Rate: {result['success_rate']:.4f} ({result['success_rate']*100:.2f}%)  [{int(result['success_rate']*result['num_episodes'])}/{result['num_episodes']} episodes]")
         print("="*70)
 
         # Save results to file
@@ -579,9 +635,13 @@ def main():
         with open(output_file, 'w') as f:
             import datetime
             f.write("="*70 + "\n")
-            f.write("MAPush HAPPO Testing Results\n")
+            if is_velocity:
+                f.write("Velocity-MAPush HAPPO Testing Results\n")
+            else:
+                f.write("MAPush HAPPO Testing Results\n")
             f.write("="*70 + "\n")
             f.write(f"Test Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Task: {args.task}\n")
             f.write(f"Num Episodes per Checkpoint: {args.num_episodes}\n")
             f.write(f"Num Parallel Envs: {args.num_envs}\n")
             f.write(f"Seed: {args.seed}\n")
@@ -589,9 +649,16 @@ def main():
 
             f.write("Results by Checkpoint:\n")
             f.write("-"*70 + "\n")
-            for result in all_results:
-                f.write(f"{result['checkpoint']:8s}  Success Rate: {result['success_rate']:.4f} ({result['success_rate']*100:.2f}%)  ")
-                f.write(f"[{int(result['success_rate']*result['num_episodes'])}/{result['num_episodes']} episodes]\n")
+
+            if is_velocity:
+                f.write(f"{'Checkpoint':8s}  {'success%':>8s}  {'dir_err(rad)':>12s}  {'spd_err(m/s)':>12s}  {'ang_vel(r/s)':>12s}  {'vel_track':>10s}  {'ang_pen':>10s}\n")
+                f.write("-"*80 + "\n")
+                for result in all_results:
+                    f.write(f"{result['checkpoint']:8s}  {result['vel_success_rate']*100:7.2f}%  {result['avg_dir_err']:12.4f}  {result['avg_spd_err']:12.4f}  {result['avg_ang_vel']:12.4f}  {result['avg_vel_track']:10.6f}  {result['avg_ang_pen']:10.6f}\n")
+            else:
+                for result in all_results:
+                    f.write(f"{result['checkpoint']:8s}  Success Rate: {result['success_rate']:.4f} ({result['success_rate']*100:.2f}%)  ")
+                    f.write(f"[{int(result['success_rate']*result['num_episodes'])}/{result['num_episodes']} episodes]\n")
             f.write("="*70 + "\n")
 
         print(f"\nResults saved to: {output_file}")

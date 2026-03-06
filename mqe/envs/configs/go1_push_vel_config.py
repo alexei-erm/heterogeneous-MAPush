@@ -15,14 +15,26 @@ class Go1PushVelCfg(Go1PushMidCfg):
     """
 
     class asset(Go1PushMidCfg.asset):
-        """Override box mass — 8kg is lighter and easier to push for faster learning.
+        """Override box mass to 8kg for faster learning.
         Override target NPC to use arrow marker URDF (green elongated box) instead
         of the red circle. Unfix base link so we can reposition + rotate it each
         step, and disable gravity so it floats in place."""
+        # --- 1.5x bigger box (1.8m) — DISABLED, using default SmallBox (1.2m x 1.2m x 0.5m) ---
+        # file_npc = "{LEGGED_GYM_ROOT_DIR}/resources/objects/cuboid/VelBox.urdf"
+        # npc_box_dimensions = [1.8, 1.8, 0.75]  # must match VelBox.urdf
         npc_mass_override = 8
         _file_npc = "{LEGGED_GYM_ROOT_DIR}/resources/objects/arrow.urdf"
         _fix_npc_base_link = False  # Allow teleporting target NPC (arrow marker)
         _npc_gravity = False        # Prevent target NPC from falling
+
+    class domain_rand(Go1PushMidCfg.domain_rand):
+        """Spawn radius for 1.2m box (edge at 0.6m from center).
+        ~0.6m clearance: 0.6 + 0.6 = 1.2m minimum radius."""
+        random_base_init_state = True
+        init_base_pos_range = dict(
+            r=[1.2, 1.3],  # reverted from [1.5, 1.6] (was for 1.8m big box)
+            theta=[-0.01, 2 * np.pi],
+        )
 
     class termination(Go1PushMidCfg.termination):
         """Override termination: remove z_wave since arrow marker (target NPC)
@@ -36,7 +48,7 @@ class Go1PushVelCfg(Go1PushMidCfg):
 
     class velocity_command:
         """Velocity command parameters sampled per episode."""
-        speed_range = [0.3, 1.0]        # [min, max] m/s commanded speed
+        speed_range = [0.5, 0.5]        # [min, max] m/s — fixed speed (no randomization)
         direction_range = [0, 2 * np.pi]  # [min, max] radians for commanded direction
         arrow_offset = 2.0               # meters ahead of box to place arrow marker
 
@@ -70,6 +82,13 @@ class Go1PushVelCfg(Go1PushMidCfg):
 
     class rewards(Go1PushMidCfg.rewards):
         """Velocity-specific reward scales."""
+
+        # Dual-push balance: multiplicatively gates the velocity tracking reward
+        # so freeloading kills the primary reward signal.
+        # tracking_reward *= alpha + (1 - alpha) * balance
+        # alpha=1.0 disables (no gating), alpha=0.0 means full gating (freeloader gets 0)
+        dual_push_balance_alpha = 0.3  # 1.0 = disabled by default
+
         class scales:
             # Velocity-specific rewards
             velocity_tracking_scale = 0.01

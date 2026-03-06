@@ -1,0 +1,5 @@
+============================================
+Velocity-MAPush Calculator Results
+Run: ./log/MQE/go1push_vel/velocity/run2/checkpoints
+Date: 2026年  2月 14日 土曜日 11:55:41 JST
+============================================

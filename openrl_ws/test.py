@@ -143,37 +143,68 @@ if getattr(args, "test_mode") is not None:
 agent.set_env(env)  # The agent requires an interactive environment.
 obs = env.reset()  # Initialize the environment to obtain initial observations and environmental information.
 
+is_velocity_task = (getattr(args, 'task', '') == 'go1push_vel')
+
 if test_mode == "calculator":
-    while not torch.all(env.init_reset_buf):
-        action, _ = agent.act(obs) 
-        obs, r, done, info = env.step(action)
-    success_rate=torch.mean(env.init_finished_buf.to(torch.float))
-    finished_time = torch.mean(env.init_episode_length_buf * env.dt)
-    collision_degree = torch.mean(env.collision_degree_buf[env.init_finished_buf]/ env.init_episode_length_buf[env.init_finished_buf])
-    collaboration_degree = torch.mean(env.collaboration_degree_buf[env.init_finished_buf]/ env.init_episode_length_buf[env.init_finished_buf])
-    print("success rate:",(success_rate.item()))
-    print("finished time:",(finished_time.item()))
-    print("collision degree:",(collision_degree.item()))
-    print("collaboration degree:",(collaboration_degree.item()))
-    success_rate=torch.mean(env.init_finished_buf.to(torch.float))
-    finished_time = torch.mean(env.init_episode_length_buf * env.dt)
-    collision_degree = torch.mean(env.collision_degree_buf[env.init_finished_buf]/ env.init_episode_length_buf[env.init_finished_buf])
-    collaboration_degree = torch.mean(env.collaboration_degree_buf[env.init_finished_buf]/ env.init_episode_length_buf[env.init_finished_buf])
-    print("success rate:",(success_rate.item()))
-    print("finished time:",(finished_time.item()))
-    print("collision degree:",(collision_degree.item()))
-    print("collaboration degree:",(collaboration_degree.item()))
-    print("-----------------------------------------------------")
+    if is_velocity_task:
+        # Velocity task: run for fixed number of steps (no init_reset_buf)
+        # Episodes auto-reset on timeout; collect metrics from reward_buffer
+        max_calc_steps = 400  # ~2 full episodes at 200-step episode length
+        for step_i in range(max_calc_steps):
+            action, _ = agent.act(obs)
+            obs, r, done, info = env.step(action)
+
+        # Extract velocity metrics from wrapper's reward_buffer
+        rb = env.env.reward_buffer
+        sc = rb["step_count"] if rb["step_count"] > 0 else 1
+
+        avg_dir_err = rb["avg_direction_error"] / sc
+        avg_spd_err = rb["avg_speed_error"] / sc
+        avg_ang_vel = rb["avg_box_angular_vel"] / sc
+        avg_vel_track = rb["velocity_tracking_reward"] / (sc * env.env.num_envs)
+        avg_ang_pen = rb["angular_velocity_penalty"] / (sc * env.env.num_envs)
+
+        # Success rate: actual tracking reward / theoretical max (from config)
+        max_per_step = env.env.velocity_tracking_scale  # perfect = scale * 1 * 1
+        vel_success_rate = avg_vel_track / max_per_step if max_per_step != 0 else 0
+
+        print("=====================================================")
+        print("Velocity-MAPush Calculator Results")
+        print(f"  Steps: {sc}, Envs: {env.env.num_envs}")
+        print("-----------------------------------------------------")
+        print(f"  vel_tracking_success:  {vel_success_rate:.4f} ({vel_success_rate*100:.2f}%)")
+        print(f"  avg_direction_error:   {avg_dir_err:.4f} rad ({np.degrees(avg_dir_err):.2f} deg)")
+        print(f"  avg_speed_error:       {avg_spd_err:.4f} m/s")
+        print(f"  avg_box_angular_vel:   {avg_ang_vel:.4f} rad/s")
+        print(f"  avg_vel_track_reward:  {avg_vel_track:.6f}")
+        print(f"  avg_ang_vel_penalty:   {avg_ang_pen:.6f}")
+        print("=====================================================")
+    else:
+        # Mid-task: original calculator mode
+        while not torch.all(env.init_reset_buf):
+            action, _ = agent.act(obs)
+            obs, r, done, info = env.step(action)
+        success_rate=torch.mean(env.init_finished_buf.to(torch.float))
+        finished_time = torch.mean(env.init_episode_length_buf * env.dt)
+        collision_degree = torch.mean(env.collision_degree_buf[env.init_finished_buf]/ env.init_episode_length_buf[env.init_finished_buf])
+        collaboration_degree = torch.mean(env.collaboration_degree_buf[env.init_finished_buf]/ env.init_episode_length_buf[env.init_finished_buf])
+        print("success rate:",(success_rate.item()))
+        print("finished time:",(finished_time.item()))
+        print("collision degree:",(collision_degree.item()))
+        print("collaboration degree:",(collaboration_degree.item()))
+        print("-----------------------------------------------------")
 elif test_mode=="viewer":
     if args.record_video:
         running_count = 0
         env.start_recording()
         while True:
-            action, _ = agent.act(obs) 
+            action, _ = agent.act(obs)
             obs, r, done, info = env.step(action)
             if done.all():
                 running_count += 1
-                if torch.all(env.finished_buf):
+                if is_velocity_task:
+                    print("episode done (velocity task)")
+                elif torch.all(env.finished_buf):
                     print("success")
                 else:
                     print("fail")
@@ -187,10 +218,24 @@ elif test_mode=="viewer":
                 break
     else:
         while True:
-            action, _ = agent.act(obs) 
+            action, _ = agent.act(obs)
             obs, r, done, info = env.step(action)
             if done.all():
-                if torch.all(env.finished_buf):
+                if is_velocity_task:
+                    # Velocity task: print metrics from reward_buffer
+                    rb = env.env.reward_buffer
+                    sc = rb["step_count"] if rb["step_count"] > 0 else 1
+                    avg_dir_err = rb["avg_direction_error"] / sc
+                    avg_spd_err = rb["avg_speed_error"] / sc
+                    avg_ang_vel = rb["avg_box_angular_vel"] / sc
+                    avg_vel_track = rb["velocity_tracking_reward"] / (sc * env.env.num_envs)
+                    max_per_step = env.env.velocity_tracking_scale
+                    sr = avg_vel_track / max_per_step if max_per_step != 0 else 0
+                    print(f"Episode done | success={sr:.2%} dir_err={avg_dir_err:.3f}rad spd_err={avg_spd_err:.3f}m/s ang_vel={avg_ang_vel:.3f}rad/s")
+                    # Reset reward_buffer for next episode
+                    for k in rb:
+                        rb[k] = 0
+                elif torch.all(env.finished_buf):
                     print("success")
                 else:
                     print("fail")

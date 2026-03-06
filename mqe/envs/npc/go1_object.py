@@ -111,9 +111,10 @@ class Go1Object(Go1):
             rigid_body_props = self.gym.get_actor_rigid_body_properties(env_handle, npc_handle)
             rigid_body_props[0].mass = npc_mass_override
             # Recalculate inertia for box: I = (1/12) * m * (a² + b²) for each axis
-            # Box dimensions from SmallBox.urdf: 1.2m x 1.2m x 0.5m
+            # Box dimensions from config or default to SmallBox.urdf: 1.2m x 1.2m x 0.5m
             m = npc_mass_override
-            w, d, h = 1.2, 1.2, 0.5  # width (x), depth (y), height (z)
+            box_dims = getattr(self.cfg.asset, "npc_box_dimensions", [1.2, 1.2, 0.5])
+            w, d, h = box_dims[0], box_dims[1], box_dims[2]
             ixx = (1.0/12.0) * m * (d*d + h*h)
             iyy = (1.0/12.0) * m * (w*w + h*h)
             izz = (1.0/12.0) * m * (w*w + d*d)
@@ -122,7 +123,7 @@ class Go1Object(Go1):
             rigid_body_props[0].inertia.z = gymapi.Vec3(0, 0, izz)
             self.gym.set_actor_rigid_body_properties(env_handle, npc_handle, rigid_body_props, recomputeInertia=False)
             if env_id == 0:
-                print(f"[Box Mass Override] Box mass set to {npc_mass_override:.1f} kg (URDF default: 4 kg)")
+                print(f"[Box Mass Override] Box mass set to {npc_mass_override:.1f} kg, dims={w}x{d}x{h}m (URDF default: 4 kg)")
 
         npc_handles.append(npc_handle)
         # create target box illusion

@@ -120,7 +120,10 @@ def train(args):
             print("*******************************************************************************************************")
 
         # initilize callback
-        callback=CheckpointCallback(save_freq=10000000, save_path= run_dir + "/checkpoints", name_prefix="rl_model", save_replay_buffer=False, verbose=2)
+        # save_freq counts n_calls (one per env.step()), NOT timesteps.
+        # Each env.step() = num_envs timesteps, so: save_freq = desired_interval / num_envs
+        # 20000 * 500 envs = checkpoint every 10M timesteps
+        callback=CheckpointCallback(save_freq=20000, save_path= run_dir + "/checkpoints", name_prefix="rl_model", save_replay_buffer=False, verbose=2)
         agent.train(
             total_time_steps=args.train_timesteps,
             logger=logger,
