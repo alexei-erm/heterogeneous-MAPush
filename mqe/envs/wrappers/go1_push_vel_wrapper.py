@@ -138,7 +138,7 @@ class Go1PushVelWrapper(EmptyWrapper):
                   f"feet={sorted(feet_local)}, non-foot count={len(non_foot)}")
 
         # Force threshold: below this, consider no meaningful push happening
-        self.push_force_threshold = 5.0  # Newtons
+        self.push_force_threshold = 0.1  # N/kg (force-per-unit-mass threshold)
 
         # Reward buffer for tensorboard logging
         self.reward_buffer = {
@@ -178,7 +178,7 @@ class Go1PushVelWrapper(EmptyWrapper):
         print(f"  Dual-push balance: alpha={self.dual_push_alpha}, "
               f"agent_masses={[m.item() for m in self.agent_masses]}, "
               f"body_offsets={self.agent_body_offsets}, "
-              f"force_threshold={self.push_force_threshold}N")
+              f"force_threshold={self.push_force_threshold} N/kg")
 
     def _compute_agent_masses(self):
         """Compute total mass for each agent type by summing all rigid body masses.
@@ -223,8 +223,6 @@ class Go1PushVelWrapper(EmptyWrapper):
         # contact_forces shape: (num_envs, total_bodies_in_env, 3)
         contact_forces = self.env.contact_forces
 
-        M_total = sum(m for m in self.agent_masses)
-
         contributions = torch.zeros(N, self.num_agents, device=self.device)
 
         for i in range(self.num_agents):
@@ -240,9 +238,8 @@ class Go1PushVelWrapper(EmptyWrapper):
             # Sum across all non-foot bodies: (N,)
             push_force_i = horiz_force.sum(dim=1)
 
-            # Mass-normalize: lighter robot's force counts proportionally more
-            mass_fraction = self.agent_masses[i] / M_total
-            contributions[:, i] = push_force_i * mass_fraction
+            # Normalize by mass: force-per-kg so heavier robot's raw force advantage is divided out
+            contributions[:, i] = push_force_i / self.agent_masses[i]
 
         # Balance ratio
         max_c = contributions.max(dim=1).values  # (N,)

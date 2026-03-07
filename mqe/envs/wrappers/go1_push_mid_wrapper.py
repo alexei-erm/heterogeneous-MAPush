@@ -184,13 +184,13 @@ class Go1PushMidWrapper(EmptyWrapper):
                 print(f"  Agent {agent_idx} ({agent_label}): {nb} bodies, "
                       f"feet={sorted(feet_local)}, non-foot count={len(non_foot)}")
 
-            self.cf_push_force_threshold = 5.0  # Newtons
+            self.cf_push_force_threshold = 0.1  # N/kg (force-per-unit-mass threshold)
 
             print(f"[Go1PushMidWrapper] CONTACT-FORCE GATING ENABLED")
             print(f"  alpha={self.contact_force_gating_alpha}, "
                   f"agent_masses={[m.item() for m in self.cf_agent_masses]}, "
                   f"body_offsets={self.cf_agent_body_offsets}, "
-                  f"force_threshold={self.cf_push_force_threshold}N")
+                  f"force_threshold={self.cf_push_force_threshold} N/kg")
             # Add per-agent contribution metrics to reward_buffer
             for i in range(self.num_agents):
                 self.reward_buffer[f"avg_push_contribution_agent{i}"] = 0
@@ -364,16 +364,14 @@ class Go1PushMidWrapper(EmptyWrapper):
         eps = 1e-6
         N = self.num_envs
         contact_forces = self.env.contact_forces
-        M_total = sum(m for m in self.cf_agent_masses)
-
         contributions = torch.zeros(N, self.num_agents, device=self.device)
         for i in range(self.num_agents):
             body_indices = self.cf_agent_body_offsets[i] + self.cf_per_agent_non_foot_indices[i]
             agent_contact = contact_forces[:, body_indices, :]
             horiz_force = torch.norm(agent_contact[:, :, :2], dim=2)
             push_force_i = horiz_force.sum(dim=1)
-            mass_fraction = self.cf_agent_masses[i] / M_total
-            contributions[:, i] = push_force_i * mass_fraction
+            # Normalize by mass: force-per-kg so heavier robot's raw force advantage is divided out
+            contributions[:, i] = push_force_i / self.cf_agent_masses[i]
 
         max_c = contributions.max(dim=1).values
         min_c = contributions.min(dim=1).values
