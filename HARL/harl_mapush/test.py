@@ -601,7 +601,8 @@ def main():
                 print("This may take a long time. Consider using calculator mode instead.\n")
 
             # Run viewer mode (creates its own single-env environment)
-            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1, task=args.task)
+            test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1, task=args.task,
+                           record_video=args.record_video, video_dir=args.video_dir)
 
     # Clean up
     if args.mode == "calculator":

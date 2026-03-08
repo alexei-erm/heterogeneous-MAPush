@@ -104,22 +104,10 @@ class Go1PushMidWrapper(EmptyWrapper):
             "push_reward":0,
             "ocb_reward":0,
             "goal_push_bonus": 0,
-            # Iter6 new rewards (old, not used)
-            "engagement_bonus": 0,
-            "cooperation_bonus": 0,
-            "same_side_bonus": 0,
-            "blocking_penalty": 0,
-            # Iter8 gated rewards
-            "gating_factor": 0,
-            # CRITIC12: Three-tier cooperation bonuses
-            "dual_engagement_bonus": 0,
-            "synchronized_contact_bonus": 0,
-            "bilateral_push_bonus": 0,
             "proximity_penalty": 0,
-            # CRITIC15 v4: Collaboration rewards
             "dual_push_bonus": 0,
-            # CRITIC17 v2: Gaussian proximity bonus
             "gaussian_proximity_bonus": 0,
+            "gating_factor": 0,
             # Contact-force gating metrics
             "avg_dual_push_balance": 0,
             "avg_dual_push_gate": 0,
@@ -194,6 +182,10 @@ class Go1PushMidWrapper(EmptyWrapper):
             # Add per-agent contribution metrics to reward_buffer
             for i in range(self.num_agents):
                 self.reward_buffer[f"avg_push_contribution_agent{i}"] = 0
+            # Gate activation analysis metrics
+            self.reward_buffer["gate_near_min_frac"] = 0
+            self.reward_buffer["gate_near_max_frac"] = 0
+            self.reward_buffer["gate_active_frac"] = 0
 
         # Whether to use individualized rewards (for HAPPO)
         self.individualized_rewards = getattr(self.cfg.rewards, "individualized_rewards", False)
@@ -679,6 +671,10 @@ class Go1PushMidWrapper(EmptyWrapper):
             self.reward_buffer["avg_dual_push_gate"] += cf_gate.mean().item()
             for i in range(self.num_agents):
                 self.reward_buffer[f"avg_push_contribution_agent{i}"] += cf_contributions[:, i].mean().item()
+            # Gate activation analysis
+            self.reward_buffer["gate_near_min_frac"] += (cf_gate < (self.contact_force_gating_alpha + 0.1)).float().mean().item()
+            self.reward_buffer["gate_near_max_frac"] += (cf_gate > 0.9).float().mean().item()
+            self.reward_buffer["gate_active_frac"] += (cf_gate < 0.99).float().mean().item()
         else:
             cf_gate = None
 
