@@ -239,7 +239,26 @@ def test_calculator_mode(actors, env, num_episodes, seed):
     return stats
 
 
-def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1", task="go1push_mid"):
+def save_video(frames, fps, filename="output.mp4"):
+    """Save video frames to mp4 file using imageio."""
+    import imageio
+    video_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "docs", "video")
+    os.makedirs(video_dir, exist_ok=True)
+    output_path = os.path.join(video_dir, filename)
+
+    # frames: (N, C, H, W) -> take RGB, transpose to (N, H, W, C)
+    frames = frames[:, :3, :, :]
+    frames = np.transpose(frames, (0, 2, 3, 1)).astype(np.uint8)
+
+    writer = imageio.get_writer(output_path, fps=fps)
+    for i in range(len(frames)):
+        writer.append_data(frames[i])
+    writer.close()
+
+    print(f"Video saved to: {output_path}")
+
+
+def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1", task="go1push_mid", record_video=False):
     """Run viewer mode to visualize episodes sequentially.
 
     Args:
@@ -270,7 +289,7 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
     args.num_envs = 1
     args.seed = seed
     args.headless = False  # Enable rendering
-    args.record_video = False
+    args.record_video = record_video
     args.rl_device = "cuda:0"
     args.sim_device = "cuda:0"
     args.device = "cuda"
@@ -336,6 +355,12 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
         # Reset environment
         obs = env_raw.reset()
         obs_np = obs.cpu().numpy()  # [1, n_agents, obs_dim]
+
+        # Start recording AFTER reset so reset doesn't clear our frames
+        if record_video:
+            if episode_idx == 0:
+                print("Starting video recording (FloatingCameraSensor)...")
+            env_raw.start_recording()
 
         # Initialize RNN states and masks
         rnn_states = np.zeros((1, n_agents, recurrent_n, rnn_hidden_size), dtype=np.float32)
@@ -414,6 +439,18 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
                 collab = env_raw.collaboration_degree_buf[0].item() / step_count
                 print(f"  Collaboration:  {collab:.4f}")
 
+        # Save video for this episode if recording
+        if record_video:
+            frames = env_raw.get_complete_frames()
+            if frames and len(frames) > 0:
+                video_array = np.concatenate(
+                    [np.expand_dims(frame, axis=0) for frame in frames], axis=0
+                ).swapaxes(1, 3).swapaxes(2, 3)
+                filename = f"happo_ep{episode_idx + 1}.mp4"
+                save_video(video_array, 1 / env_raw.dt, filename=filename)
+            else:
+                print(f"  WARNING: No frames captured for episode {episode_idx + 1}")
+
     print(f"\n{'='*70}\n")
 
     # Close environment
@@ -458,6 +495,8 @@ def main():
                        help="Robot type for agent 0. Options: go1, anymal_c. DEFAULT: go1")
     parser.add_argument("--agent1", type=str, default="go1",
                        help="Robot type for agent 1. Options: go1, anymal_c. DEFAULT: go1")
+    parser.add_argument("--record_video", action="store_true",
+                       help="Record viewer mode episodes as mp4 videos (saved to docs/video/)")
 
     args = parser.parse_args()
 
@@ -602,7 +641,7 @@ def main():
 
             # Run viewer mode (creates its own single-env environment)
             test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1, task=args.task,
-                           record_video=args.record_video, video_dir=args.video_dir)
+                           record_video=args.record_video)
 
     # Clean up
     if args.mode == "calculator":
