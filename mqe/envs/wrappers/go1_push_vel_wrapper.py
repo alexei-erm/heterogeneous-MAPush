@@ -137,8 +137,8 @@ class Go1PushVelWrapper(EmptyWrapper):
             print(f"  Agent {agent_idx} ({agent_label}): {nb} bodies, "
                   f"feet={sorted(feet_local)}, non-foot count={len(non_foot)}")
 
-        # Force threshold: below this, consider no meaningful push happening
-        self.push_force_threshold = 0.1  # N/kg (force-per-unit-mass threshold)
+        # Box velocity threshold: gate activates when box is moving (mass-independent)
+        self.box_vel_threshold = 0.01  # m/s
 
         # Reward buffer for tensorboard logging
         self.reward_buffer = {
@@ -178,7 +178,7 @@ class Go1PushVelWrapper(EmptyWrapper):
         print(f"  Dual-push balance: alpha={self.dual_push_alpha}, "
               f"agent_masses={[m.item() for m in self.agent_masses]}, "
               f"body_offsets={self.agent_body_offsets}, "
-              f"force_threshold={self.push_force_threshold} N/kg")
+              f"box_vel_threshold={self.box_vel_threshold} m/s")
 
     def _compute_agent_masses(self):
         """Compute total mass for each agent type by summing all rigid body masses.
@@ -245,10 +245,14 @@ class Go1PushVelWrapper(EmptyWrapper):
         max_c = contributions.max(dim=1).values  # (N,)
         min_c = contributions.min(dim=1).values  # (N,)
 
-        # Only gate when someone is actually pushing
-        someone_pushing = max_c > self.push_force_threshold
+        # Trigger gating when box is moving (velocity-based, mass-independent)
+        npc_full = self.root_states_npc.reshape(N, self.num_npcs, -1)
+        box_vel_xy = npc_full[:, 0, 7:9]
+        box_speed = torch.norm(box_vel_xy, dim=1)
+        box_moving = box_speed > self.box_vel_threshold
+
         balance = torch.ones(N, device=self.device)
-        balance[someone_pushing] = min_c[someone_pushing] / (max_c[someone_pushing] + eps)
+        balance[box_moving] = min_c[box_moving] / (max_c[box_moving] + eps)
 
         return balance, contributions
 

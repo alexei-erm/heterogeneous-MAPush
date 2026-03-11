@@ -78,6 +78,7 @@ class MAPushEnv:
         require_both_contact_for_success = env_args.get("require_both_contact_for_success", False)
         contact_force_gating = env_args.get("contact_force_gating", False)
         contact_force_gating_alpha = env_args.get("contact_force_gating_alpha", 0.3)
+        box_mass = env_args.get("box_mass", None)
 
         # Velocity task parameters
         vel_speed_min = env_args.get("vel_speed_min", None)
@@ -107,7 +108,8 @@ class MAPushEnv:
                                       contact_force_gating_alpha=contact_force_gating_alpha,
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
-                                      vel_angular_penalty_scale=vel_angular_penalty_scale)
+                                      vel_angular_penalty_scale=vel_angular_penalty_scale,
+                                      box_mass=box_mass)
             )
         else:
             # Standard homogeneous environment
@@ -127,7 +129,8 @@ class MAPushEnv:
                                       contact_force_gating_alpha=contact_force_gating_alpha,
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
-                                      vel_angular_penalty_scale=vel_angular_penalty_scale)
+                                      vel_angular_penalty_scale=vel_angular_penalty_scale,
+                                      box_mass=box_mass)
             )
 
         self.n_envs = self.env.num_envs

@@ -65,6 +65,8 @@ def main():
                        help="Gate push_reward and target_reward by contact-force balance ratio. Prevents freeloading in heterogeneous teams. DEFAULT: False")
     parser.add_argument("--contact_force_gating_alpha", type=float, default=0.3,
                        help="Minimum gate value when balance=0 (freeloader gets alpha fraction of gated rewards). 1.0=disabled, 0.0=full gating. DEFAULT: 0.3")
+    parser.add_argument("--box_mass", type=float, default=None,
+                       help="Override box mass in kg. None = use config default (8kg). DEFAULT: None")
     parser.add_argument("--agent0", type=str, default="go1",
                        help="Robot type for agent 0. Options: go1, anymal_c. DEFAULT: go1")
     parser.add_argument("--agent1", type=str, default="go1",
@@ -130,6 +132,7 @@ def main():
     use_require_both_contact = args.get("require_both_contact_for_success", False)
     use_contact_force_gating = args.get("contact_force_gating", False)
     contact_force_gating_alpha = args.get("contact_force_gating_alpha", 0.3)
+    box_mass = args.get("box_mass", None)
 
     # Velocity task parameters
     vel_speed_min = args.get("vel_speed_min", None)
@@ -164,6 +167,7 @@ def main():
         "require_both_contact_for_success": use_require_both_contact,  # COLLABORATION ENFORCEMENT: Only give reach_target_reward if BOTH agents in contact
         "contact_force_gating": use_contact_force_gating,  # Gate push/target rewards by contact-force balance
         "contact_force_gating_alpha": contact_force_gating_alpha,  # Min gate value (0.3 = freeloader gets 30%)
+        "box_mass": box_mass,  # Override box mass in kg (None = config default)
         # Velocity task parameters
         "vel_speed_min": vel_speed_min,
         "vel_speed_max": vel_speed_max,

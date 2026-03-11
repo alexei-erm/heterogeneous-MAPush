@@ -214,7 +214,7 @@ def _merge_configs_for_homogeneous(base_config, robot_config_class, robot_type):
 
     return MergedConfig
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False, contact_force_gating=False, contact_force_gating_alpha=0.3, vel_speed_min=None, vel_speed_max=None, vel_tracking_scale=None, vel_angular_penalty_scale=None):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False, contact_force_gating=False, contact_force_gating_alpha=0.3, vel_speed_min=None, vel_speed_max=None, vel_tracking_scale=None, vel_angular_penalty_scale=None, box_mass=None):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -306,6 +306,11 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
             cfg.rewards.contact_force_gating = True
             cfg.rewards.contact_force_gating_alpha = contact_force_gating_alpha
             print(f"[custom_cfg] Contact-force gating ENABLED: alpha={contact_force_gating_alpha}")
+
+        # Box mass override
+        if box_mass is not None and hasattr(cfg, 'asset'):
+            cfg.asset.npc_mass_override = box_mass
+            print(f"[custom_cfg] Box mass override: {box_mass} kg")
 
         # Velocity task overrides
         if hasattr(cfg, 'velocity_command'):

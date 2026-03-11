@@ -172,13 +172,13 @@ class Go1PushMidWrapper(EmptyWrapper):
                 print(f"  Agent {agent_idx} ({agent_label}): {nb} bodies, "
                       f"feet={sorted(feet_local)}, non-foot count={len(non_foot)}")
 
-            self.cf_push_force_threshold = 0.1  # N/kg (force-per-unit-mass threshold)
+            self.cf_box_vel_threshold = 0.01  # m/s — gate activates when box is moving
 
             print(f"[Go1PushMidWrapper] CONTACT-FORCE GATING ENABLED")
             print(f"  alpha={self.contact_force_gating_alpha}, "
                   f"agent_masses={[m.item() for m in self.cf_agent_masses]}, "
                   f"body_offsets={self.cf_agent_body_offsets}, "
-                  f"force_threshold={self.cf_push_force_threshold} N/kg")
+                  f"box_vel_threshold={self.cf_box_vel_threshold} m/s")
             # Add per-agent contribution metrics to reward_buffer
             for i in range(self.num_agents):
                 self.reward_buffer[f"avg_push_contribution_agent{i}"] = 0
@@ -349,6 +349,9 @@ class Go1PushMidWrapper(EmptyWrapper):
         Measures each agent's horizontal contact forces on non-foot bodies.
         Mass-weighted so heavier robots' contributions are normalized.
 
+        Gate activation is triggered by box velocity (not force threshold),
+        making it robust across different box masses.
+
         Returns:
             balance: (N,) tensor in [0, 1]. 1.0 = balanced, 0.0 = one agent idle
             contributions: (N, A) tensor — per-agent contact force (mass-normalized)
@@ -368,9 +371,13 @@ class Go1PushMidWrapper(EmptyWrapper):
         max_c = contributions.max(dim=1).values
         min_c = contributions.min(dim=1).values
 
-        someone_pushing = max_c > self.cf_push_force_threshold
+        # Trigger gating when box is moving (velocity-based, mass-independent)
+        box_vel_xy = self.root_states_npc.reshape(N, self.num_npcs, -1)[:, 0, 7:9]
+        box_speed = torch.norm(box_vel_xy, dim=1)
+        box_moving = box_speed > self.cf_box_vel_threshold
+
         balance = torch.ones(N, device=self.device)
-        balance[someone_pushing] = min_c[someone_pushing] / (max_c[someone_pushing] + eps)
+        balance[box_moving] = min_c[box_moving] / (max_c[box_moving] + eps)
 
         return balance, contributions
 
