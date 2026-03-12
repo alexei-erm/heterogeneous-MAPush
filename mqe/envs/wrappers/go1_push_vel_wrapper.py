@@ -1,11 +1,11 @@
 """Velocity-MAPush wrapper.
 
-Task: Push box in a commanded direction at a commanded speed for the full episode.
+Task: Push box in a commanded direction for the full episode.
 Cooperation mechanism: Angular velocity penalty makes single-agent torque costly,
 while two agents from complementary positions cancel torques.
 
-Observation space (16 dims for 2 agents, agent-centric):
-    cmd(3):       [cos_theta_local, sin_theta_local, cmd_speed]
+Observation space (15 dims for 2 agents, agent-centric):
+    cmd(2):       [cos_theta_local, sin_theta_local]    — direction only, no speed
     box_pos(3):   [box_dx, box_dy, box_dyaw]           — box position relative to agent
     box_vel(3):   [box_vx_local, box_vy_local, box_wz]  — box velocity in agent frame + angular vel
     self_vel(2):  [self_vx, self_vy]                     — agent's own velocity in agent frame
@@ -13,7 +13,7 @@ Observation space (16 dims for 2 agents, agent-centric):
     other_vel(2): [other_vx_local, other_vy_local]       — other agent velocity in agent frame
 
 Reward terms (all team rewards):
-    1. velocity_tracking_reward   — cosine_similarity(box_vel, desired_vel) [direction-only, no speed penalty]
+    1. velocity_tracking_reward   — cosine_similarity(box_vel, desired_dir) [direction-only]
     2. angular_velocity_penalty   — -|box_angular_vel_z| (COOPERATION KEY)
     3. velocity_ocb_reward        — positioning: be on push side of box (continuous, averaged)
     4. approach_reward            — -(distance_to_box + 0.5)^2 per agent, averaged
@@ -53,10 +53,15 @@ class Go1PushVelWrapper(EmptyWrapper):
             self.num_envs, self.num_agents, 1
         )
 
-        # Observation space: 3(cmd) + 3(box pos) + 3(box vel+wz) + 2(self vel)
+        # Legacy mode: include cmd_speed in obs (16 dims) for old checkpoints
+        self.legacy_vel_obs = getattr(self.cfg.rewards, "legacy_vel_obs", False)
+
+        # Observation space: 2(cmd) + 3(box pos) + 3(box vel+wz) + 2(self vel)
         #   + (num_agents-1) * [3(other pos) + 2(other vel)]
-        # = 3 + 3 + 3 + 2 + (A-1)*5 = 11 + 5*(A-1) = 16 for 2 agents
-        obs_dim = 11 + 5 * (self.num_agents - 1)
+        # = 2 + 3 + 3 + 2 + (A-1)*5 = 10 + 5*(A-1) = 15 for 2 agents
+        # Legacy: 3(cmd with speed) → 11 + 5*(A-1) = 16 for 2 agents
+        cmd_dims = 3 if self.legacy_vel_obs else 2
+        obs_dim = (cmd_dims + 8) + 5 * (self.num_agents - 1)
         self.observation_space = spaces.Box(
             low=-float("inf"), high=float("inf"), shape=(obs_dim,), dtype=float
         )
@@ -344,7 +349,7 @@ class Go1PushVelWrapper(EmptyWrapper):
         self.root_states_npc[:] = npc_states.reshape(-1, 13)
 
     def _build_obs(self, base_pos, base_rpy, base_vel, box_lin_vel, box_ang_vel_z):
-        """Build agent-centric observations (16 dims for 2 agents).
+        """Build agent-centric observations (15 dims for 2 agents).
 
         Args:
             base_pos: (num_envs*num_agents, 3) — agent positions in env frame
@@ -356,8 +361,8 @@ class Go1PushVelWrapper(EmptyWrapper):
         Returns:
             obs: (num_envs, num_agents, obs_dim) tensor
 
-        Obs layout (16 dims for 2 agents):
-            cmd(3):       [cos θ_local, sin θ_local, cmd_speed]
+        Obs layout (15 dims for 2 agents):
+            cmd(2):       [cos θ_local, sin θ_local]            — direction only
             box_pos(3):   [box_dx, box_dy, box_dyaw]           — agent frame
             box_vel(3):   [box_vx_local, box_vy_local, box_ωz] — agent frame + angular vel
             self_vel(2):  [self_vx, self_vy]                    — agent frame
@@ -381,16 +386,23 @@ class Go1PushVelWrapper(EmptyWrapper):
         box_quat = self.root_states_npc.reshape(N, self.num_npcs, -1)[:, 0, 3:7]
         box_rpy = torch.stack(get_euler_xyz(box_quat), dim=1)  # (N, 3)
 
-        # --- 1. Velocity command in agent's local frame (3 dims) ---
+        # --- 1. Velocity command direction in agent's local frame (2 dims) ---
         cmd_dir_exp = self.cmd_direction.unsqueeze(1).expand(-1, A)  # (N, A)
         local_dir = cmd_dir_exp - agent_yaw
-        cmd_speed_exp = self.cmd_speed.unsqueeze(1).expand(-1, A)  # (N, A)
 
-        vel_cmd = torch.stack([
-            torch.cos(local_dir),
-            torch.sin(local_dir),
-            cmd_speed_exp,
-        ], dim=2)  # (N, A, 3)
+        if self.legacy_vel_obs:
+            # Legacy mode: include cmd_speed for old 16-dim checkpoints
+            cmd_speed_exp = self.cmd_speed.unsqueeze(1).expand(-1, A)  # (N, A)
+            vel_cmd = torch.stack([
+                torch.cos(local_dir),
+                torch.sin(local_dir),
+                cmd_speed_exp,
+            ], dim=2)  # (N, A, 3)
+        else:
+            vel_cmd = torch.stack([
+                torch.cos(local_dir),
+                torch.sin(local_dir),
+            ], dim=2)  # (N, A, 2)
 
         # --- 2. Box position relative to agent in agent's frame (3 dims) ---
         box_pos_xy_exp = box_pos[:, :2].unsqueeze(1).expand(-1, A, -1)  # (N, A, 2)

@@ -258,7 +258,7 @@ def save_video(frames, fps, filename="output.mp4"):
     print(f"Video saved to: {output_path}")
 
 
-def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1", task="go1push_mid", record_video=False, box_mass=None):
+def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1", task="go1push_mid", record_video=False, box_mass=None, box_mass_range=None, legacy_vel_obs=False):
     """Run viewer mode to visualize episodes sequentially.
 
     Args:
@@ -311,11 +311,11 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
             env_name=args.task,
             agent_types=[agent0, agent1],
             args=args,
-            custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass)
+            custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass, box_mass_range=box_mass_range, legacy_vel_obs=legacy_vel_obs)
         )
     else:
         print(f"  Using homogeneous mode: 2x {agent0}")
-        env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass))
+        env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass, box_mass_range=box_mass_range, legacy_vel_obs=legacy_vel_obs))
 
     n_agents = env_raw.num_agents
 
@@ -498,8 +498,12 @@ def main():
                        help="Robot type for agent 1. Options: go1, anymal_c. DEFAULT: go1")
     parser.add_argument("--box_mass", type=float, default=None,
                        help="Override box mass in kg. None = use config default (8kg). DEFAULT: None")
+    parser.add_argument("--box_mass_range", type=float, nargs=2, default=None,
+                       help="Randomize box mass uniformly in [min, max] kg per env. Example: --box_mass_range 4 20")
     parser.add_argument("--record_video", action="store_true",
                        help="Record viewer mode episodes as mp4 videos (saved to docs/video/)")
+    parser.add_argument("--legacy_vel_obs", action="store_true", default=False,
+                       help="Use legacy 16-dim velocity obs (includes cmd_speed) for loading old checkpoints")
 
     args = parser.parse_args()
 
@@ -591,6 +595,8 @@ def main():
                     "agent0": args.agent0,
                     "agent1": args.agent1,
                     "box_mass": args.box_mass,
+                    "box_mass_range": args.box_mass_range,
+                    "legacy_vel_obs": args.legacy_vel_obs,
                 }
                 if is_hetero:
                     print(f"\n[HAPPO Testing] Heterogeneous mode: agent0={args.agent0}, agent1={args.agent1}")
@@ -645,7 +651,8 @@ def main():
 
             # Run viewer mode (creates its own single-env environment)
             test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1, task=args.task,
-                           record_video=args.record_video, box_mass=args.box_mass)
+                           record_video=args.record_video, box_mass=args.box_mass, box_mass_range=args.box_mass_range,
+                           legacy_vel_obs=args.legacy_vel_obs)
 
     # Clean up
     if args.mode == "calculator":

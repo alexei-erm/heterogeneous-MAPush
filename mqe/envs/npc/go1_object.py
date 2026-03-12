@@ -105,14 +105,22 @@ class Go1Object(Go1):
             rigid_body_prop.friction = friction_range[0] + torch.rand(1).item() * (friction_range[1] - friction_range[0])
         self.gym.set_actor_rigid_shape_properties(env_handle, npc_handle, rigid_body_props)
 
-        # Apply box mass override if specified (for heavy box to encourage collaboration)
+        # Apply box mass: either randomized range or fixed override
+        npc_mass_range = getattr(self.cfg.asset, "npc_mass_range", None)
         npc_mass_override = getattr(self.cfg.asset, "npc_mass_override", None)
-        if npc_mass_override is not None:
+        if npc_mass_range is not None:
+            # Randomize mass uniformly in [min, max] per environment
+            m = npc_mass_range[0] + torch.rand(1).item() * (npc_mass_range[1] - npc_mass_range[0])
+        elif npc_mass_override is not None:
+            m = npc_mass_override
+        else:
+            m = None
+
+        if m is not None:
             rigid_body_props = self.gym.get_actor_rigid_body_properties(env_handle, npc_handle)
-            rigid_body_props[0].mass = npc_mass_override
+            rigid_body_props[0].mass = m
             # Recalculate inertia for box: I = (1/12) * m * (a² + b²) for each axis
             # Box dimensions from config or default to SmallBox.urdf: 1.2m x 1.2m x 0.5m
-            m = npc_mass_override
             box_dims = getattr(self.cfg.asset, "npc_box_dimensions", [1.2, 1.2, 0.5])
             w, d, h = box_dims[0], box_dims[1], box_dims[2]
             ixx = (1.0/12.0) * m * (d*d + h*h)
@@ -123,7 +131,10 @@ class Go1Object(Go1):
             rigid_body_props[0].inertia.z = gymapi.Vec3(0, 0, izz)
             self.gym.set_actor_rigid_body_properties(env_handle, npc_handle, rigid_body_props, recomputeInertia=False)
             if env_id == 0:
-                print(f"[Box Mass Override] Box mass set to {npc_mass_override:.1f} kg, dims={w}x{d}x{h}m (URDF default: 4 kg)")
+                if npc_mass_range is not None:
+                    print(f"[Box Mass Randomized] Range [{npc_mass_range[0]:.1f}, {npc_mass_range[1]:.1f}] kg, env0={m:.1f} kg, dims={w}x{d}x{h}m")
+                else:
+                    print(f"[Box Mass Override] Box mass set to {m:.1f} kg, dims={w}x{d}x{h}m (URDF default: 4 kg)")
 
         npc_handles.append(npc_handle)
         # create target box illusion

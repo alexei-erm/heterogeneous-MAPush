@@ -79,12 +79,15 @@ class MAPushEnv:
         contact_force_gating = env_args.get("contact_force_gating", False)
         contact_force_gating_alpha = env_args.get("contact_force_gating_alpha", 0.3)
         box_mass = env_args.get("box_mass", None)
+        box_mass_range = env_args.get("box_mass_range", None)
 
         # Velocity task parameters
         vel_speed_min = env_args.get("vel_speed_min", None)
         vel_speed_max = env_args.get("vel_speed_max", None)
         vel_tracking_scale = env_args.get("vel_tracking_scale", None)
         vel_angular_penalty_scale = env_args.get("vel_angular_penalty_scale", None)
+        legacy_vel_obs = env_args.get("legacy_vel_obs", False)
+        self.legacy_vel_obs = legacy_vel_obs
 
         if self.is_hetero:
             # Use make_hetero_env for heterogeneous agents
@@ -109,7 +112,9 @@ class MAPushEnv:
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
                                       vel_angular_penalty_scale=vel_angular_penalty_scale,
-                                      box_mass=box_mass)
+                                      box_mass=box_mass,
+                                      box_mass_range=box_mass_range,
+                                      legacy_vel_obs=legacy_vel_obs)
             )
         else:
             # Standard homogeneous environment
@@ -130,7 +135,9 @@ class MAPushEnv:
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
                                       vel_angular_penalty_scale=vel_angular_penalty_scale,
-                                      box_mass=box_mass)
+                                      box_mass=box_mass,
+                                      box_mass_range=box_mass_range,
+                                      legacy_vel_obs=legacy_vel_obs)
             )
 
         self.n_envs = self.env.num_envs
@@ -171,9 +178,13 @@ class MAPushEnv:
         # Share observation space (for centralized critic)
         from gym import spaces
         if self.is_velocity_task:
-            # Velocity task global state (box-centered frame, 18 dims for 2 agents):
-            # cmd(3) + box_dynamics(3) + agents(5*n_agents) + vel_error(2)
-            global_state_dim = 3 + 3 + 5 * self.n_agents + 2  # = 18 for 2 agents
+            if self.legacy_vel_obs:
+                # Legacy mode: cmd(3) + box_dynamics(3) + vel_error(2) + agents(5*n_agents) = 18 for 2 agents
+                global_state_dim = 3 + 3 + 2 + 5 * self.n_agents
+            else:
+                # Velocity task global state (box-centered frame, 15 dims for 2 agents):
+                # cmd_dir(2) + box_dynamics(3) + agents(5*n_agents)
+                global_state_dim = 2 + 3 + 5 * self.n_agents  # = 15 for 2 agents
         elif self.use_relative_obs_critic:
             # CRITIC11: Relative observations with explicit inter-robot distance
             # Structure: [robot1_to_box(3), robot2_to_box(3), inter_robot_dist(1), goal_to_box(2)]
@@ -590,21 +601,20 @@ class MAPushEnv:
         All quantities are expressed relative to the box position and orientation,
         giving the critic translation and rotation invariance.
 
-        Structure (18 dims for 2 agents):
-            cmd(3):          [cos(θ_box), sin(θ_box), cmd_speed]          — command rotated to box frame
+        Structure (15 dims for 2 agents, or 18 in legacy mode):
+            cmd(2 or 3):     [cos(θ_box), sin(θ_box), (cmd_speed)]        — direction rotated to box frame
             box_dynamics(3): [box_vx_box, box_vy_box, box_ωz]             — box velocity in box frame
+            (vel_error(2)):  [speed_error, dir_error]                      — legacy only
             a0(5):           [a0_dx, a0_dy, a0_dyaw, a0_vx, a0_vy]       — agent 0 pos+vel in box frame
             a1(5):           [a1_dx, a1_dy, a1_dyaw, a1_vx, a1_vy]       — agent 1 pos+vel in box frame
-            vel_error(2):    [err_vx, err_vy]                             — (actual_v - cmd_v) in box frame
 
         Returns:
-            global_state_np: [n_envs, 18] numpy array
+            global_state_np: [n_envs, 15] or [n_envs, 18] numpy array
         """
         wrapper = self.env
 
         # Velocity command from wrapper
         cmd_dir = wrapper.cmd_direction  # (n_envs,) — direction in world frame
-        cmd_speed = wrapper.cmd_speed    # (n_envs,)
 
         # NPC states
         npc_states = wrapper.root_states_npc.reshape(self.n_envs, wrapper.num_npcs, -1)
@@ -629,13 +639,15 @@ class MAPushEnv:
         base_rpy = obs_buf.base_rpy.reshape(self.n_envs, self.n_agents, 3)
         base_lin_vel = obs_buf.lin_vel.reshape(self.n_envs, self.n_agents, 3)
 
-        # --- 1. Command rotated to box frame (3 dims) ---
+        # --- 1. Command direction rotated to box frame (2 or 3 dims) ---
         cmd_dir_box = cmd_dir - box_yaw  # direction relative to box orientation
         state_list = [
             torch.cos(cmd_dir_box).unsqueeze(1),   # cos(θ_box) (n_envs, 1)
             torch.sin(cmd_dir_box).unsqueeze(1),   # sin(θ_box) (n_envs, 1)
-            cmd_speed.unsqueeze(1),                 # cmd_speed  (n_envs, 1)
         ]
+        if self.legacy_vel_obs:
+            cmd_speed = wrapper.cmd_speed  # (n_envs,)
+            state_list.append(cmd_speed.unsqueeze(1))  # (n_envs, 1)
 
         # --- 2. Box dynamics in box frame (3 dims) ---
         # Rotate box linear velocity from world to box frame
@@ -644,6 +656,23 @@ class MAPushEnv:
         state_list.append(box_vx_box.unsqueeze(1))       # (n_envs, 1)
         state_list.append(box_vy_box.unsqueeze(1))       # (n_envs, 1)
         state_list.append(box_ang_vel[:, 2:3])            # box ωz (n_envs, 1)
+
+        if self.legacy_vel_obs:
+            # Legacy: velocity error dims (speed_error, direction_error)
+            cmd_speed = wrapper.cmd_speed  # (n_envs,)
+            actual_speed = torch.norm(box_lin_vel[:, :2], dim=1)  # (n_envs,)
+            speed_error = torch.abs(actual_speed - cmd_speed)  # (n_envs,)
+            # Direction error: angle between desired and actual velocity
+            desired_vx = cmd_speed * torch.cos(cmd_dir)
+            desired_vy = cmd_speed * torch.sin(cmd_dir)
+            desired_vel = torch.stack([desired_vx, desired_vy], dim=1)
+            actual_vel = box_lin_vel[:, :2]
+            desired_norm = torch.norm(desired_vel, dim=1).clamp(min=1e-6)
+            actual_norm = torch.norm(actual_vel, dim=1).clamp(min=1e-6)
+            cos_sim = torch.sum(desired_vel * actual_vel, dim=1) / (desired_norm * actual_norm)
+            dir_error = torch.acos(cos_sim.clamp(-1, 1))
+            state_list.append(speed_error.unsqueeze(1))   # (n_envs, 1)
+            state_list.append(dir_error.unsqueeze(1))     # (n_envs, 1)
 
         # --- 3. Agent positions + velocities in box frame (5 dims each) ---
         for agent_id in range(self.n_agents):
@@ -667,35 +696,30 @@ class MAPushEnv:
             state_list.append(a_vx_box.unsqueeze(1))   # (n_envs, 1)
             state_list.append(a_vy_box.unsqueeze(1))   # (n_envs, 1)
 
-        # --- 4. 2D velocity error in box frame (2 dims) ---
-        # desired velocity in world frame
-        desired_vx = cmd_speed * torch.cos(cmd_dir)
-        desired_vy = cmd_speed * torch.sin(cmd_dir)
-        # error = actual - desired (world frame)
-        err_vx_world = box_lin_vel[:, 0] - desired_vx
-        err_vy_world = box_lin_vel[:, 1] - desired_vy
-        # Rotate error to box frame
-        err_vx_box = err_vx_world * cos_b - err_vy_world * sin_b
-        err_vy_box = err_vx_world * sin_b + err_vy_world * cos_b
-        state_list.append(err_vx_box.unsqueeze(1))   # (n_envs, 1)
-        state_list.append(err_vy_box.unsqueeze(1))   # (n_envs, 1)
-
         global_state_torch = torch.cat(state_list, dim=1)
         global_state_np = global_state_torch.cpu().numpy().astype(np.float32)
 
         # Diagnostic logging (first call only)
         if not hasattr(self, '_logged_global_state'):
+            ndims = global_state_np.shape[1]
+            mode_str = "LEGACY 18 dims" if self.legacy_vel_obs else "15 dims"
             print("\n" + "=" * 80)
-            print("GLOBAL STATE DIAGNOSTIC (First Step) - Velocity Task (Box-centered, 18 dims)")
+            print(f"GLOBAL STATE DIAGNOSTIC (First Step) - Velocity Task (Box-centered, {mode_str})")
             print("=" * 80)
             print(f"Global state shape: {global_state_np.shape}")
-            print(f"Expected: [{self.n_envs}, 18] for 2 agents")
-            print(f"\nEnvironment 0 global state (18 dims):")
-            print(f"  cmd (box frame):     cos={global_state_np[0,0]:.3f}, sin={global_state_np[0,1]:.3f}, speed={global_state_np[0,2]:.3f}")
-            print(f"  box dynamics (box):  vx={global_state_np[0,3]:.3f}, vy={global_state_np[0,4]:.3f}, ωz={global_state_np[0,5]:.3f}")
-            print(f"  agent0 (box frame):  dx={global_state_np[0,6]:.3f}, dy={global_state_np[0,7]:.3f}, dyaw={global_state_np[0,8]:.3f}, vx={global_state_np[0,9]:.3f}, vy={global_state_np[0,10]:.3f}")
-            print(f"  agent1 (box frame):  dx={global_state_np[0,11]:.3f}, dy={global_state_np[0,12]:.3f}, dyaw={global_state_np[0,13]:.3f}, vx={global_state_np[0,14]:.3f}, vy={global_state_np[0,15]:.3f}")
-            print(f"  vel error (box):     err_vx={global_state_np[0,16]:.3f}, err_vy={global_state_np[0,17]:.3f}")
+            print(f"Expected: [{self.n_envs}, {ndims}] for 2 agents")
+            print(f"\nEnvironment 0 global state ({ndims} dims):")
+            if self.legacy_vel_obs:
+                print(f"  cmd (box frame):     cos={global_state_np[0,0]:.3f}, sin={global_state_np[0,1]:.3f}, speed={global_state_np[0,2]:.3f}")
+                print(f"  box dynamics (box):  vx={global_state_np[0,3]:.3f}, vy={global_state_np[0,4]:.3f}, ωz={global_state_np[0,5]:.3f}")
+                print(f"  vel error:           speed_err={global_state_np[0,6]:.3f}, dir_err={global_state_np[0,7]:.3f}")
+                print(f"  agent0 (box frame):  dx={global_state_np[0,8]:.3f}, dy={global_state_np[0,9]:.3f}, dyaw={global_state_np[0,10]:.3f}, vx={global_state_np[0,11]:.3f}, vy={global_state_np[0,12]:.3f}")
+                print(f"  agent1 (box frame):  dx={global_state_np[0,13]:.3f}, dy={global_state_np[0,14]:.3f}, dyaw={global_state_np[0,15]:.3f}, vx={global_state_np[0,16]:.3f}, vy={global_state_np[0,17]:.3f}")
+            else:
+                print(f"  cmd dir (box frame): cos={global_state_np[0,0]:.3f}, sin={global_state_np[0,1]:.3f}")
+                print(f"  box dynamics (box):  vx={global_state_np[0,2]:.3f}, vy={global_state_np[0,3]:.3f}, ωz={global_state_np[0,4]:.3f}")
+                print(f"  agent0 (box frame):  dx={global_state_np[0,5]:.3f}, dy={global_state_np[0,6]:.3f}, dyaw={global_state_np[0,7]:.3f}, vx={global_state_np[0,8]:.3f}, vy={global_state_np[0,9]:.3f}")
+                print(f"  agent1 (box frame):  dx={global_state_np[0,10]:.3f}, dy={global_state_np[0,11]:.3f}, dyaw={global_state_np[0,12]:.3f}, vx={global_state_np[0,13]:.3f}, vy={global_state_np[0,14]:.3f}")
             print("=" * 80 + "\n")
             self._logged_global_state = True
 

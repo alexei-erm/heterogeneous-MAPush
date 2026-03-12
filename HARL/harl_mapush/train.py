@@ -67,6 +67,8 @@ def main():
                        help="Minimum gate value when balance=0 (freeloader gets alpha fraction of gated rewards). 1.0=disabled, 0.0=full gating. DEFAULT: 0.3")
     parser.add_argument("--box_mass", type=float, default=None,
                        help="Override box mass in kg. None = use config default (8kg). DEFAULT: None")
+    parser.add_argument("--box_mass_range", type=float, nargs=2, default=None,
+                       help="Randomize box mass uniformly in [min, max] kg per env. Overrides --box_mass. Example: --box_mass_range 4 20")
     parser.add_argument("--agent0", type=str, default="go1",
                        help="Robot type for agent 0. Options: go1, anymal_c. DEFAULT: go1")
     parser.add_argument("--agent1", type=str, default="go1",
@@ -80,6 +82,8 @@ def main():
                        help="Velocity task: velocity tracking reward scale. DEFAULT: config value (0.01)")
     parser.add_argument("--vel_angular_penalty_scale", type=float, default=None,
                        help="Velocity task: angular velocity penalty scale. DEFAULT: config value (-0.005)")
+    parser.add_argument("--legacy_vel_obs", action="store_true", default=False,
+                       help="Use legacy 16-dim velocity obs (includes cmd_speed) for loading old checkpoints")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -133,6 +137,7 @@ def main():
     use_contact_force_gating = args.get("contact_force_gating", False)
     contact_force_gating_alpha = args.get("contact_force_gating_alpha", 0.3)
     box_mass = args.get("box_mass", None)
+    box_mass_range = args.get("box_mass_range", None)
 
     # Velocity task parameters
     vel_speed_min = args.get("vel_speed_min", None)
@@ -168,11 +173,13 @@ def main():
         "contact_force_gating": use_contact_force_gating,  # Gate push/target rewards by contact-force balance
         "contact_force_gating_alpha": contact_force_gating_alpha,  # Min gate value (0.3 = freeloader gets 30%)
         "box_mass": box_mass,  # Override box mass in kg (None = config default)
+        "box_mass_range": box_mass_range,  # Randomize box mass in [min, max] kg per env
         # Velocity task parameters
         "vel_speed_min": vel_speed_min,
         "vel_speed_max": vel_speed_max,
         "vel_tracking_scale": vel_tracking_scale,
         "vel_angular_penalty_scale": vel_angular_penalty_scale,
+        "legacy_vel_obs": args.get("legacy_vel_obs", False),
     }
 
     # Override training parameters only if specified on command line

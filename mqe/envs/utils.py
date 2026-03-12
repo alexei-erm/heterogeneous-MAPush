@@ -214,7 +214,7 @@ def _merge_configs_for_homogeneous(base_config, robot_config_class, robot_type):
 
     return MergedConfig
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False, contact_force_gating=False, contact_force_gating_alpha=0.3, vel_speed_min=None, vel_speed_max=None, vel_tracking_scale=None, vel_angular_penalty_scale=None, box_mass=None):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False, contact_force_gating=False, contact_force_gating_alpha=0.3, vel_speed_min=None, vel_speed_max=None, vel_tracking_scale=None, vel_angular_penalty_scale=None, box_mass=None, box_mass_range=None, legacy_vel_obs=False):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -307,10 +307,19 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
             cfg.rewards.contact_force_gating_alpha = contact_force_gating_alpha
             print(f"[custom_cfg] Contact-force gating ENABLED: alpha={contact_force_gating_alpha}")
 
-        # Box mass override
-        if box_mass is not None and hasattr(cfg, 'asset'):
+        # Box mass: range takes priority over fixed override
+        if box_mass_range is not None and hasattr(cfg, 'asset'):
+            cfg.asset.npc_mass_range = box_mass_range
+            cfg.asset.npc_mass_override = None  # disable fixed mass when using range
+            print(f"[custom_cfg] Box mass randomized: [{box_mass_range[0]}, {box_mass_range[1]}] kg")
+        elif box_mass is not None and hasattr(cfg, 'asset'):
             cfg.asset.npc_mass_override = box_mass
             print(f"[custom_cfg] Box mass override: {box_mass} kg")
+
+        # Legacy velocity obs: include cmd_speed in obs (16 dims) for old checkpoints
+        if legacy_vel_obs and hasattr(cfg, 'rewards'):
+            cfg.rewards.legacy_vel_obs = True
+            print(f"[custom_cfg] Legacy vel obs ENABLED: 16-dim actor obs, 18-dim critic state")
 
         # Velocity task overrides
         if hasattr(cfg, 'velocity_command'):
