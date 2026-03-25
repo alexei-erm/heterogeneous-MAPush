@@ -1,3 +1,4 @@
+import os
 import gym
 from gym import spaces
 import numpy
@@ -5,7 +6,6 @@ import torch
 from copy import copy,deepcopy
 from mqe.envs.wrappers.empty_wrapper import EmptyWrapper
 from mqe.envs.wrappers.utils.trajectory import TrajectoryPlanner
-from openrl.modules.ppo_module import PPOModule
 from mqe.envs.wrappers.utils.rrt import KinodynamicRRT,TwoDVisualizer
 
 from isaacgym.torch_utils import *
@@ -118,13 +118,114 @@ class Go1PushUpperWrapper(EmptyWrapper):
     def _prepare_command_policy(self):
         assert self.cfg.control.command_network_path != None, "No command policy provided."
 
-        self.rnn_states_command = np.zeros((self.num_envs * self.num_agents, 1, 64))
-        self.mask_command = np.ones((self.num_envs * self.num_agents, 1))
-
-        self.command_observation_space = spaces.Box(low=-float('inf'), high=float('inf'), shape=(3 + 3 * self.num_agents,), dtype=float)
+        self.mid_level_format = getattr(self.cfg.control, 'mid_level_format', 'openrl')
+        self.command_observation_space = spaces.Box(low=-float('inf'), high=float('inf'), shape=(2 + 3 * self.num_agents,), dtype=float)
         self.command_action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=float)
 
+        if self.mid_level_format == 'happo':
+            self._prepare_happo_command_policy()
+        else:
+            self._prepare_openrl_command_policy()
+
+    def _prepare_openrl_command_policy(self):
+        """Load OpenRL PPOModule mid-level policy (original behavior)."""
+        from openrl.modules.ppo_module import PPOModule
+        self.rnn_states_command = np.zeros((self.num_envs * self.num_agents, 1, 64))
+        self.mask_command = np.ones((self.num_envs * self.num_agents, 1))
         self.command_module = torch.load(self.cfg.control.command_network_path, map_location=self.device)
+        print(f"[Upper] Loaded OpenRL mid-level policy from {self.cfg.control.command_network_path}")
+
+    def _prepare_happo_command_policy(self):
+        """Load HAPPO per-agent StochasticPolicy actors from checkpoint directory."""
+        from harl.models.policy_models.stochastic_policy import StochasticPolicy
+
+        checkpoint_dir = self.cfg.control.command_network_path
+        assert os.path.isdir(checkpoint_dir), \
+            f"HAPPO mid-level checkpoint must be a directory: {checkpoint_dir}"
+
+        # Model args matching HAPPO training config (default [256,256] MLP)
+        model_args = {
+            "hidden_sizes": [256, 256],
+            "activation_func": "relu",
+            "use_feature_normalization": True,
+            "initialization_method": "orthogonal_",
+            "gain": 0.01,
+            "use_naive_recurrent_policy": False,
+            "use_recurrent_policy": False,
+            "recurrent_n": 1,
+            "use_policy_active_masks": True,
+            "data_chunk_length": 10,
+            "std_x_coef": 1,
+            "std_y_coef": 0.5,
+            "action_aggregation": "prod",
+        }
+
+        self.happo_actors = []
+        for agent_id in range(self.num_agents):
+            actor_path = os.path.join(checkpoint_dir, f"actor_agent{agent_id}.pt")
+            assert os.path.exists(actor_path), f"HAPPO actor not found: {actor_path}"
+
+            actor = StochasticPolicy(
+                model_args,
+                self.command_observation_space,
+                self.command_action_space,
+                device=self.device,
+            )
+            state_dict = torch.load(actor_path, map_location=self.device)
+            actor.load_state_dict(state_dict)
+            actor.eval()
+            self.happo_actors.append(actor)
+            print(f"[Upper] Loaded HAPPO mid-level actor {agent_id} from {actor_path}")
+
+        # Dummy tensors for StochasticPolicy.forward() (no RNN used)
+        self.happo_rnn_states = torch.zeros(
+            self.num_envs, 1, dtype=torch.float32, device=self.device
+        )
+        self.happo_masks = torch.ones(
+            self.num_envs, 1, dtype=torch.float32, device=self.device
+        )
+
+    def _openrl_mid_level_act(self, command_obs):
+        """Run OpenRL PPOModule inference on mid-level command observations.
+
+        Args:
+            command_obs: (N, A, obs_dim) torch tensor on CUDA
+        Returns:
+            command_action: (N, A, 3) torch tensor on CUDA, clipped to [-1, 1]
+        """
+        command_obs_np = command_obs.cpu().numpy()
+        command_obs_np = np.concatenate(command_obs_np, axis=0)  # (N*A, obs_dim)
+        command_action, _ = self.command_module.act(
+            command_obs_np, self.rnn_states_command, self.mask_command, deterministic=True
+        )
+        command_action = np.array(np.split(_t2n(command_action), self.num_envs))
+        command_action = torch.from_numpy(0.5 * command_action).cuda().clip(-1, 1)
+        return torch.clip(command_action, -1, 1)
+
+    def _happo_mid_level_act(self, command_obs):
+        """Run HAPPO per-agent StochasticPolicy inference.
+
+        Args:
+            command_obs: (N, A, obs_dim) torch tensor on CUDA
+        Returns:
+            command_action: (N, A, 3) torch tensor on CUDA, clipped to [-1, 1]
+        """
+        actions_list = []
+        with torch.no_grad():
+            for agent_id in range(self.num_agents):
+                agent_obs = command_obs[:, agent_id, :]  # (N, obs_dim)
+                actions, _, _ = self.happo_actors[agent_id](
+                    agent_obs,
+                    self.happo_rnn_states,
+                    self.happo_masks,
+                    deterministic=True,
+                )
+                actions_list.append(actions)  # each (N, 3)
+
+        # Stack to (N, A, 3) and apply same 0.5x scaling as OpenRL path
+        command_action = torch.stack(actions_list, dim=1)
+        command_action = (0.5 * command_action).clamp(-1, 1)
+        return command_action
 
     def _init_extras(self, obs):
         return
@@ -294,17 +395,11 @@ class Go1PushUpperWrapper(EmptyWrapper):
         command_obs[torch.isnan(command_obs)] = 0
         command_obs[torch.isinf(command_obs)] = 0
 
-        # fit for openrl
-        command_obs = command_obs.cpu().numpy()
-        command_obs = np.concatenate(command_obs, axis=0)
-
-        # middle layer policy
-        command_action,_ = self.command_module.act(command_obs, self.rnn_states_command, self.mask_command, deterministic=True)
-        
-        # fit for openrl
-        command_action = np.array(np.split(_t2n(command_action), self.num_envs))
-        command_action = torch.from_numpy(0.5 * command_action).cuda().clip(-1, 1)
-        command_action = torch.clip(command_action, -1, 1)
+        # middle layer policy inference
+        if self.mid_level_format == 'happo':
+            command_action = self._happo_mid_level_act(command_obs)
+        else:
+            command_action = self._openrl_mid_level_act(command_obs)
 
         obs_buf, _, termination, info = self.env.step((command_action * self.action_scale).reshape(-1, self.command_action_space.shape[0]))
 

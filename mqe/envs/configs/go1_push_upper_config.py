@@ -88,6 +88,7 @@ class Go1PushUpperCfg(Go1Cfg):
     class control(Go1Cfg.control):
         control_type = 'C'
         command_network_path = "./resources/command_nets/1.2x1.2.pt"
+        mid_level_format = "openrl"  # "openrl" or "happo"
 
     # termination conditions
     class termination(Go1Cfg.termination):

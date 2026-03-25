@@ -214,7 +214,7 @@ def _merge_configs_for_homogeneous(base_config, robot_config_class, robot_type):
 
     return MergedConfig
 
-def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False, contact_force_gating=False, contact_force_gating_alpha=0.3, vel_speed_min=None, vel_speed_max=None, vel_tracking_scale=None, vel_angular_penalty_scale=None, vel_tracking_sharpness=None, box_mass=None, box_mass_range=None, legacy_vel_obs=False):
+def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, cooperation_rewards=False, mapush_og_rewards_teamified=False, reward_scale_testing=False, collaboration_rewards=False, positive_approachtobox_reward=False, agent0='go1', agent1='go1', baseline_mappo_rewards=False, mappo_heavybox_rewards=False, require_both_contact_for_success=False, contact_force_gating=False, contact_force_gating_alpha=0.3, vel_speed_min=None, vel_speed_max=None, vel_tracking_scale=None, vel_angular_penalty_scale=None, vel_tracking_sharpness=None, box_mass=None, box_mass_range=None, legacy_vel_obs=False, mid_level_checkpoint=None, mid_level_format='happo'):
 
     def fn(cfg:LeggedRobotFieldCfg):
 
@@ -320,6 +320,12 @@ def custom_cfg(args, individualized_rewards=False, shared_gated_rewards=False, c
         if legacy_vel_obs and hasattr(cfg, 'rewards'):
             cfg.rewards.legacy_vel_obs = True
             print(f"[custom_cfg] Legacy vel obs ENABLED: 16-dim actor obs, 18-dim critic state")
+
+        # Upper task: mid-level checkpoint configuration
+        if mid_level_checkpoint is not None and hasattr(cfg, 'control'):
+            cfg.control.command_network_path = mid_level_checkpoint
+            cfg.control.mid_level_format = mid_level_format
+            print(f"[custom_cfg] Mid-level: format={mid_level_format}, path={mid_level_checkpoint}")
 
         # Velocity task overrides
         if hasattr(cfg, 'velocity_command'):

@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--exp_name", type=str, default="cuboid_happo",
                        help="Experiment name")
     parser.add_argument("--task", type=str, default="go1push_mid",
-                       choices=["go1push_mid", "go1push_vel"],
+                       choices=["go1push_mid", "go1push_vel", "go1push_upper"],
                        help="MAPush task variant")
     parser.add_argument("--individualized_rewards", action="store_true", default=False,
                        help="Enable individualized rewards for HAPPO (prevents freeloading)")
@@ -86,6 +86,12 @@ def main():
                        help="Velocity task: exponent for positive cosine similarity (1=linear, 4=sharp). DEFAULT: config value (4)")
     parser.add_argument("--legacy_vel_obs", action="store_true", default=False,
                        help="Use legacy 16-dim velocity obs (includes cmd_speed) for loading old checkpoints")
+    # Upper task arguments
+    parser.add_argument("--mid_level_checkpoint", type=str, default=None,
+                       help="Path to mid-level checkpoint dir for upper task (e.g., .../checkpoints/100M/). Contains actor_agent0.pt, actor_agent1.pt")
+    parser.add_argument("--mid_level_format", type=str, default="happo",
+                       choices=["happo", "openrl"],
+                       help="Format of mid-level checkpoint (happo=per-agent state_dict, openrl=full PPOModule)")
     parser.add_argument("--seed", type=int, default=1,
                        help="Random seed")
 
@@ -184,6 +190,9 @@ def main():
         "vel_angular_penalty_scale": vel_angular_penalty_scale,
         "vel_tracking_sharpness": vel_tracking_sharpness,
         "legacy_vel_obs": args.get("legacy_vel_obs", False),
+        # Upper task parameters
+        "mid_level_checkpoint": args.get("mid_level_checkpoint", None),
+        "mid_level_format": args.get("mid_level_format", "happo"),
     }
 
     # Override training parameters only if specified on command line
@@ -231,6 +240,14 @@ def main():
             print(f"  Angular penalty scale override: {vel_angular_penalty_scale}")
         if vel_tracking_sharpness is not None:
             print(f"  Tracking sharpness (cos^n for positive): n={vel_tracking_sharpness}")
+    if env_args['task'] == 'go1push_upper':
+        mid_ckpt = env_args.get('mid_level_checkpoint', None)
+        mid_fmt = env_args.get('mid_level_format', 'happo')
+        print(f"Task type: UPPER (high-level planner with frozen mid-level policy)")
+        print(f"  Mid-level format: {mid_fmt}")
+        print(f"  Mid-level checkpoint: {mid_ckpt}")
+        if mid_ckpt is None:
+            print(f"  WARNING: No --mid_level_checkpoint specified!")
     print(f"Seed: {algo_args['seed']['seed']}")
     print(f"Parallel envs: {algo_args['train']['n_rollout_threads']}")
     print(f"Total steps: {algo_args['train']['num_env_steps']:,}")

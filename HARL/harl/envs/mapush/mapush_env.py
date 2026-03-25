@@ -90,6 +90,10 @@ class MAPushEnv:
         legacy_vel_obs = env_args.get("legacy_vel_obs", False)
         self.legacy_vel_obs = legacy_vel_obs
 
+        # Upper task parameters
+        mid_level_checkpoint = env_args.get("mid_level_checkpoint", None)
+        mid_level_format = env_args.get("mid_level_format", "happo")
+
         if self.is_hetero:
             # Use make_hetero_env for heterogeneous agents
             from mqe.envs.utils import make_hetero_env
@@ -116,7 +120,9 @@ class MAPushEnv:
                                       vel_tracking_sharpness=vel_tracking_sharpness,
                                       box_mass=box_mass,
                                       box_mass_range=box_mass_range,
-                                      legacy_vel_obs=legacy_vel_obs)
+                                      legacy_vel_obs=legacy_vel_obs,
+                                      mid_level_checkpoint=mid_level_checkpoint,
+                                      mid_level_format=mid_level_format)
             )
         else:
             # Standard homogeneous environment
@@ -140,18 +146,30 @@ class MAPushEnv:
                                       vel_tracking_sharpness=vel_tracking_sharpness,
                                       box_mass=box_mass,
                                       box_mass_range=box_mass_range,
-                                      legacy_vel_obs=legacy_vel_obs)
+                                      legacy_vel_obs=legacy_vel_obs,
+                                      mid_level_checkpoint=mid_level_checkpoint,
+                                      mid_level_format=mid_level_format)
             )
 
         self.n_envs = self.env.num_envs
         self.n_agents = self.env.num_agents
 
-        # Detect velocity task
+        # Detect task type
         self.is_velocity_task = (args.task == "go1push_vel")
+        self.is_upper_task = (args.task == "go1push_upper")
 
-        # HARL expects list of spaces (one per agent)
-        # In hetero mode, spaces are already lists; in homo mode, we need to duplicate
-        if self.is_hetero and isinstance(self.env.observation_space, list):
+        if self.is_upper_task:
+            # Upper task: HARL sees 1 high-level planner agent
+            # The upper wrapper internally handles 2 robots via frozen mid-level actors
+            from gym import spaces as gym_spaces
+            self.n_agents = 1
+            obs_dim = 26  # upper wrapper obs: base_info(12) + target(2) + box_pos(2) + box_rot(4) + obs1(2) + obs2(2) + waypoint(2)
+            act_dim = 2   # sub-goal x, y
+            self.observation_space = [gym_spaces.Box(low=-float('inf'), high=float('inf'), shape=(obs_dim,), dtype=np.float32)]
+            self.action_space = [gym_spaces.Box(low=-1.0, high=1.0, shape=(act_dim,), dtype=np.float32)]
+            print(f"[MAPushEnv] Upper task: 1 high-level agent, obs={obs_dim}d, action={act_dim}d")
+        elif self.is_hetero and isinstance(self.env.observation_space, list):
+            # HARL expects list of spaces (one per agent)
             # Heterogeneous: spaces already different per agent
             self.observation_space = self.env.observation_space
             self.action_space = self.env.action_space
@@ -180,7 +198,10 @@ class MAPushEnv:
 
         # Share observation space (for centralized critic)
         from gym import spaces
-        if self.is_velocity_task:
+        if self.is_upper_task:
+            # Upper task: critic state = obs (26-dim already contains global info)
+            global_state_dim = 26
+        elif self.is_velocity_task:
             if self.legacy_vel_obs:
                 # Legacy mode: cmd(3) + box_dynamics(3) + vel_error(2) + agents(5*n_agents) = 18 for 2 agents
                 global_state_dim = 3 + 3 + 2 + 5 * self.n_agents
@@ -748,6 +769,9 @@ class MAPushEnv:
             infos: list of dicts
             available_actions: None
         """
+        if self.is_upper_task:
+            return self._step_upper(actions)
+
         # Convert to torch: actions already in [n_envs, n_agents, action_dim] format
         actions_torch = torch.from_numpy(actions).cuda()
 
@@ -838,6 +862,9 @@ class MAPushEnv:
             state: [n_envs, n_agents, global_state_dim] - Concatenated local observations
             available_actions: None (continuous action space)
         """
+        if self.is_upper_task:
+            return self._reset_upper()
+
         obs = self.env.reset()
         obs_np = obs.cpu().numpy()
 
@@ -862,6 +889,73 @@ class MAPushEnv:
             global_state_np[:, np.newaxis, :],
             (self.n_envs, self.n_agents, global_state_np.shape[1])
         )
+
+        return obs_np, state_np, None
+
+    def _step_upper(self, actions: np.ndarray) -> Tuple:
+        """Step for upper-level task.
+
+        The upper wrapper handles sub-goal → mid-level obs → mid-level action → physics.
+        HARL sees 1 agent (high-level planner) with 26-dim obs, 2-dim action.
+
+        Args:
+            actions: (n_envs, 1, 2) — single agent, 2D sub-goal
+
+        Returns:
+            obs, state, rewards, dones, infos, available_actions
+        """
+        # Upper wrapper expects (N, 1, 2) torch tensor on CUDA
+        actions_torch = torch.from_numpy(actions).cuda()
+
+        # Upper wrapper step: internally runs mid-level policy and physics
+        obs, reward, termination, info = self.env.step(actions_torch)
+
+        # obs: (N, 1, 26) from upper wrapper
+        obs_np = obs.cpu().numpy()  # (n_envs, 1, 26)
+
+        # reward: (N, 1) team reward from upper wrapper
+        reward_np = reward.cpu().numpy()  # (n_envs, 1)
+
+        # termination: (N,) bool tensor
+        dones_np = termination.cpu().numpy()  # (n_envs,)
+
+        # Global state = obs itself (26-dim already contains global info)
+        global_state_np = obs_np.squeeze(1)  # (n_envs, 26)
+        state_np = global_state_np[:, np.newaxis, :]  # (n_envs, 1, 26)
+
+        # Reshape rewards: (n_envs, 1) -> (n_envs, 1, 1) for HARL
+        rewards_np = reward_np[..., np.newaxis]  # (n_envs, 1, 1)
+
+        # Dones: (n_envs,) -> (n_envs, 1)
+        dones_np = dones_np[:, np.newaxis]  # (n_envs, 1)
+
+        # Track statistics
+        for env_idx in range(self.n_envs):
+            if dones_np[env_idx, 0]:
+                success = False
+                if hasattr(self.env, 'finished_buf'):
+                    success = bool(self.env.finished_buf[env_idx].item())
+                self.episode_success.append(success)
+
+        # Infos
+        infos_list = [{0: {}} for _ in range(self.n_envs)]
+
+        return obs_np, state_np, rewards_np, dones_np, infos_list, None
+
+    def _reset_upper(self) -> Tuple:
+        """Reset for upper-level task.
+
+        Returns:
+            obs: (n_envs, 1, 26)
+            state: (n_envs, 1, 26)
+            available_actions: None
+        """
+        obs = self.env.reset()
+        obs_np = obs.cpu().numpy()  # (n_envs, 1, 26) from upper wrapper
+
+        # Global state = obs
+        global_state_np = obs_np.squeeze(1)  # (n_envs, 26)
+        state_np = global_state_np[:, np.newaxis, :]  # (n_envs, 1, 26)
 
         return obs_np, state_np, None
 
