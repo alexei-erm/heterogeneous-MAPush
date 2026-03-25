@@ -199,9 +199,24 @@ def test_calculator_mode(actors, env, num_episodes, seed):
     print(f"Statistics Summary (over {stats['num_episodes']} episodes)")
     print(f"{'='*70}")
 
-    # Check if this is a velocity task
+    # Check task type
+    is_upper_task = getattr(env, 'is_upper_task', False)
     is_vel_task = getattr(env, 'is_velocity_task', False)
-    if is_vel_task:
+    if is_upper_task:
+        # Upper task metrics
+        wrapper = env.env
+        rb = wrapper.reward_buffer
+        sc = rb["step_count"] if rb["step_count"] > 0 else 1
+        print(f"  Task: Upper-MAPush (High-Level Planner)")
+        print(f"  Success Rate:         {stats['success_rate']:.4f} ({stats['success_rate']*100:.2f}%)")
+        print(f"                        [{stats['num_success']}/{stats['num_episodes']} episodes succeeded]")
+        print(f"\n  Upper Reward Metrics (avg per step):")
+        print(f"    Distance-to-target:  {rb['distance_to_target_reward']/sc:.6f}")
+        print(f"    Trajectory:          {rb['trajectory_rewards']/sc:.6f}")
+        print(f"    Reach target:        {rb['reach_target_reward']/sc:.6f}")
+        print(f"    Obstacle:            {rb['obstacle_reward_scale']/sc:.6f}")
+        print(f"    Exception:           {rb['exception_punishment']/sc:.6f}")
+    elif is_vel_task:
         # Velocity task metrics
         # Get reward_buffer from wrapper for velocity-specific metrics
         wrapper = env.env
@@ -258,7 +273,7 @@ def save_video(frames, fps, filename="output.mp4"):
     print(f"Video saved to: {output_path}")
 
 
-def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1", task="go1push_mid", record_video=False, box_mass=None, box_mass_range=None, legacy_vel_obs=False):
+def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="go1", task="go1push_mid", record_video=False, box_mass=None, box_mass_range=None, legacy_vel_obs=False, mid_level_checkpoint=None, mid_level_format="happo"):
     """Run viewer mode to visualize episodes sequentially.
 
     Args:
@@ -311,28 +326,39 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
             env_name=args.task,
             agent_types=[agent0, agent1],
             args=args,
-            custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass, box_mass_range=box_mass_range, legacy_vel_obs=legacy_vel_obs)
+            custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass, box_mass_range=box_mass_range, legacy_vel_obs=legacy_vel_obs, mid_level_checkpoint=mid_level_checkpoint, mid_level_format=mid_level_format)
         )
     else:
         print(f"  Using homogeneous mode: 2x {agent0}")
-        env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass, box_mass_range=box_mass_range, legacy_vel_obs=legacy_vel_obs))
+        env_raw, _ = make_mqe_env(args.task, args, custom_cfg=custom_cfg(args, agent0=agent0, agent1=agent1, box_mass=box_mass, box_mass_range=box_mass_range, legacy_vel_obs=legacy_vel_obs, mid_level_checkpoint=mid_level_checkpoint, mid_level_format=mid_level_format))
 
-    n_agents = env_raw.num_agents
+    is_upper_viewer = (task == "go1push_upper")
 
-    # Get observation and action spaces from env
-    obs_space = env_raw.observation_space
-    act_space = env_raw.action_space
-
-    # CRITICAL FIX: In hetero mode, spaces are already lists (one per agent)
-    # In homogeneous mode, they're single spaces
-    if isinstance(obs_space, list):
-        # Heterogeneous mode - use different spaces per agent
-        obs_spaces = obs_space
-        act_spaces = act_space
+    if is_upper_viewer:
+        # Upper task: HARL sees 1 high-level planner agent
+        n_agents = 1
+        from gym import spaces as gym_spaces
+        obs_dim = 26
+        act_dim = 2
+        obs_spaces = [gym_spaces.Box(low=-float('inf'), high=float('inf'), shape=(obs_dim,), dtype=np.float32)]
+        act_spaces = [gym_spaces.Box(low=-1.0, high=1.0, shape=(act_dim,), dtype=np.float32)]
     else:
-        # Homogeneous mode - same space for all agents
-        obs_spaces = [obs_space] * n_agents
-        act_spaces = [act_space] * n_agents
+        n_agents = env_raw.num_agents
+
+        # Get observation and action spaces from env
+        obs_space = env_raw.observation_space
+        act_space = env_raw.action_space
+
+        # CRITICAL FIX: In hetero mode, spaces are already lists (one per agent)
+        # In homogeneous mode, they're single spaces
+        if isinstance(obs_space, list):
+            # Heterogeneous mode - use different spaces per agent
+            obs_spaces = obs_space
+            act_spaces = act_space
+        else:
+            # Homogeneous mode - same space for all agents
+            obs_spaces = [obs_space] * n_agents
+            act_spaces = [act_space] * n_agents
 
     # Load models
     actors = load_models(checkpoint_dir, n_agents, obs_spaces, act_spaces, device="cuda:0")
@@ -390,7 +416,11 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
 
             # Stack and convert to torch
             actions_np = np.stack(actions_list, axis=1)  # [1, n_agents, action_dim]
-            actions_torch = torch.from_numpy(actions_np[0]).cuda()  # [n_agents, action_dim]
+            if is_upper_viewer:
+                # Upper wrapper expects (N, 1, 2) shape
+                actions_torch = torch.from_numpy(actions_np).cuda()  # [1, 1, 2]
+            else:
+                actions_torch = torch.from_numpy(actions_np[0]).cuda()  # [n_agents, action_dim]
 
             # Step environment
             obs, rewards, dones_raw, infos = env_raw.step(actions_torch)
@@ -405,12 +435,23 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
                 masks = np.zeros((1, n_agents, 1), dtype=np.float32)
 
         # Print episode results
-        is_vel_viewer = (task == "go1push_vel")
-
         print(f"  Steps:   {step_count}")
         print(f"  Reward:  {episode_reward:.2f}")
 
-        if is_vel_viewer:
+        if is_upper_viewer:
+            success = env_raw.finished_buf[0].item() if hasattr(env_raw, 'finished_buf') else False
+            print(f"  Result:  {'SUCCESS' if success else 'FAILED'}")
+            if hasattr(env_raw, 'reward_buffer'):
+                rb = env_raw.reward_buffer
+                sc = rb["step_count"] if rb["step_count"] > 0 else 1
+                print(f"  Distance-to-target rwd: {rb['distance_to_target_reward']/sc:.4f}")
+                print(f"  Trajectory rwd:         {rb['trajectory_rewards']/sc:.4f}")
+                print(f"  Reach target rwd:       {rb['reach_target_reward']/sc:.4f}")
+                print(f"  Obstacle rwd:           {rb['obstacle_reward_scale']/sc:.4f}")
+                # Reset for next episode
+                for k in rb:
+                    rb[k] = 0
+        elif (task == "go1push_vel"):
             # Velocity task: print metrics from reward_buffer
             if hasattr(env_raw, 'reward_buffer'):
                 rb = env_raw.reward_buffer
@@ -486,7 +527,7 @@ def main():
 
     # Task selection
     parser.add_argument("--task", type=str, default="go1push_mid",
-                       choices=["go1push_mid", "go1push_vel"],
+                       choices=["go1push_mid", "go1push_vel", "go1push_upper"],
                        help="MAPush task variant")
 
     # Other
@@ -504,8 +545,18 @@ def main():
                        help="Record viewer mode episodes as mp4 videos (saved to docs/video/)")
     parser.add_argument("--legacy_vel_obs", action="store_true", default=False,
                        help="Use legacy 16-dim velocity obs (includes cmd_speed) for loading old checkpoints")
+    parser.add_argument("--mid_level_checkpoint", type=str, default=None,
+                       help="Path to mid-level checkpoint dir for upper task (e.g., .../checkpoints/190M/)")
+    parser.add_argument("--mid_level_format", type=str, default="happo",
+                       choices=["happo", "openrl"],
+                       help="Format of mid-level checkpoint (default: happo)")
 
     args = parser.parse_args()
+
+    # Validate upper task requires mid-level checkpoint
+    if args.task == "go1push_upper" and args.mid_level_checkpoint is None:
+        print(f"\nERROR: --mid_level_checkpoint is required for go1push_upper task\n")
+        sys.exit(1)
 
     # Determine if heterogeneous
     is_hetero = (args.agent0 != args.agent1)
@@ -524,18 +575,28 @@ def main():
             print(f"\nERROR: --all_checkpoints requires a directory path\n")
             sys.exit(1)
 
-        # Look for subdirectories that contain actor_agent0.pt
+        # Look for subdirectories that contain actor checkpoint files
         for item in sorted(os.listdir(args.checkpoint)):
             item_path = os.path.join(args.checkpoint, item)
             if os.path.isdir(item_path):
                 actor0 = os.path.join(item_path, "actor_agent0.pt")
-                actor1 = os.path.join(item_path, "actor_agent1.pt")
-                if os.path.exists(actor0) and os.path.exists(actor1):
-                    checkpoints_to_test.append(item_path)
+                if args.task == "go1push_upper":
+                    # Upper task: single agent, only actor_agent0.pt
+                    if os.path.exists(actor0):
+                        checkpoints_to_test.append(item_path)
+                else:
+                    # Mid/vel tasks: 2 agents
+                    actor1 = os.path.join(item_path, "actor_agent1.pt")
+                    if os.path.exists(actor0) and os.path.exists(actor1):
+                        checkpoints_to_test.append(item_path)
 
         if not checkpoints_to_test:
-            print(f"\nERROR: No valid checkpoints found in: {args.checkpoint}")
-            print("Looking for subdirectories containing actor_agent0.pt and actor_agent1.pt\n")
+            if args.task == "go1push_upper":
+                print(f"\nERROR: No valid checkpoints found in: {args.checkpoint}")
+                print("Looking for subdirectories containing actor_agent0.pt\n")
+            else:
+                print(f"\nERROR: No valid checkpoints found in: {args.checkpoint}")
+                print("Looking for subdirectories containing actor_agent0.pt and actor_agent1.pt\n")
             sys.exit(1)
 
         print(f"\nFound {len(checkpoints_to_test)} checkpoints to test:")
@@ -546,14 +607,24 @@ def main():
     else:
         # Single checkpoint mode
         actor0_path = os.path.join(args.checkpoint, "actor_agent0.pt")
-        actor1_path = os.path.join(args.checkpoint, "actor_agent1.pt")
 
-        if not os.path.exists(actor0_path) or not os.path.exists(actor1_path):
-            print(f"\nERROR: Actor models not found in checkpoint directory")
-            print(f"  Looking for: actor_agent0.pt, actor_agent1.pt")
-            print(f"  In directory: {args.checkpoint}")
-            print("\nTip: Use --all_checkpoints to test all checkpoints in a directory\n")
-            sys.exit(1)
+        if args.task == "go1push_upper":
+            # Upper task: single agent
+            if not os.path.exists(actor0_path):
+                print(f"\nERROR: Actor model not found in checkpoint directory")
+                print(f"  Looking for: actor_agent0.pt")
+                print(f"  In directory: {args.checkpoint}")
+                print("\nTip: Use --all_checkpoints to test all checkpoints in a directory\n")
+                sys.exit(1)
+        else:
+            # Mid/vel tasks: 2 agents
+            actor1_path = os.path.join(args.checkpoint, "actor_agent1.pt")
+            if not os.path.exists(actor0_path) or not os.path.exists(actor1_path):
+                print(f"\nERROR: Actor models not found in checkpoint directory")
+                print(f"  Looking for: actor_agent0.pt, actor_agent1.pt")
+                print(f"  In directory: {args.checkpoint}")
+                print("\nTip: Use --all_checkpoints to test all checkpoints in a directory\n")
+                sys.exit(1)
 
         checkpoints_to_test = [args.checkpoint]
 
@@ -597,6 +668,8 @@ def main():
                     "box_mass": args.box_mass,
                     "box_mass_range": args.box_mass_range,
                     "legacy_vel_obs": args.legacy_vel_obs,
+                    "mid_level_checkpoint": args.mid_level_checkpoint,
+                    "mid_level_format": args.mid_level_format,
                 }
                 if is_hetero:
                     print(f"\n[HAPPO Testing] Heterogeneous mode: agent0={args.agent0}, agent1={args.agent1}")
@@ -624,9 +697,19 @@ def main():
                 'num_episodes': stats['num_episodes'],
             }
 
-            # Add velocity-specific metrics if available
+            # Add task-specific metrics
+            is_upper_task = getattr(env, 'is_upper_task', False)
             is_vel_task = getattr(env, 'is_velocity_task', False)
-            if is_vel_task:
+            if is_upper_task:
+                result_entry['is_upper'] = True
+                result_entry['is_velocity'] = False
+                wrapper = env.env
+                rb = wrapper.reward_buffer
+                sc = rb["step_count"] if rb["step_count"] > 0 else 1
+                result_entry['dist_to_target'] = float(rb['distance_to_target_reward']) / sc
+                result_entry['trajectory'] = float(rb['trajectory_rewards']) / sc
+                result_entry['reach_target'] = float(rb['reach_target_reward']) / sc
+            elif is_vel_task:
                 wrapper = env.env
                 rb = wrapper.reward_buffer
                 sc = rb["step_count"] if rb["step_count"] > 0 else 1
@@ -639,8 +722,10 @@ def main():
                 max_per_step = wrapper.velocity_tracking_scale
                 result_entry['vel_success_rate'] = avg_vel_track / max_per_step if max_per_step != 0 else 0
                 result_entry['is_velocity'] = True
+                result_entry['is_upper'] = False
             else:
                 result_entry['is_velocity'] = False
+                result_entry['is_upper'] = False
 
             all_results.append(result_entry)
 
@@ -652,7 +737,8 @@ def main():
             # Run viewer mode (creates its own single-env environment)
             test_viewer_mode(checkpoint_path, args.num_episodes, args.seed, args.agent0, args.agent1, task=args.task,
                            record_video=args.record_video, box_mass=args.box_mass, box_mass_range=args.box_mass_range,
-                           legacy_vel_obs=args.legacy_vel_obs)
+                           legacy_vel_obs=args.legacy_vel_obs, mid_level_checkpoint=args.mid_level_checkpoint,
+                           mid_level_format=args.mid_level_format)
 
     # Clean up
     if args.mode == "calculator":
@@ -664,12 +750,18 @@ def main():
     # Print summary if testing multiple checkpoints
     if len(checkpoints_to_test) > 1 and args.mode == "calculator":
         is_velocity = all_results[0].get('is_velocity', False) if all_results else False
+        is_upper = all_results[0].get('is_upper', False) if all_results else False
 
         print("\n" + "="*70)
         print("Summary of All Checkpoints")
         print("="*70)
 
-        if is_velocity:
+        if is_upper:
+            print(f"  {'Checkpoint':8s}  {'success%':>8s}  {'dist_to_tgt':>11s}  {'trajectory':>10s}  {'reach_tgt':>9s}")
+            print(f"  {'-'*8}  {'-'*8}  {'-'*11}  {'-'*10}  {'-'*9}")
+            for result in all_results:
+                print(f"  {result['checkpoint']:8s}  {result['success_rate']*100:7.2f}%  {result['dist_to_target']:11.6f}  {result['trajectory']:10.6f}  {result['reach_target']:9.6f}")
+        elif is_velocity:
             print(f"  {'Checkpoint':8s}  {'success%':>8s}  {'dir_err(rad)':>12s}  {'spd_err(m/s)':>12s}  {'ang_vel(r/s)':>12s}  {'vel_track':>10s}")
             print(f"  {'-'*8}  {'-'*8}  {'-'*12}  {'-'*12}  {'-'*12}  {'-'*10}")
             for result in all_results:
@@ -686,7 +778,9 @@ def main():
         with open(output_file, 'w') as f:
             import datetime
             f.write("="*70 + "\n")
-            if is_velocity:
+            if is_upper:
+                f.write("Upper-MAPush HAPPO Testing Results\n")
+            elif is_velocity:
                 f.write("Velocity-MAPush HAPPO Testing Results\n")
             else:
                 f.write("MAPush HAPPO Testing Results\n")
@@ -701,7 +795,12 @@ def main():
             f.write("Results by Checkpoint:\n")
             f.write("-"*70 + "\n")
 
-            if is_velocity:
+            if is_upper:
+                f.write(f"{'Checkpoint':8s}  {'success%':>8s}  {'dist_to_tgt':>11s}  {'trajectory':>10s}  {'reach_tgt':>9s}\n")
+                f.write("-"*60 + "\n")
+                for result in all_results:
+                    f.write(f"{result['checkpoint']:8s}  {result['success_rate']*100:7.2f}%  {result['dist_to_target']:11.6f}  {result['trajectory']:10.6f}  {result['reach_target']:9.6f}\n")
+            elif is_velocity:
                 f.write(f"{'Checkpoint':8s}  {'success%':>8s}  {'dir_err(rad)':>12s}  {'spd_err(m/s)':>12s}  {'ang_vel(r/s)':>12s}  {'vel_track':>10s}  {'ang_pen':>10s}\n")
                 f.write("-"*80 + "\n")
                 for result in all_results:
