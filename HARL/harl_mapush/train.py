@@ -82,6 +82,8 @@ def main():
                        help="Velocity task: velocity tracking reward scale. DEFAULT: config value (0.01)")
     parser.add_argument("--vel_angular_penalty_scale", type=float, default=None,
                        help="Velocity task: angular velocity penalty scale. DEFAULT: config value (-0.005)")
+    parser.add_argument("--vel_tracking_sharpness", type=int, default=None,
+                       help="Velocity task: exponent for positive cosine similarity (1=linear, 4=sharp). DEFAULT: config value (4)")
     parser.add_argument("--legacy_vel_obs", action="store_true", default=False,
                        help="Use legacy 16-dim velocity obs (includes cmd_speed) for loading old checkpoints")
     parser.add_argument("--seed", type=int, default=1,
@@ -144,6 +146,7 @@ def main():
     vel_speed_max = args.get("vel_speed_max", None)
     vel_tracking_scale = args.get("vel_tracking_scale", None)
     vel_angular_penalty_scale = args.get("vel_angular_penalty_scale", None)
+    vel_tracking_sharpness = args.get("vel_tracking_sharpness", None)
 
     # Agent types for heterogeneous training
     agent0 = args.get("agent0", "go1")
@@ -179,6 +182,7 @@ def main():
         "vel_speed_max": vel_speed_max,
         "vel_tracking_scale": vel_tracking_scale,
         "vel_angular_penalty_scale": vel_angular_penalty_scale,
+        "vel_tracking_sharpness": vel_tracking_sharpness,
         "legacy_vel_obs": args.get("legacy_vel_obs", False),
     }
 
@@ -225,6 +229,8 @@ def main():
             print(f"  Tracking scale override: {vel_tracking_scale}")
         if vel_angular_penalty_scale is not None:
             print(f"  Angular penalty scale override: {vel_angular_penalty_scale}")
+        if vel_tracking_sharpness is not None:
+            print(f"  Tracking sharpness (cos^n for positive): n={vel_tracking_sharpness}")
     print(f"Seed: {algo_args['seed']['seed']}")
     print(f"Parallel envs: {algo_args['train']['n_rollout_threads']}")
     print(f"Total steps: {algo_args['train']['num_env_steps']:,}")

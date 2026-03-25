@@ -88,10 +88,16 @@ class Go1PushVelWrapper(EmptyWrapper):
         self.approach_reward_scale = self.cfg.rewards.scales.approach_reward_scale
         self.collision_punishment_scale = self.cfg.rewards.scales.collision_punishment_scale
         self.push_reward_scale = self.cfg.rewards.scales.push_reward_scale
+        self.flanking_separation_scale = getattr(self.cfg.rewards.scales, 'flanking_separation_scale', 0.0)
         self.exception_punishment_scale = self.cfg.rewards.scales.exception_punishment_scale
 
-        # Dual-push balance config
-        self.dual_push_alpha = getattr(self.cfg.rewards, 'dual_push_balance_alpha', 1.0)
+        # Velocity tracking sharpness: cos^n for positive side (n=1 is linear, n>1 rewards precision)
+        self.vel_tracking_sharpness = getattr(self.cfg.rewards, 'vel_tracking_sharpness', 4)
+
+        # Contact-force gating: gate velocity_tracking_reward by contact-force balance
+        # Controlled by --contact_force_gating and --contact_force_gating_alpha CLI flags
+        self.contact_force_gating = getattr(self.cfg.rewards, "contact_force_gating", False)
+        self.contact_force_gating_alpha = getattr(self.cfg.rewards, "contact_force_gating_alpha", 1.0)
 
         # Compute per-agent total mass from Isaac Gym rigid body properties
         self.agent_masses = self._compute_agent_masses()
@@ -153,6 +159,7 @@ class Go1PushVelWrapper(EmptyWrapper):
             "approach_to_box_reward": 0,
             "collision_punishment": 0,
             "push_reward": 0,
+            "flanking_separation_reward": 0,
             "exception_punishment": 0,
             # Metrics (not rewards, but tracked for monitoring)
             "avg_direction_error": 0,
@@ -173,17 +180,22 @@ class Go1PushVelWrapper(EmptyWrapper):
         print(f"  Direction range: {self.direction_range}")
         print(f"  Arrow offset: {self.arrow_offset}")
         print(f"  Obs dim: {obs_dim}")
+        print(f"  Tracking sharpness: cos^{self.vel_tracking_sharpness} (positive side), cos^1 (negative side)")
         print(f"  Reward scales: vel_track={self.velocity_tracking_scale}, "
               f"ang_vel_pen={self.angular_velocity_penalty_scale}, "
               f"vel_ocb={self.velocity_ocb_scale}, "
               f"approach={self.approach_reward_scale}, "
               f"collision={self.collision_punishment_scale}, "
               f"push={self.push_reward_scale}, "
+              f"flanking={self.flanking_separation_scale}, "
               f"exception={self.exception_punishment_scale}")
-        print(f"  Dual-push balance: alpha={self.dual_push_alpha}, "
-              f"agent_masses={[m.item() for m in self.agent_masses]}, "
-              f"body_offsets={self.agent_body_offsets}, "
-              f"box_vel_threshold={self.box_vel_threshold} m/s")
+        if self.contact_force_gating:
+            print(f"  Contact-force gating: ENABLED, alpha={self.contact_force_gating_alpha}, "
+                  f"agent_masses={[m.item() for m in self.agent_masses]}, "
+                  f"body_offsets={self.agent_body_offsets}, "
+                  f"box_vel_threshold={self.box_vel_threshold} m/s")
+        else:
+            print(f"  Contact-force gating: DISABLED")
 
     def _compute_agent_masses(self):
         """Compute total mass for each agent type by summing all rigid body masses.
@@ -606,27 +618,30 @@ class Go1PushVelWrapper(EmptyWrapper):
             actual_speed = actual_norm.squeeze()  # (N,)
             speed_error = torch.abs(actual_speed - self.cmd_speed)  # (N,)
 
-            # Direction-only reward: cosine similarity with desired direction.
-            # No speed magnitude penalty — agents are rewarded for pushing the box
-            # in the right direction regardless of speed. This prevents the weaker
-            # agent from giving up when the team can't reach commanded speed.
+            # Direction-only reward: shaped cosine similarity with desired direction.
+            # Positive side: cos^n (sharp reward near perfect alignment, flat near 90°)
+            # Negative side: linear cos (quick punishment for backwards pushing)
+            # No speed magnitude penalty — prevents weaker agent from giving up.
+            shaped_cos = torch.where(
+                cos_sim >= 0,
+                cos_sim ** self.vel_tracking_sharpness,
+                cos_sim,
+            )
             vel_track_reward = (
                 self.velocity_tracking_scale
-                * cos_sim
+                * shaped_cos
             )  # (N,)
 
-            # Dual-push balance gating: multiplicatively reduce tracking reward
-            # when push effort is unbalanced (one agent freeloading)
-            # tracking_reward *= alpha + (1 - alpha) * balance
-            # alpha=1.0 → no gating, alpha=0.0 → full gating
-            if self.dual_push_alpha < 1.0:
-                balance, contribs = self._compute_dual_push_balance()
-                gate = self.dual_push_alpha + (1.0 - self.dual_push_alpha) * balance
+            # Contact-force monitoring: always compute balance/contributions for tensorboard
+            # Only apply gate to reward when --contact_force_gating is enabled
+            balance, contribs = self._compute_dual_push_balance()
+            gate = self.contact_force_gating_alpha + (1.0 - self.contact_force_gating_alpha) * balance
+            if self.contact_force_gating:
                 vel_track_reward = vel_track_reward * gate
-                self.reward_buffer["avg_dual_push_balance"] += torch.mean(balance).cpu().item()
-                self.reward_buffer["avg_dual_push_gate"] += torch.mean(gate).cpu().item()
-                for i in range(self.num_agents):
-                    self.reward_buffer[f"avg_push_contribution_agent{i}"] += torch.mean(contribs[:, i]).cpu().item()
+            self.reward_buffer["avg_dual_push_balance"] += torch.mean(balance).cpu().item()
+            self.reward_buffer["avg_dual_push_gate"] += torch.mean(gate).cpu().item()
+            for i in range(self.num_agents):
+                self.reward_buffer[f"avg_push_contribution_agent{i}"] += torch.mean(contribs[:, i]).cpu().item()
 
             # Team reward
             reward[:, :] += vel_track_reward.unsqueeze(1).repeat(1, self.num_agents)
@@ -657,6 +672,20 @@ class Go1PushVelWrapper(EmptyWrapper):
             )
 
         # --- 3. Velocity OCB reward (positioning: be on push side of box) ---
+        # --- 3b. Flanking separation reward (agents on different faces) ---
+        # Compute cross_mag first — used by both OCB (as multiplier) and flanking reward
+        # |cross(normalize(agent0-box), normalize(agent1-box))| = sin(angle_between)
+        # Peaks at 90° separation (sin=1), zero when same face (0°) or opposite (180°)
+        cross_mag = torch.zeros(self.num_envs, device=self.device)
+        if self.num_agents == 2:
+            vec0 = base_pos_r[:, 0, :2] - box_pos[:, :2]  # (N, 2)
+            vec1 = base_pos_r[:, 1, :2] - box_pos[:, :2]  # (N, 2)
+            norm0 = torch.norm(vec0, dim=1, keepdim=True).clamp(min=1e-6)
+            norm1 = torch.norm(vec1, dim=1, keepdim=True).clamp(min=1e-6)
+            unit0 = vec0 / norm0  # (N, 2)
+            unit1 = vec1 / norm1  # (N, 2)
+            cross_mag = torch.abs(unit0[:, 0] * unit1[:, 1] - unit0[:, 1] * unit1[:, 0])  # (N,)
+
         if self.velocity_ocb_scale != 0:
             # Push direction in world frame (unit vector)
             push_dir = torch.stack([
@@ -667,12 +696,13 @@ class Go1PushVelWrapper(EmptyWrapper):
             # For each agent: dot(agent_pos - box_pos, push_dir)
             # Negative dot = agent is behind box (correct push side) → raw_ocb < 0
             # We negate so positive = correct side
+            # Multiplied by cross_mag: no OCB credit when both agents on same face
             total_ocb = torch.zeros(self.num_envs, device=self.device)
             for i in range(self.num_agents):
                 agent_to_box = base_pos_r[:, i, :2] - box_pos[:, :2]  # (N, 2)
                 raw_dot = torch.sum(agent_to_box * push_dir, dim=1)   # (N,)
                 # raw_dot < 0 means agent is behind box (good) → negate for positive reward
-                ocb_i = -raw_dot * self.velocity_ocb_scale
+                ocb_i = -raw_dot * self.velocity_ocb_scale * cross_mag
                 total_ocb += ocb_i
 
             # Average across agents (continuous, teamified)
@@ -681,6 +711,15 @@ class Go1PushVelWrapper(EmptyWrapper):
             reward[:, :] += total_ocb.unsqueeze(1).repeat(1, self.num_agents)
             self.reward_buffer["velocity_ocb_reward"] += (
                 torch.sum(total_ocb).cpu().item()
+            )
+
+        if self.flanking_separation_scale != 0 and self.num_agents == 2:
+            # Reuse cross_mag computed above
+            flanking_reward = self.flanking_separation_scale * cross_mag
+
+            reward[:, :] += flanking_reward.unsqueeze(1).repeat(1, self.num_agents)
+            self.reward_buffer["flanking_separation_reward"] += (
+                torch.sum(flanking_reward).cpu().item()
             )
 
         # --- 4. Approach reward (approach to box) ---

@@ -83,22 +83,25 @@ class Go1PushVelCfg(Go1PushMidCfg):
     class rewards(Go1PushMidCfg.rewards):
         """Velocity-specific reward scales."""
 
-        # Dual-push balance: multiplicatively gates the velocity tracking reward
-        # so freeloading kills the primary reward signal.
-        # tracking_reward *= alpha + (1 - alpha) * balance
-        # alpha=1.0 disables (no gating), alpha=0.0 means full gating (freeloader gets 0)
-        dual_push_balance_alpha = 0.3  # 1.0 = disabled by default
+        # Contact-force gating is now controlled by CLI flags:
+        #   --contact_force_gating True --contact_force_gating_alpha 0.1
+        # See go1_push_vel_wrapper.py for implementation.
+
+        # Sharpness exponent for positive cosine similarity: cos^n
+        # n=1: linear (old behavior), n=4: rewards precise alignment sharply
+        vel_tracking_sharpness = 4
 
         class scales:
             # Velocity-specific rewards
-            velocity_tracking_scale = 0.01
-            angular_velocity_penalty_scale = -0.005
+            velocity_tracking_scale = 0.05      # Dominant reward (was 0.1, before that 0.01)
+            angular_velocity_penalty_scale = 0.0   # Disabled
             velocity_ocb_scale = 0.004          # Positioning: be on push side of box
+            flanking_separation_scale = 0.002   # Reward agents for ~90° separation around box (cross-product)
 
             # Reuse from mid task
             approach_reward_scale = 0.00075
             collision_punishment_scale = -0.001  # Lightened (was -0.0025)
-            push_reward_scale = 0.0015
+            push_reward_scale = 0.0015          # Re-enabled: reward when box moving > 0.1 m/s
             exception_punishment_scale = -5
 
             # Disabled rewards (set to 0)

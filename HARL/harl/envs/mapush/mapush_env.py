@@ -86,6 +86,7 @@ class MAPushEnv:
         vel_speed_max = env_args.get("vel_speed_max", None)
         vel_tracking_scale = env_args.get("vel_tracking_scale", None)
         vel_angular_penalty_scale = env_args.get("vel_angular_penalty_scale", None)
+        vel_tracking_sharpness = env_args.get("vel_tracking_sharpness", None)
         legacy_vel_obs = env_args.get("legacy_vel_obs", False)
         self.legacy_vel_obs = legacy_vel_obs
 
@@ -112,6 +113,7 @@ class MAPushEnv:
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
                                       vel_angular_penalty_scale=vel_angular_penalty_scale,
+                                      vel_tracking_sharpness=vel_tracking_sharpness,
                                       box_mass=box_mass,
                                       box_mass_range=box_mass_range,
                                       legacy_vel_obs=legacy_vel_obs)
@@ -135,6 +137,7 @@ class MAPushEnv:
                                       vel_speed_min=vel_speed_min, vel_speed_max=vel_speed_max,
                                       vel_tracking_scale=vel_tracking_scale,
                                       vel_angular_penalty_scale=vel_angular_penalty_scale,
+                                      vel_tracking_sharpness=vel_tracking_sharpness,
                                       box_mass=box_mass,
                                       box_mass_range=box_mass_range,
                                       legacy_vel_obs=legacy_vel_obs)
