@@ -1,9 +1,9 @@
 # HARL Integration into MAPush — Implementation Report
 
 **Original Proposal Date:** 2025-12-13
-**Last Verified:** 2026-03-12
+**Last Verified:** 2026-03-26
 **Status:** ✅ FULLY IMPLEMENTED AND PRODUCTION-READY
-**Objective:** Integrate HAPPO from HARL for mid-level and velocity-level controller training (k=2 agents, cuboid task, homogeneous and heterogeneous robot teams)
+**Objective:** Integrate HAPPO from HARL for all three task levels — mid-level (goal-based), velocity-level (direction tracking), and upper-level (high-level planner with frozen mid-level actors) — supporting homogeneous and heterogeneous robot teams
 
 ---
 
@@ -31,6 +31,7 @@
 | Batch checkpoint testing | ✅ | `--all_checkpoints` tests all 10M/20M/.../200M and outputs summary table + `test_results.txt` |
 | Video recording | ✅ | `--record_video` saves MP4s via imageio to `docs/video/` |
 | Velocity task metrics | ✅ | Direction error, speed error, box angular velocity, velocity success rate |
+| Upper task support | ✅ | Single-agent checkpoint detection, mid-level config passthrough, upper reward metrics |
 
 ---
 
@@ -54,28 +55,29 @@ HARL/
 │       └── __init__.py                      # Modified: LOGGER_REGISTRY["mapush"]
 │
 ├── harl_mapush/                             # MAPush-specific training/testing
-│   ├── train.py                             # Training script (~275 lines, 40+ CLI flags)
-│   ├── test.py                              # Testing script (~700+ lines, 2 modes)
+│   ├── train.py                             # Training script (~290 lines, 40+ CLI flags)
+│   ├── test.py                              # Testing script (~830 lines, 3 task modes)
 │   └── runners/
 │       └── mapush_happo_runner.py           # Custom runner with step-based checkpoints
 │
 └── results/
     └── mapush/
         ├── go1push_mid/happo/               # 69 seed runs across 43 experiments
-        └── go1push_vel/happo/               # 19 seed runs across 12 experiments
+        ├── go1push_vel/happo/               # 19 seed runs across 12 experiments
+        └── go1push_upper/happo/             # Upper-level planner training runs
 ```
 
 ### What Changed vs. the Original Proposal
 
 | Component | Proposal (Dec 2025) | Actual Implementation (Mar 2026) |
 |-----------|---------------------|----------------------------------|
-| `mapush_env.py` | ~80 lines, basic wrapper | ~900 lines: 5 critic modes, hetero routing, velocity global state, statistics tracking |
+| `mapush_env.py` | ~80 lines, basic wrapper | ~1000 lines: 5 critic modes, hetero routing, velocity global state, upper task step/reset, statistics tracking |
 | `mapush_logger.py` | ~15 lines, minimal | ~145 lines: per-reward TensorBoard logging, velocity metrics, OpenRL-compatible reward buffer reading |
-| `train.py` | ~50 lines, 6 flags | ~275 lines, **40+ CLI flags** for rewards, critic, heterogeneous agents, box mass, velocity task |
-| `test.py` | ~250 lines, basic calc/viewer | ~700+ lines: `--all_checkpoints` batch testing, video recording, velocity-specific metrics, `--legacy_vel_obs` |
+| `train.py` | ~50 lines, 6 flags | ~290 lines, **40+ CLI flags** for rewards, critic, heterogeneous agents, box mass, velocity task, upper task mid-level config |
+| `test.py` | ~250 lines, basic calc/viewer | ~830 lines: `--all_checkpoints` batch testing, video recording, velocity-specific metrics, upper task support, `--legacy_vel_obs` |
 | `mapush_happo_runner.py` | ~120 lines, basic override | Full run() override with step-based checkpointing, config saving, `command.txt` generation |
 | YAML config | `mapush.yaml` proposed | **Not used** — all config via `env_args` dict and CLI flags (more flexible) |
-| Tasks supported | `go1push_mid` only | `go1push_mid` + `go1push_vel` (velocity-MAPush) |
+| Tasks supported | `go1push_mid` only | `go1push_mid` + `go1push_vel` + `go1push_upper` (3-level hierarchy) |
 | Robot support | Homogeneous Go1 only | **3 robots**: go1, anymal_c, cassie via `--agent0`/`--agent1` |
 | Critic modes | EP only, obs=actor_obs | 5 modes: absolute (11d), box-centered (9d), goal-centered (9d), relative (9d), concat-agent (16d) |
 | Reward variants | None | 10+ reward configurations: individualized, teamified, gated, collaboration bonuses, contact-force gating |
@@ -103,8 +105,15 @@ else:
 **Interface Shapes (HARL standard):**
 | Method | Input | Output |
 |--------|-------|--------|
-| `step(actions)` | `[n_envs, n_agents, 3]` | obs `[n_envs, n_agents, obs_dim]`, state `[n_envs, n_agents, global_dim]`, rewards `[n_envs, n_agents, 1]`, dones `[n_envs, n_agents]`, infos `[list]`, available_actions `None` |
+| `step(actions)` | `[n_envs, n_agents, act_dim]` | obs `[n_envs, n_agents, obs_dim]`, state `[n_envs, n_agents, global_dim]`, rewards `[n_envs, n_agents, 1]`, dones `[n_envs, n_agents]`, infos `[list]`, available_actions `None` |
 | `reset()` | — | obs, state, available_actions |
+
+**Task-Specific Dispatch:**
+| Task | n_agents | obs_dim | act_dim | step method |
+|------|----------|---------|---------|-------------|
+| `go1push_mid` | 2 | 8 | 3 | `_step_mid()` via standard step |
+| `go1push_vel` | 2 | 15 | 3 | `_step_vel()` via standard step |
+| `go1push_upper` | 1 | 26 | 2 | `_step_upper()` — single agent, sub-goal actions |
 
 **Global State (Centralized Critic) — 5 Modes:**
 
@@ -119,6 +128,10 @@ else:
 **Velocity Task Global State:**
 - Modern (default): 15 dims — cmd_dir(2) + box_dynamics(3) + agents(5 each), all in box frame
 - Legacy (`--legacy_vel_obs`): 18 dims — adds cmd_speed(1) + speed_error(1) + dir_error(1)
+
+**Upper Task Global State:**
+- 26 dims = observation (already global): base_info(12) + target_pos(2) + box_pos(2) + box_rot(4) + obs1(2) + obs2(2) + waypoint(2)
+- `share_observation_space = observation_space` (no separate critic state needed)
 
 **State Type:** Always EP (Environment Provided) — single global state broadcast to all agents.
 
@@ -140,7 +153,7 @@ else:
 
 | Group | Key Flags |
 |-------|-----------|
-| Core | `--algo happo`, `--task {go1push_mid, go1push_vel}`, `--exp_name`, `--seed` |
+| Core | `--algo happo`, `--task {go1push_mid, go1push_vel, go1push_upper}`, `--exp_name`, `--seed` |
 | Training | `--n_rollout_threads 500`, `--num_env_steps 200000000`, `--episode_length 200` |
 | Heterogeneous | `--agent0 {go1, anymal_c, cassie}`, `--agent1 {same}` |
 | Box physics | `--box_mass N`, `--box_mass_range MIN MAX` |
@@ -148,6 +161,7 @@ else:
 | Contact gating | `--contact_force_gating`, `--contact_force_gating_alpha 0.3` |
 | Critic mode | `--use_box_centered_critic`, `--use_goal_centered_critic`, `--use_relative_obs_critic`, `--use_concat_agent_observations_critic` |
 | Velocity task | `--vel_speed_min`, `--vel_speed_max`, `--vel_tracking_scale`, `--vel_angular_penalty_scale`, `--legacy_vel_obs` |
+| Upper task | `--mid_level_checkpoint <path>`, `--mid_level_format {happo, openrl}` |
 | Logging | `--use_tensorboard True`, `--checkpoint <path>` (resume) |
 
 **Flow:** Parse args → load HAPPO YAML defaults → build `env_args` dict → `import isaacgym` → create `MAPushHAPPORunner(args, algo_args, env_args)` → optionally `restore_checkpoint()` → `runner.run()` → `runner.close()`
@@ -166,6 +180,13 @@ else:
 
 **Statistics (go1push_mid):** success_rate, collision_rate, avg_episode_length, collaboration_degree
 **Statistics (go1push_vel):** direction_error (rad/deg), speed_error (m/s), box_angular_vel (rad/s), velocity_success_rate (%)
+**Statistics (go1push_upper):** success_rate, distance_to_target_reward, trajectory_reward, reach_target_reward, obstacle_reward, exception_punishment
+
+**Upper Task Testing Notes:**
+- Single-agent checkpoints: `--all_checkpoints` checks for `actor_agent0.pt` only (not agent1)
+- Requires `--mid_level_checkpoint` flag to specify frozen mid-level actors directory
+- Calculator mode passes mid-level config through `env_args` to `MAPushEnv`
+- Viewer mode overrides `n_agents=1`, obs_space=26d, action_space=2d
 
 ### 3.5 Logger (`mapush_logger.py`)
 
@@ -247,6 +268,15 @@ python HARL/harl_mapush/train.py \
     --exp_name velocity_homogeneous \
     --n_rollout_threads 500 --num_env_steps 200000000
 
+# Upper-level planner — with frozen HAPPO mid-level
+python HARL/harl_mapush/train.py \
+    --task go1push_upper \
+    --mid_level_checkpoint results/mapush/go1push_mid/happo/<RUN>/checkpoints/190M/ \
+    --mid_level_format happo \
+    --agent0 go1 --agent1 anymal_c \
+    --n_rollout_threads 10 --num_env_steps 200000000 \
+    --exp_name upper_hetero_planner
+
 # Resume from checkpoint
 python HARL/harl_mapush/train.py \
     --checkpoint results/mapush/.../checkpoints/100M \
@@ -280,6 +310,20 @@ python HARL/harl_mapush/test.py \
     --checkpoint results/mapush/.../checkpoints/190M \
     --task go1push_vel --mode calculator \
     --box_mass 8 --legacy_vel_obs
+
+# Upper task — viewer mode with video recording
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/go1push_upper/happo/<RUN>/checkpoints/10M \
+    --task go1push_upper \
+    --mid_level_checkpoint results/mapush/go1push_mid/happo/<MID_RUN>/checkpoints/190M/ \
+    --mode viewer --num_episodes 3 --record_video
+
+# Upper task — batch calculator mode
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/go1push_upper/happo/<RUN>/checkpoints/ \
+    --task go1push_upper \
+    --mid_level_checkpoint results/mapush/go1push_mid/happo/<MID_RUN>/checkpoints/190M/ \
+    --all_checkpoints --mode calculator --num_episodes 100 --num_envs 50
 ```
 
 ---
@@ -336,20 +380,43 @@ gated_rewards *= gate
 
 ---
 
-## 8. Velocity-MAPush Task Integration
+## 8. Three-Level Task Hierarchy
 
-Added alongside the original `go1push_mid` task with full HARL support:
+All three MAPush task levels are supported with full HARL training and testing:
 
-| Aspect | go1push_mid (Goal) | go1push_vel (Velocity) |
-|--------|-------------------|----------------------|
-| Objective | Push box to target position | Push box in commanded direction |
-| Actor obs | 8 dims (egocentric) | 15 dims (egocentric, direction-only) |
-| Critic state | 9-16 dims (5 modes) | 15 dims (box-frame) or 18 dims (legacy) |
-| Primary reward | Distance to target | Cosine similarity with commanded direction |
-| Success metric | Binary (reached target) | Velocity tracking success rate (%) |
-| Episode end | Reached target or timeout | Timeout only |
+| Aspect | go1push_mid (Goal) | go1push_vel (Velocity) | go1push_upper (High-Level Planner) |
+|--------|-------------------|----------------------|----------------------------------|
+| Objective | Push box to target position | Push box in commanded direction | Plan sub-goal waypoints for mid-level |
+| HARL agents | 2 | 2 | 1 (single planner) |
+| Actor obs | 8 dims (egocentric) | 15 dims (egocentric, direction-only) | 26 dims (global: robots+box+obstacles+trajectory) |
+| Critic state | 9-16 dims (5 modes) | 15 dims (box-frame) or 18 dims (legacy) | 26 dims (= observation, already global) |
+| Action | 3-DOF velocity [vx, vy, vyaw] | 3-DOF velocity [vx, vy, vyaw] | 2D sub-goal [x, y] |
+| Primary reward | Distance to target | Cosine similarity with commanded direction | Trajectory following + distance to final target |
+| Success metric | Binary (reached target) | Velocity tracking success rate (%) | Binary (box reached final target) |
+| Episode end | Reached target or timeout | Timeout only | Reached target or 160s timeout |
+| Mid-level dep. | None (IS the mid-level) | None | Frozen HAPPO mid-level actors (loaded at init) |
 
-**Key design decision:** Velocity tracking reward uses `cos_sim` only (direction), NOT `cos_sim × exp(-speed_error)`. The `exp(-speed_error)` term uniformly suppressed reward for heterogeneous teams that physically couldn't reach commanded speed, causing weaker agents to give up.
+### Hierarchical Control Flow (Upper Task)
+```
+Upper level (HAPPO, 1 agent)
+  → sub-goal [x, y] → scaled to map coordinates [0,14] × [-5.5, 5.5]
+    Mid level (frozen HAPPO actors, 2 per-robot)
+      → velocity commands [vx, vy, vyaw] per robot
+        Locomotion (Walk-These-Ways / legged_gym)
+          → joint torques
+```
+
+**Upper wrapper (`go1_push_upper_wrapper.py`) supports two mid-level formats:**
+- `openrl`: loads `PPOModule` via `torch.load()` (original MAPush format)
+- `happo`: loads per-agent `StochasticPolicy` from `harl.models.policy_models.stochastic_policy`
+
+**Mid-level format selected via:**
+- Config default: `cfg.control.mid_level_format = "openrl"`
+- CLI override: `--mid_level_format happo --mid_level_checkpoint <path>`
+
+**Action scaling chain:** raw_action × 0.5 (in wrapper) × 0.5 (action_scale) = 0.25× net
+
+**Key design decision (velocity task):** Velocity tracking reward uses `cos_sim` only (direction), NOT `cos_sim × exp(-speed_error)`. The `exp(-speed_error)` term uniformly suppressed reward for heterogeneous teams that physically couldn't reach commanded speed, causing weaker agents to give up.
 
 ---
 
@@ -369,10 +436,10 @@ Added alongside the original `go1push_mid` task with full HARL support:
 
 | Aspect | Original Proposal (Dec 2025) | Final Implementation (Mar 2026) |
 |--------|-----------------------------|---------------------------------|
-| Scope | 1 task, homogeneous Go1 | 2 tasks, 3 robots, heterogeneous |
-| `mapush_env.py` size | ~80 lines | ~900 lines |
+| Scope | 1 task, homogeneous Go1 | 3 tasks, 3 robots, heterogeneous, hierarchical |
+| `mapush_env.py` size | ~80 lines | ~1000 lines |
 | `train.py` flags | 6 flags | 40+ flags |
-| `test.py` features | Basic calc/viewer | + batch testing, video, velocity metrics, legacy obs |
+| `test.py` features | Basic calc/viewer | + batch testing, video, velocity metrics, upper task support, legacy obs |
 | Critic modes | 1 (EP, obs=actor_obs) | 5 modes (absolute, box-centered, goal-centered, relative, concat) |
 | Reward variants | None (default rewards) | 10+ configurations including contact-force gating |
 | Anti-freeloading | Not considered | Contact-force gating with mass normalization |
@@ -389,10 +456,10 @@ Added alongside the original `go1push_mid` task with full HARL support:
 | File | Lines | Purpose |
 |------|-------|---------|
 | `HARL/harl/envs/mapush/__init__.py` | ~10 | Exports MAPushEnv, MAPushLogger |
-| `HARL/harl/envs/mapush/mapush_env.py` | ~900 | Environment wrapper with 5 critic modes, hetero routing, velocity state |
+| `HARL/harl/envs/mapush/mapush_env.py` | ~1000 | Environment wrapper with 5 critic modes, hetero routing, velocity state, upper task step/reset |
 | `HARL/harl/envs/mapush/mapush_logger.py` | ~145 | TensorBoard logging, reward component tracking |
-| `HARL/harl_mapush/train.py` | ~275 | Training entry point with 40+ CLI flags |
-| `HARL/harl_mapush/test.py` | ~700+ | Testing with calculator, viewer, batch, video modes |
+| `HARL/harl_mapush/train.py` | ~290 | Training entry point with 40+ CLI flags, 3 task support |
+| `HARL/harl_mapush/test.py` | ~830 | Testing with calculator, viewer, batch, video modes, 3 task support |
 | `HARL/harl_mapush/runners/mapush_happo_runner.py` | ~240 | Custom runner with step-based checkpoints |
 
 ### Modified Files (HARL core — minimal)
@@ -409,6 +476,8 @@ Added alongside the original `go1push_mid` task with full HARL support:
 | `mqe/envs/robot_registry.py` | 287 | Robot class/config registry (3 working robots: go1, anymal_c, cassie) |
 | `mqe/envs/base/hetero_robot.py` | 1444 | Multi-robot environment with different URDFs |
 | `mqe/utils/hetero_config.py` | 332 | Config merging for heterogeneous setups |
-| `mqe/envs/utils.py` | 300+ | `make_mqe_env()`, `make_hetero_env()`, `custom_cfg()` |
+| `mqe/envs/utils.py` | 350+ | `make_mqe_env()`, `make_hetero_env()`, `custom_cfg()` with mid-level config passthrough |
 | `mqe/envs/wrappers/go1_push_mid_wrapper.py` | — | Mid-task wrapper with contact-force gating |
 | `mqe/envs/wrappers/go1_push_vel_wrapper.py` | — | Velocity-task wrapper with gating + direction-only tracking |
+| `mqe/envs/wrappers/go1_push_upper_wrapper.py` | — | Upper-task wrapper: HAPPO/OpenRL mid-level loading, trajectory planning, sub-goal dispatch |
+| `mqe/envs/configs/go1_push_upper_config.py` | — | Upper-task config: 160s episodes, trajectory planner, obstacle handling, `mid_level_format` |

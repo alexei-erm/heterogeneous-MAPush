@@ -140,6 +140,9 @@ def test_calculator_mode(actors, env, num_episodes, seed):
         # Collect actions from all actors
         actions_list = []
 
+        # Sanitize obs before feeding to actors (prevent NaN crash in FixedNormal)
+        np.nan_to_num(obs, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+
         for agent_id in range(n_agents):
             # Get action from actor (deterministic for testing)
             with torch.no_grad():
@@ -156,6 +159,9 @@ def test_calculator_mode(actors, env, num_episodes, seed):
 
         # Stack actions: [n_envs, n_agents, action_dim]
         actions = np.stack(actions_list, axis=1)
+
+        # Sanitize actions (NaN from actor can crash env)
+        np.nan_to_num(actions, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
         # Step environment
         obs, _, rewards, dones, infos, _ = env.step(actions)
@@ -401,6 +407,9 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
             # Collect actions from all actors
             actions_list = []
 
+            # Sanitize obs before feeding to actors (prevent NaN crash in FixedNormal)
+            np.nan_to_num(obs_np, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+
             for agent_id in range(n_agents):
                 with torch.no_grad():
                     action, rnn_state = actors[agent_id].act(
@@ -416,6 +425,7 @@ def test_viewer_mode(checkpoint_dir, num_episodes, seed, agent0="go1", agent1="g
 
             # Stack and convert to torch
             actions_np = np.stack(actions_list, axis=1)  # [1, n_agents, action_dim]
+            np.nan_to_num(actions_np, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
             if is_upper_viewer:
                 # Upper wrapper expects (N, 1, 2) shape
                 actions_torch = torch.from_numpy(actions_np).cuda()  # [1, 1, 2]

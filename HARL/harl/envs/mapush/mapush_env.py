@@ -907,6 +907,11 @@ class MAPushEnv:
         # Upper wrapper expects (N, 1, 2) torch tensor on CUDA
         actions_torch = torch.from_numpy(actions).cuda()
 
+        # Sanitize NaN/Inf actions (cascading NaN from actor output)
+        nan_mask = torch.isnan(actions_torch) | torch.isinf(actions_torch)
+        if nan_mask.any():
+            actions_torch[nan_mask] = 0.0
+
         # Upper wrapper step: internally runs mid-level policy and physics
         obs, reward, termination, info = self.env.step(actions_torch)
 
@@ -918,6 +923,9 @@ class MAPushEnv:
 
         # termination: (N,) bool tensor
         dones_np = termination.cpu().numpy()  # (n_envs,)
+
+        # Sanitize any remaining NaN/Inf in observations
+        np.nan_to_num(obs_np, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
         # Global state = obs itself (26-dim already contains global info)
         global_state_np = obs_np.squeeze(1)  # (n_envs, 26)
@@ -952,6 +960,9 @@ class MAPushEnv:
         """
         obs = self.env.reset()
         obs_np = obs.cpu().numpy()  # (n_envs, 1, 26) from upper wrapper
+
+        # Sanitize any NaN/Inf in initial observations
+        np.nan_to_num(obs_np, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
         # Global state = obs
         global_state_np = obs_np.squeeze(1)  # (n_envs, 26)
