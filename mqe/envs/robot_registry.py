@@ -33,13 +33,6 @@ ROBOT_REGISTRY = {
         'num_actions': 3,  # [vx, vy, w] for mid-level control
         'description': 'Unitree Go1 quadruped robot with locomotion policy'
     },
-    'jackal': {
-        'class_path': 'mqe.envs.jackal.jackal.Jackal',
-        'config_path': 'mqe.envs.jackal.jackal_config.JackalCfg',
-        'default_control': 'P',  # Differential drive controller (kinematic)
-        'num_actions': 3,  # [vx, vy, vyaw] - same as Go1
-        'description': 'Clearpath Robotics Jackal differential drive wheeled robot'
-    },
     'anymal_c': {
         'class_path': 'mqe.envs.anymal_c.anymal_c.AnymalC',
         'config_path': 'mqe.envs.anymal_c.anymal_c_config.AnymalCCfg',

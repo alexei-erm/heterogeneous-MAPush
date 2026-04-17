@@ -830,7 +830,7 @@ class HeteroRobot(LeggedRobotField):
 
         # For heterogeneous agents, use action dimension (unified across agents)
         # instead of per-agent DOF count
-        action_dim_per_agent = self.num_action  # This is 3 for both Go1 and Jackal
+        action_dim_per_agent = self.num_action  # This is 3 for all robots
 
         # Compute per-agent DOF positions/velocities differently for hetero
         # We need to handle each agent's DOF separately

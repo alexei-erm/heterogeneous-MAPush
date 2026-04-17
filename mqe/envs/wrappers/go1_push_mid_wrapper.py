@@ -53,8 +53,7 @@ class Go1PushMidWrapper(EmptyWrapper):
         # Check if heterogeneous mode is enabled
         self.is_hetero = getattr(self.cfg.hetero, 'use_hetero', False) if hasattr(self.cfg, 'hetero') else False
 
-        # Action space: Both Go1 and Jackal use [vx, vy, vyaw] (3 DOF)
-        # Difference is in the low-level controller (locomotion policy vs differential drive)
+        # Action space: All robots use [vx, vy, vyaw] (3 DOF)
         self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=float)
         self.action_scale = torch.tensor([[[0.5, 0.5, 0.5],],], device="cuda").repeat(self.num_envs, self.num_agents, 1)
 
@@ -63,16 +62,6 @@ class Go1PushMidWrapper(EmptyWrapper):
             print(f"[Go1PushMidWrapper] Heterogeneous mode enabled:")
             print(f"  Agent types: {self.hetero_agent_types}")
             print(f"  Both agents use 3 DOF [vx, vy, vyaw] action space")
-            # Identify control types for each agent
-            ctrl_descriptions = []
-            for agent_type in self.hetero_agent_types:
-                if agent_type in ['go1', 'anymal_c']:  # Quadrupeds use locomotion policy
-                    ctrl_descriptions.append(f"{agent_type}: Locomotion policy")
-                elif agent_type == 'jackal':  # Wheeled robots use differential drive
-                    ctrl_descriptions.append(f"{agent_type}: Differential drive")
-                else:
-                    ctrl_descriptions.append(f"{agent_type}: Unknown")
-            print(f"  Control types: {', '.join(ctrl_descriptions)}")
 
         # Initialize physics exception buffer for NaN detection
         self.physics_exception_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
@@ -600,7 +589,7 @@ class Go1PushMidWrapper(EmptyWrapper):
         base_rpy = base_rpy.reshape([self.env.num_envs, self.env.num_agents, -1])
 
         # CRITICAL FIX: Detect and handle NaN/Inf from physics states
-        # Physics simulation can produce NaN in unstable states (e.g., Jackal instability)
+        # Physics simulation can produce NaN in unstable states
         # Mark environments with NaN for reset via value_exception_buf
         # This triggers episode reset + exception punishment (-5)
 

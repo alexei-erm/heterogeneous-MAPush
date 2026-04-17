@@ -157,7 +157,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--checkpoint',
         type=str,
-        default='./results/mapush/go1push_mid/happo/go1_jackal_hetero_concat_critic/seed-00001-2026-01-17-22-26-05/checkpoints/10M',
+        default='./results/mapush/go1push_mid/happo/',
         help='Path to checkpoint directory'
     )
     parser.add_argument('--steps', type=int, default=2000, help='Number of steps to run')
