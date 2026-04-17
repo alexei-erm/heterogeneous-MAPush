@@ -199,6 +199,9 @@ class Go1PushUpperWrapper(EmptyWrapper):
             command_obs_np, self.rnn_states_command, self.mask_command, deterministic=True
         )
         command_action = np.array(np.split(_t2n(command_action), self.num_envs))
+        # NOTE: OpenRL mid-level may have been trained with this 0.5x scaling
+        # in place (original MAPush code). Only remove if OpenRL mid-level was
+        # trained without it (check openrl_ws train pipeline).
         command_action = torch.from_numpy(0.5 * command_action).cuda().clip(-1, 1)
         return torch.clip(command_action, -1, 1)
 
@@ -222,9 +225,11 @@ class Go1PushUpperWrapper(EmptyWrapper):
                 )
                 actions_list.append(actions)  # each (N, 3)
 
-        # Stack to (N, A, 3) and apply same 0.5x scaling as OpenRL path
-        command_action = torch.stack(actions_list, dim=1)
-        command_action = (0.5 * command_action).clamp(-1, 1)
+        # Stack to (N, A, 3) — no extra scaling here!
+        # The action_scale [0.5, 0.5, 0.5] in step() already matches
+        # the mid-level wrapper's scaling. Adding 0.5x here would double-scale
+        # (mid-level HAPPO training had NO scaling in mapush_env.py step()).
+        command_action = torch.stack(actions_list, dim=1).clamp(-1, 1)
         return command_action
 
     def _init_extras(self, obs):
@@ -341,7 +346,12 @@ class Go1PushUpperWrapper(EmptyWrapper):
         # get box state and target pos
         npc_pos = self.root_states_npc[:, :3].reshape(self.num_envs, self.num_npcs, -1)
         box_pos = npc_pos[:,0,:] - self.env.env_origins
-        target_pos = npc_pos[:,1,:] - self.env.env_origins 
+        # FIX: Use the freshly computed sub_goals as target_pos, NOT the stale
+        # physical target NPC position. The target NPC only gets teleported to
+        # sub_goals inside _update_target_state() which runs during env.step(),
+        # but we're building command_obs BEFORE env.step(). Reading npc_pos[:,1,:]
+        # here would give the OLD target position from the previous step.
+        target_pos = sub_goals  # (N, 3) already in env-relative coords
         box_qyaternion = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 0 , 3:7]
         box_rpy = torch.stack(get_euler_xyz(box_qyaternion), dim=1)
         target_qyaternion = self.root_states_npc.reshape(self.num_envs, self.num_npcs, -1)[:, 1 , 3:7]

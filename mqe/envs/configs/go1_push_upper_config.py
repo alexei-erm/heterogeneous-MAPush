@@ -76,6 +76,8 @@ class Go1PushUpperCfg(Go1Cfg):
             virtual_terrain = False, # Change this to False for real terrain
             no_perlin_threshold = 0.06,
             add_perlin_noise = False,
+            static_friction = 0.1,
+            dynamic_friction = 0.1,
        ))
     
     # velocity control
@@ -248,7 +250,7 @@ class Go1PushUpperCfg(Go1Cfg):
             p= [-0.01, 0.01],
             y= [-np.pi/2-0.10,-np.pi/2+0.10],
         )
-        friction_raige = [0.6, 0.7]
+        friction_range = [0.5, 0.6]
 
     class generalize_obsersation:
         rotate_obs = True 

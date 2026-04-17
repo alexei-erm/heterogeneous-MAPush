@@ -1,0 +1,66 @@
+\begin{table*}[t]
+\centering
+\caption{Reward components of the original MAPush framework (MAPPO baseline, goal-based mid-level task). Each agent receives shared (team) rewards plus individual per-agent rewards at every timestep.}
+\label{tab:baseline_rewards}
+\begin{tabular}{@{}llclc@{}}
+\toprule
+\textbf{Reward Component} & \textbf{Formula} & \textbf{Scale} & \textbf{Type} & \textbf{Assignment} \\
+\midrule
+
+Distance to Target &
+$r_{\text{dist}} = \alpha_1 \cdot 100 \cdot \bigl(2(d_{t-1} - d_t) - 0.01 \, d_t\bigr)$ &
+$\alpha_1 = 0.00325$ &
+Dense &
+Shared \\[4pt]
+
+Approach to Box &
+$r_{\text{app},i} = -\alpha_2 \, (d_i^{\text{box}} + 0.5)^2$ &
+$\alpha_2 = 0.00075$ &
+Dense &
+Per-agent \\[4pt]
+
+Push Reward &
+$r_{\text{push}} = \begin{cases} \alpha_3 & \text{if } \|\mathbf{v}_{\text{box}}^{xy}\| > 0.1 \\ 0 & \text{otherwise} \end{cases}$ &
+$\alpha_3 = 0.0015$ &
+Dense &
+Shared \\[4pt]
+
+Optimal Contact Behind &
+$r_{\text{ocb},i} = \alpha_4 \, \langle \hat{\mathbf{d}}_{\text{goal}},\, \hat{\mathbf{n}}_i \rangle$ &
+$\alpha_4 = 0.004$ &
+Dense &
+Per-agent \\[4pt]
+
+Collision Punishment &
+$r_{\text{coll}} = \dfrac{\alpha_5}{0.02 + d_{ij}/3}$ &
+$\alpha_5 = -0.0025$ &
+Dense &
+Per-pair \\[6pt]
+
+Reach Target &
+$r_{\text{reach}} = \begin{cases} \alpha_6 & \text{if } d_t < d_{\text{thresh}} \\ 0 & \text{otherwise} \end{cases}$ &
+$\alpha_6 = 10$ &
+Sparse &
+Shared \\[4pt]
+
+Exception Punishment &
+$r_{\text{exc}} = \alpha_7 \quad \text{on termination}$ &
+$\alpha_7 = -5$ &
+Sparse &
+Shared \\
+
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+\textbf{Notation:}
+$d_t$ = Euclidean distance from box to goal at step $t$;
+$d_i^{\text{box}}$ = distance from agent $i$ to the box;
+$\mathbf{v}_{\text{box}}^{xy}$ = box horizontal velocity;
+$\hat{\mathbf{d}}_{\text{goal}}$ = unit vector from box toward goal;
+$\hat{\mathbf{n}}_i$ = outward surface normal at the box face closest to agent $i$;
+$d_{ij}$ = inter-agent distance;
+$d_{\text{thresh}} = 1.0\,\text{m}$.
+\textit{Shared} rewards are identical for all agents; \textit{per-agent} rewards depend on each agent's state; \textit{per-pair} rewards are applied symmetrically to both agents in each pair.
+\end{table*}

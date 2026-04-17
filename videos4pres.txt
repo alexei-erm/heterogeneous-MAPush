@@ -1,0 +1,65 @@
+# =============================================================================
+# videos4pres.txt — Video recording commands for presentation
+# =============================================================================
+# INSTRUCTIONS FOR CLAUDE:
+# This file accumulates video recording commands for the user's presentation.
+# Each section is a named video clip (vid_secN_description).
+# NEVER delete previous sections — only append new ones.
+# Each section has both multi-line and single-line versions of the command.
+# Videos are saved to docs/video/ via --record_video flag.
+# =============================================================================
+
+
+# =============================================================================
+# vid_sec3_concatagentcritic
+# Run: critic10 — Homogeneous Go1, concat agent observations critic, 200M
+# =============================================================================
+
+# Multi-line:
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/go1push_mid/happo/critic10/seed-00001-2025-12-27-00-20-25/checkpoints/200M \
+    --task go1push_mid \
+    --mode viewer \
+    --num_episodes 2 \
+    --record_video
+
+# Single-line:
+python HARL/harl_mapush/test.py --checkpoint results/mapush/go1push_mid/happo/critic10/seed-00001-2025-12-27-00-20-25/checkpoints/200M --task go1push_mid --mode viewer --num_episodes 2 --record_video
+
+
+# =============================================================================
+# vid_sec4_happo_8kg_heterogeneous
+# Run: heavy8kg_concat_critic_teamified_go1anymal — Hetero Go1+Anymal C, 8kg box, 190M
+# =============================================================================
+
+# Multi-line:
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/go1push_mid/happo/heavy8kg_concat_critic_teamified_go1anymal/seed-00001-2026-03-06-01-22-08/checkpoints/190M \
+    --task go1push_mid \
+    --agent0 go1 \
+    --agent1 anymal_c \
+    --mode viewer \
+    --num_episodes 2 \
+    --record_video
+
+# Single-line:
+python HARL/harl_mapush/test.py --checkpoint results/mapush/go1push_mid/happo/heavy8kg_concat_critic_teamified_go1anymal/seed-00001-2026-03-06-01-22-08/checkpoints/190M --task go1push_mid --agent0 go1 --agent1 anymal_c --mode viewer --num_episodes 2 --record_video
+
+
+# =============================================================================
+# vid_sec4_happo_8kg_hetero_warmstart
+# Run: heavy8kg_concat_critic_teamified_warmstart_go1anymal — Hetero Go1+Anymal C, 8kg box, warmstart, 240M
+# =============================================================================
+
+# Multi-line:
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/go1push_mid/happo/heavy8kg_concat_critic_teamified_warmstart_go1anymal/seed-00001-2026-04-02-17-47-09/checkpoints/240M \
+    --task go1push_mid \
+    --agent0 go1 \
+    --agent1 anymal_c \
+    --mode viewer \
+    --num_episodes 2 \
+    --record_video
+
+# Single-line:
+python HARL/harl_mapush/test.py --checkpoint results/mapush/go1push_mid/happo/heavy8kg_concat_critic_teamified_warmstart_go1anymal/seed-00001-2026-04-02-17-47-09/checkpoints/240M --task go1push_mid --agent0 go1 --agent1 anymal_c --mode viewer --num_episodes 2 --record_video

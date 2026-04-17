@@ -1,0 +1,177 @@
+\section{HAPPO for Homogeneous Teams: Reward Design}
+\label{sec:happo_reward_design}
+
+The first challenge encountered when training HAPPO with 2$\times$Go1 robots using the original MAPush reward structure (table~\ref{tab:mappobaseline_rewards}) was a consistent freeloading behavior: one agent converged to solo-pushing while the other hovered nearby doing nothing. Both agents received the same team reward, so the freeloading agent was reinforced for its inaction as long as its partner succeeded. This is visible in fig.~\ref{fig:happo_baseline_freeloading}, where both agents receive nearly identical episode rewards despite only one contributing to the task.
+
+The natural hypothesis was to individualize rewards so that only agents actively contributing receive credit. This led to a series of 12 iterative experiments testing increasingly sophisticated reward formulations. All individualization attempts failed, ultimately revealing that reward individualization is fundamentally incompatible with HAPPO's architecture.
+
+% TODO: fig:happo_baseline_freeloading — TensorBoard episode_rewards from
+% early HAPPO training showing both agents receiving ~same reward, plus a
+% viewer screenshot showing one agent pushing and one hovering.
+
+%------------------------------------------------------------------
+\subsection{Reward individualization attempts}
+\label{sec:reward_indiv}
+%------------------------------------------------------------------
+
+The first five iterations explored different strategies to assign credit at the reward level. Table~\ref{tab:reward_indiv_summary} summarizes the approaches and outcomes; the two most informative ones are detailed below.
+
+\begin{table}[H]
+  \centering
+  \caption{Summary of reward individualization attempts (Iterations 1--5). All five failed to produce cooperative pushing.}
+  \label{tab:reward_indiv_summary}
+  \begin{tabular}{clp{5.5cm}p{4.5cm}}
+    \toprule
+    \textbf{Iter} & \textbf{Approach} & \textbf{Result} & \textbf{Lesson} \\
+    \midrule
+    1 & Contact-based weighting & Training destabilized---agents lost learning signal when far from box & Agents need base reward to learn approach \\
+    2 & Individualize only push reward & Designed, not run (push reward too sparse) & --- \\
+    3 & Idle penalty when far + box stationary & Freeloader was actively moving away, not idle & Negative reinforcement $\to$ avoidance \\
+    4 & Direction-aware approach + 3$\times$ reduced collision & Collision penalty still dominated episode reward & Scale balance is critical \\
+    5 & All positive individual + goal push bonus & Agent escaped entirely (reward $-7 \to -18$) & Individualization creates degenerate minima \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Iteration 1 --- Contact-based reward weighting.}
+The three main shared rewards (\code{reach\_target}, \code{distance\_to\_target}, \code{push\_reward}) were weighted by each agent's proximity to the box using a linear contact weight:
+\begin{equation}
+  w_i = \text{clamp}\!\left(1 - \frac{d_i^{\text{box}} - 0.8}{0.8},\; 0,\; 1\right)
+  \label{eq:contact_weight}
+\end{equation}
+where $d_i^{\text{box}}$ is the distance from agent $i$ to the box. An agent at the box surface ($d \leq 0.8$\,m) receives full reward; at 1.6\,m the weight drops to zero. Training destabilized immediately---when agents drifted far from the box (common early in training), they received near-zero reward and lost all learning signal. The \code{approach\_reward}, which should incentivize moving toward the box, conflicted with the zeroed-out shared rewards, effectively telling agents ``go to the box'' and ``you get nothing because you are not at the box'' at the same time.
+
+\paragraph{Iteration 5 --- All-positive individual rewards.}
+A philosophical shift was attempted: all positive rewards become individual (weighted by proximity), all negative rewards remain shared. A new \code{goal\_push\_bonus} (scale 0.003) was added to reward box movement toward the goal. The result is shown in fig.~\ref{fig:iter5_reward_collapse}: Agent~1's reward collapsed from $-7$ to $-18.66$ over training. The agent discovered a degenerate local minimum---by moving far away from the box it avoided the shared collision penalties, while the proximity weighting zeroed out the positive rewards it was missing anyway. The optimizer found it cheaper to flee than to learn pushing.
+
+% TODO: fig:iter5_reward_collapse — TensorBoard train/episode_rewards for
+% iter5, showing reward collapse to -18 and divergence between Agent 0 and
+% Agent 1. Per-agent logging was added in this iteration.
+
+Every individualization attempt produced one of two failure modes: (1)~training destabilization where agents lost their learning signal and could not recover, or (2)~degenerate solutions where agents optimized something other than pushing (hovering, escaping, staying still). The common thread was that modifying per-agent reward magnitudes to encode credit assignment fought HAPPO's own credit assignment mechanism (the sequential importance-weighted update), creating conflicting optimization pressures.
+
+%------------------------------------------------------------------
+\subsection{EP mode bug discovery}
+\label{sec:ep_mode_bug}
+%------------------------------------------------------------------
+
+Iteration 6 took a fundamentally different approach: replace all punishment-based rewards with positive incentives. Six new reward components were introduced (table~\ref{tab:iter6_rewards}).
+
+\begin{table}[H]
+  \centering
+  \caption{Positive-reinforcement reward components introduced in Iteration 6.}
+  \label{tab:iter6_rewards}
+  \begin{tabular}{llp{7cm}}
+    \toprule
+    \textbf{Reward} & \textbf{Scale} & \textbf{Description} \\
+    \midrule
+    \code{engagement\_bonus}      & 0.02  & Agent within 1.5\,m of box \\
+    \code{cooperation\_bonus}     & 0.01  & Both agents within 1.5\,m \\
+    \code{same\_side\_bonus}      & 0.02  & Both agents on the push side of box \\
+    \code{blocking\_penalty}      & $-0.05$ & Agent between box and goal \\
+    \code{goal\_push\_bonus}      & 0.15  & Box velocity toward goal \\
+    \code{directional\_progress}  & 0.15  & Box-to-goal distance decreased (shared) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Training with these rewards revealed something unexpected: both agents received nearly identical rewards (within 0.1\% of each other) despite the rewards being individually computed. Investigation traced the problem to HARL's EP (Environment Provided) critic mode. In HARL's \code{on\_policy\_base\_runner.py}, the critic buffer insertion reads only Agent~0's reward:
+
+\begin{lstlisting}[style=pythonstyle, caption={Reward routing in EP mode (HARL source).}, label={lst:ep_bug}]
+self.critic_buffer.insert(
+    share_obs[:, 0],   # Only Agent 0's observation
+    ...
+    rewards[:, 0],     # Only Agent 0's reward
+)
+\end{lstlisting}
+
+In EP mode, the centralized critic is trained exclusively on Agent~0's reward. Agent~1's individually computed reward is silently discarded and its advantage estimates are derived from Agent~0's value function, meaning Agent~1 receives a gradient signal that has nothing to do with its own actions. The critic value loss exploded from 0.01 to 0.25 (a 170\% increase, see fig.~\ref{fig:iter6_valueloss}), confirming that no amount of reward engineering could fix this: the learning algorithm was not even reading Agent~1's rewards.
+
+% TODO: fig:iter6_valueloss — TensorBoard train/value_loss for iter6,
+% showing explosion from 0.01 to 0.25.
+
+%------------------------------------------------------------------
+\subsection{FP critic mode and first task success}
+\label{sec:fp_mode}
+%------------------------------------------------------------------
+
+The EP mode bug motivated switching to FP (Feature Pruned) critic mode, where each agent maintains its own value function and receives advantages computed from its own returns. Iteration~8 attempted gated shared rewards---multiplying all shared rewards by $\min(\text{engagement}_{a_0},\, \text{engagement}_{a_1})$ to create ``peer pressure''---but training was unstable. The reward landscape became non-stationary because the gate value fluctuated as agents moved, causing value loss to oscillate between 0.03 and 0.16.
+
+Iteration~9 combined FP mode with the original MAPush reward structure and contact-weighted \code{push\_reward} and \code{reach\_target} (using eq.~\ref{eq:contact_weight}). This produced the first HAPPO task success: an \textbf{18\% success rate at 100M steps} (fig.~\ref{fig:iter9_successrate}). Both agents learned to approach the box, though they hovered without actively pushing in many episodes. Compared to MAPPO's $\sim$90\% success rate, this was a proof-of-concept rather than a competitive result, but it confirmed that HAPPO \emph{could} learn the task.
+
+% TODO: fig:iter9_successrate — Success rate vs training steps for iter9,
+% 0% to 18% over 100M steps. Overlay MAPPO baseline (~90%) for context.
+
+%------------------------------------------------------------------
+\subsection{Collision penalty and learning rate corrections}
+\label{sec:collision_lr}
+%------------------------------------------------------------------
+
+Two hyperparameter issues were identified that, while not root causes, created significant obstacles to learning.
+
+\paragraph{Collision penalty magnitude.}
+Quantitative analysis of the collision penalty revealed why agents avoided each other. With the original scale of $-0.0025$, the penalty at 0.5\,m inter-agent distance amounted to $-0.0134$ per step. Over one episode ($\sim$1000 steps at this distance), this accumulated to $-13.4$---roughly 50\% of a typical positive episode reward of $\sim$25--30. The penalty function is a smooth curve (not a hard threshold), so agents experienced significant negative reward well before actual collision. Staying apart was the rational policy under this reward landscape (fig.~\ref{fig:collision_penalty_curve}).
+
+The scale was reduced $5\times$ from $-0.0025$ to $-0.0005$. At 0.5\,m, the penalty dropped to $-0.0027$ per step---still discouraging collision but no longer dominating the total reward.
+
+% TODO: fig:collision_penalty_curve — Plot of collision penalty magnitude
+% vs inter-agent distance for both scale values (-0.0025 and -0.0005).
+% Annotate the 0.5m point and the typical episode reward magnitude.
+
+\paragraph{Learning rate mismatch.}
+HAPPO's default learning rate in HARL (0.005) was $10\times$ higher than MAPPO's in OpenRL (0.0005). With the higher LR, the critic value loss diverged over training ($0.10 \to 0.19$) instead of converging as MAPPO's did ($0.53 \to 0.03$). Both actor and critic learning rates were reduced to 0.0005 to match MAPPO's configuration. These two fixes were necessary but not sufficient---they removed obstacles to learning but did not address the fundamental architectural issue discussed next.
+
+%------------------------------------------------------------------
+\subsection{HAPPO requires team rewards}
+\label{sec:happo_team_rewards}
+%------------------------------------------------------------------
+
+After 11 iterations of reward engineering, the root cause of HAPPO's underperformance was identified: HAPPO's credit assignment comes from its sequential importance-weighted update scheme, not from reward decomposition per agent. In HAPPO's update procedure, Agent~0 updates first with the full advantage signal, then Agent~1 updates with advantages reweighted by Agent~0's importance ratio. This reweighting is the mechanism that assigns credit---Agent~1's update accounts for how Agent~0's policy has already changed. When rewards are individualized, each agent's advantage is computed from a different reward stream, and the importance reweighting loses its theoretical meaning. The sequential update becomes a source of noise rather than credit assignment.
+
+The correct configuration was identified as:
+
+\begin{itemize}
+  \item \textbf{Critic mode:} EP (single centralized critic with global state input)
+  \item \textbf{Reward structure:} Team rewards---per-agent components are summed and the identical total is broadcast to all agents
+  \item \textbf{Collision scale:} $-0.0005$ ($5\times$ reduced)
+  \item \textbf{Learning rates:} 0.0005 (matched to MAPPO)
+  \item \textbf{Actor networks:} Separate per agent (not shared)
+\end{itemize}
+
+The team reward is implemented in the environment wrapper as:
+
+\begin{lstlisting}[style=pythonstyle, caption={Team reward broadcasting in the HARL environment wrapper.}, label={lst:team_reward}]
+team_reward = reward.sum(dim=1, keepdim=True)
+reward = team_reward.expand(-1, self.num_agents)
+\end{lstlisting}
+
+The only differences between this correct HAPPO setup and MAPPO are (1) separate actor networks instead of shared parameters, and (2) sequential importance-weighted updates instead of simultaneous updates. Everything else---critic mode, reward structure, state representation---should be identical. The effect of this change on critic convergence is visible in fig.~\ref{fig:valueloss_comparison}, where EP mode with team rewards converges similarly to MAPPO, unlike the diverging or oscillating trajectories observed with individual rewards.
+
+% TODO: fig:valueloss_comparison — Three critic value_loss curves:
+% (1) EP + individual rewards (iter6): diverging 0.01 -> 0.25
+% (2) FP + individual rewards (iter9): oscillating 0.03 -> 0.16
+% (3) EP + team rewards (iter12): converging like MAPPO
+
+%------------------------------------------------------------------
+\subsection{Section summary}
+\label{sec:reward_design_summary}
+%------------------------------------------------------------------
+
+Table~\ref{tab:reward_design_progression} summarizes the progression across all 12 iterations. Reward individualization was the wrong approach for HAPPO---five iterations of increasingly sophisticated strategies all failed. The algorithm's sequential importance-weighted update is itself the credit assignment mechanism, and external reward decomposition fights it. With the correct configuration identified (EP mode, team rewards, reduced collision, matched LR), the remaining performance gap ($18\% \to 85\%$) was closed through critic input representation design, detailed in section~\ref{sec:happo_critic}.
+
+\begin{table}[H]
+  \centering
+  \caption{Progression of reward design experiments across 12 iterations.}
+  \label{tab:reward_design_progression}
+  \begin{tabular}{llp{5cm}cc}
+    \toprule
+    \textbf{Phase} & \textbf{Iters} & \textbf{Approach} & \textbf{Best SR} & \textbf{Failure mode} \\
+    \midrule
+    Individualization     & 1--5   & Weight rewards by agent contribution     & 0\%    & Destabilization / degenerate minima \\
+    Bug discovery         & 6      & Positive reinforcement redesign          & 0\%    & EP mode discards Agent~1 reward \\
+    FP mode               & 7--9   & Per-agent critics + individual rewards   & 18\%   & Hovering, no active pushing \\
+    Hyperparameter fix    & 10--11 & Collision $5\times\!\downarrow$, LR $10\times\!\downarrow$ & $\sim$18\% & Necessary but not sufficient \\
+    Architectural fix     & 12     & EP mode + team rewards                   & ---    & Correct config identified \\
+    \bottomrule
+  \end{tabular}
+\end{table}

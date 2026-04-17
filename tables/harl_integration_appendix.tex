@@ -1,0 +1,269 @@
+\section{Summary of HARL integration into MAPush repository}
+\label{app:harl_integration}
+
+This appendix documents the integration of HAPPO (from the HARL library)
+into MAPush, supporting all three task levels (mid-level, velocity, and
+upper-level planner) with homogeneous and heterogeneous robot teams.
+
+% -----------------------------------------------------------
+\subsection{Architecture}
+% -----------------------------------------------------------
+
+The integration wraps MAPush as a HARL environment while keeping
+MAPush-specific training and testing code in a separate
+\texttt{harl\_mapush/} directory, minimising changes to the core HARL
+library.
+
+\begin{dirtree}{%
+.1 HARL/.
+.2 harl/.
+.3 envs/mapush/.
+.4 mapush\_env.py \DTcomment{env wrapper, $\sim$1000 lines}.
+.4 mapush\_logger.py \DTcomment{TensorBoard logging}.
+.3 utils/envs\_tools.py \DTcomment{mapush registration}.
+.2 harl\_mapush/.
+.3 train.py \DTcomment{40+ CLI flags, 3 tasks}.
+.3 test.py \DTcomment{calculator, viewer, batch, video}.
+.3 runners/mapush\_happo\_runner.py \DTcomment{step-based checkpoints}.
+}
+
+Only two core HARL files were modified: \texttt{harl/envs/\_\_init\_\_.py}
+(logger registration) and \texttt{harl/utils/envs\_tools.py} (environment
+factory).
+
+% -----------------------------------------------------------
+\subsection{Environment wrapper}
+% -----------------------------------------------------------
+
+\texttt{mapush\_env.py} adapts Isaac~Gym's MAPush to HARL's interface.
+It dispatches environment creation based on robot composition
+(\texttt{make\_mqe\_env} for homogeneous Go1, \texttt{make\_hetero\_env}
+for all other pairings) and dispatches \texttt{step()}/\texttt{reset()}
+based on task type.
+
+\paragraph{Task dispatch.}
+Table~\ref{tab:task-dispatch} summarises the three supported tasks.
+
+\begin{table}[h]
+  \centering
+  \caption{Task dispatch in the HARL environment wrapper.}
+  \label{tab:task-dispatch}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Task} & \textbf{Agents} & \textbf{Obs dim} & \textbf{Act dim} & \textbf{Dispatch} \\
+    \midrule
+    \texttt{go1push\_mid}   & 2 & 8  & 3 & \texttt{\_step\_mid()} \\
+    \texttt{go1push\_vel}   & 2 & 15 & 3 & \texttt{\_step\_vel()} \\
+    \texttt{go1push\_upper} & 1 & 26 & 2 & \texttt{\_step\_upper()} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+For the upper-level task, HARL sees a single agent ($n=1$). The upper
+wrapper internally handles both robots via frozen mid-level actors.
+
+\paragraph{Centralised critic modes.}
+Five global state representations are available for the centralised critic
+(Table~\ref{tab:critic-modes}), selectable via CLI flags. The state type
+is always EP (Environment Provided). For the velocity task, a 15-dim
+box-centred state is used by default (18-dim legacy variant via
+\texttt{--legacy\_vel\_obs}). For the upper task, the 26-dim observation
+already contains all global information, so it is reused as the critic state.
+
+\begin{table}[h]
+  \centering
+  \caption{Centralised critic state modes (mid-level task).}
+  \label{tab:critic-modes}
+  \begin{tabular}{llp{7cm}}
+    \toprule
+    \textbf{Mode} & \textbf{Dims} & \textbf{Description} \\
+    \midrule
+    Absolute (default)         & 11 & box(3) + target(2) + agent0(3) + agent1(3) \\
+    Box-centred                & 9  & target\_rel(2) + agents\_rel(3 each) + box\_yaw(1) \\
+    Goal-centred               & 9  & box\_rel(3) + agents\_rel(3 each) \\
+    Relative                   & 9  & robots\_to\_box(3 each) + inter\_dist(1) + goal\_to\_box(2) \\
+    Concat-agent               & 16 & agent0\_obs(8) + agent1\_obs(8) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% -----------------------------------------------------------
+\subsection{Training and testing scripts}
+% -----------------------------------------------------------
+
+The training script (\texttt{train.py}) exposes 40+ CLI flags grouped into:
+core (\texttt{--algo}, \texttt{--task}, \texttt{--seed}),
+training (\texttt{--n\_rollout\_threads}, \texttt{--num\_env\_steps}),
+heterogeneous agents (\texttt{--agent0}, \texttt{--agent1}),
+box physics (\texttt{--box\_mass}, \texttt{--box\_mass\_range}),
+reward shaping (\texttt{--contact\_force\_gating}, etc.),
+critic mode selection,
+velocity-task parameters, and
+upper-task parameters (\texttt{--mid\_level\_checkpoint}, \texttt{--mid\_level\_format}).
+
+The custom runner (\texttt{MAPushHAPPORunner}) extends HARL's
+\texttt{OnPolicyHARunner} with step-based checkpoints (every 10M steps),
+disabled HARL evaluation (Isaac~Gym single-instance limitation), and
+automatic saving of \texttt{config.json}, \texttt{command.txt}, and
+\texttt{run\_config.yaml} at training start. Each checkpoint folder
+(e.g.\ \texttt{10M/}) contains \texttt{actor\_agent\{i\}.pt},
+\texttt{critic\_agent.pt}, and \texttt{value\_normalizer.pt}.
+
+The testing script (\texttt{test.py}) provides three modes:
+\textbf{calculator} (multi-environment statistics),
+\textbf{viewer} (sequential visualisation), and
+\textbf{batch} (\texttt{--all\_checkpoints} tests 10M\ldots200M and
+outputs a summary table).
+Video recording is available via \texttt{--record\_video}.
+
+% -----------------------------------------------------------
+\subsection{Upper-level task integration}
+% -----------------------------------------------------------
+
+The upper-level planner trains a single HARL agent that outputs sub-goal
+waypoints $(x, y)$, which are executed by frozen mid-level actors:
+
+\begin{equation*}
+  \underbrace{\text{Upper (HAPPO, 1 agent)}}_{\text{26D obs} \to \text{2D sub-goal}}
+  \;\to\;
+  \underbrace{\text{Mid-level (frozen, 2 actors)}}_{\text{8D obs} \to [v_x, v_y, v_\text{yaw}]}
+  \;\to\;
+  \underbrace{\text{Locomotion}}_{\text{joint torques}}
+\end{equation*}
+
+\paragraph{Integration work.}
+Six files were modified to support this pipeline:
+
+\begin{enumerate}
+  \item \textbf{Upper wrapper} (\texttt{go1\_push\_upper\_wrapper.py}): added
+        \texttt{\_prepare\_happo\_command\_policy()}, which loads per-agent
+        \texttt{StochasticPolicy} networks from HARL checkpoints with matching
+        architecture (hidden sizes, activation, initialisation). A new
+        \texttt{\_happo\_mid\_level\_act()} method runs inference on both
+        frozen actors under \texttt{torch.no\_grad()}, returning scaled
+        velocity commands. The original OpenRL loading path is retained,
+        selected at runtime via \texttt{cfg.control.mid\_level\_format}.
+
+  \item \textbf{Upper config} (\texttt{go1\_push\_upper\_config.py}): added
+        \texttt{mid\_level\_format = "openrl"} as backward-compatible default.
+
+  \item \textbf{Config pipeline} (\texttt{mqe/envs/utils.py}): extended
+        \texttt{custom\_cfg()} to accept and propagate
+        \texttt{mid\_level\_checkpoint} and \texttt{mid\_level\_format}.
+
+  \item \textbf{Training script} (\texttt{train.py}): added
+        \texttt{go1push\_upper} to task choices, and
+        \texttt{--mid\_level\_checkpoint} / \texttt{--mid\_level\_format}
+        CLI flags.
+
+  \item \textbf{Environment wrapper} (\texttt{mapush\_env.py}): added upper-task
+        detection (\texttt{is\_upper\_task}), space overrides
+        (obs=26D, act=2D, $n_\text{agents}=1$), and dedicated
+        \texttt{\_step\_upper()} / \texttt{\_reset\_upper()} methods that
+        convert between HARL tensor shapes and the upper wrapper's interface.
+        NaN sanitisation was added at both step and reset to handle physics
+        corruption from degenerate quaternions.
+
+  \item \textbf{Testing script} (\texttt{test.py}): extended all three modes
+        for the upper task---single-agent checkpoint detection, mid-level
+        config passthrough, upper-specific metrics (distance-to-target,
+        trajectory, reach-target, obstacle rewards), and correct action
+        tensor shapes for single-agent inference.
+\end{enumerate}
+
+\paragraph{Usage.}
+
+\begin{lstlisting}[style=bashstyle, language=bash]
+# Train upper-level planner with frozen HAPPO mid-level
+python HARL/harl_mapush/train.py \
+    --task go1push_upper \
+    --mid_level_checkpoint results/mapush/.../checkpoints/190M/ \
+    --mid_level_format happo \
+    --n_rollout_threads 10 --num_env_steps 200000000
+
+# Test upper-level planner
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/.../checkpoints/10M \
+    --task go1push_upper \
+    --mid_level_checkpoint results/mapush/.../checkpoints/190M/ \
+    --mode calculator --num_envs 50 --num_episodes 100
+\end{lstlisting}
+
+% -----------------------------------------------------------
+\subsection{Heterogeneous robot support}
+% -----------------------------------------------------------
+
+Three robot types are supported via \texttt{--agent0}/\texttt{--agent1}
+flags. All expose a unified 3-action interface $[v_x, v_y, v_\text{yaw}]$
+so HARL sees homogeneous action spaces regardless of robot heterogeneity.
+
+\begin{table}[h]
+  \centering
+  \caption{Supported robot types.}
+  \label{tab:robots}
+  \begin{tabular}{lllll}
+    \toprule
+    \textbf{Robot} & \textbf{Type} & \textbf{DOFs} & \textbf{Locomotion} & \textbf{Actuator} \\
+    \midrule
+    go1      & Quadruped & 12 & Walk-These-Ways (70D + 2100 history) & Feedforward \\
+    anymal\_c & Quadruped & 12 & legged\_gym MLP (48D) & LSTM \\
+    cassie   & Biped     & 12 & legged\_gym MLP (48D) & PD control \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The routing logic directs \texttt{go1+go1} to \texttt{make\_mqe\_env()}
+(native path) and all other combinations to \texttt{make\_hetero\_env()},
+backed by \texttt{HeteroRobot} (1444 lines: multi-URDF loading, per-agent
+locomotion policies, per-agent actuator networks, action routing).
+
+% -----------------------------------------------------------
+\subsection{Contact-force gating}
+% -----------------------------------------------------------
+
+To combat freeloading in heterogeneous teams, rewards can be gated by the
+balance of contact forces between agents.  Isaac~Gym's
+\texttt{net\_contact\_force\_tensor} provides per-body horizontal forces;
+these are summed over non-foot bodies and normalised by agent mass:
+
+\begin{equation}
+  c_i = \frac{F_{\text{horiz},i}}{m_i}, \qquad
+  b = \frac{\min_i\, c_i}{\max_i\, c_i}, \qquad
+  g = \alpha + (1-\alpha)\, b
+  \label{eq:cf-gate}
+\end{equation}
+
+The gate $g$ is applied to \texttt{push\_reward} and
+\texttt{distance\_to\_target\_reward} when box speed exceeds 0.01\,m/s.
+Flags: \texttt{--contact\_force\_gating True --contact\_force\_gating\_alpha 0.3}.
+
+% -----------------------------------------------------------
+\subsection{File summary}
+% -----------------------------------------------------------
+
+\begin{table}[h]
+  \centering
+  \caption{Files created and modified for the integration.}
+  \label{tab:files}
+  \begin{tabular}{p{7cm}lp{4.5cm}}
+    \toprule
+    \textbf{File} & \textbf{Lines} & \textbf{Purpose} \\
+    \midrule
+    \multicolumn{3}{l}{\textit{Created (HARL-side)}} \\
+    \texttt{harl/envs/mapush/mapush\_env.py}               & $\sim$1000 & Environment wrapper (3 tasks) \\
+    \texttt{harl/envs/mapush/mapush\_logger.py}             & $\sim$145  & TensorBoard logging \\
+    \texttt{harl\_mapush/train.py}                          & $\sim$290  & Training entry point \\
+    \texttt{harl\_mapush/test.py}                           & $\sim$830  & Testing (all modes, 3 tasks) \\
+    \texttt{harl\_mapush/runners/mapush\_happo\_runner.py}  & $\sim$240  & Custom runner \\
+    \midrule
+    \multicolumn{3}{l}{\textit{Modified (HARL core -- minimal)}} \\
+    \texttt{harl/envs/\_\_init\_\_.py}                       & +1 & Logger registration \\
+    \texttt{harl/utils/envs\_tools.py}                      & +12 & Environment factory \\
+    \midrule
+    \multicolumn{3}{l}{\textit{Modified (MAPush-side)}} \\
+    \texttt{mqe/envs/wrappers/go1\_push\_upper\_wrapper.py} & +125 & HAPPO mid-level actor loading \\
+    \texttt{mqe/envs/configs/go1\_push\_upper\_config.py}   & +1   & \texttt{mid\_level\_format} default \\
+    \texttt{mqe/envs/utils.py}                              & +8   & Mid-level config passthrough \\
+    \bottomrule
+  \end{tabular}
+\end{table}

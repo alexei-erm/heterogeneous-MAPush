@@ -1,0 +1,11 @@
+python ./openrl_ws/train.py \
+    --algo ppo \
+    --task go1push_mid \
+    --agent0 go1 \
+    --agent1 anymal_c \
+    --baseline_mappo_rewards True \
+    --headless \
+    --num_envs 500 \
+    --train_timesteps 150000000 \
+    --use_tensorboard \
+    --exp_name heterogeneous_mappo
