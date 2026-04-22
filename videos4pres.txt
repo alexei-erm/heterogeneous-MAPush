@@ -63,3 +63,22 @@ python HARL/harl_mapush/test.py \
 
 # Single-line:
 python HARL/harl_mapush/test.py --checkpoint results/mapush/go1push_mid/happo/heavy8kg_concat_critic_teamified_warmstart_go1anymal/seed-00001-2026-04-02-17-47-09/checkpoints/240M --task go1push_mid --agent0 go1 --agent1 anymal_c --mode viewer --num_episodes 2 --record_video
+
+
+# =============================================================================
+# vid_sec5_velocity_hetero_go1anymal
+# Run: heterogeneous_flankingtimesOCB_go1anymal — Hetero Go1+Anymal C, velocity task, 200M
+# =============================================================================
+
+# Multi-line:
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/go1push_vel/happo/heterogeneous_flankingtimesOCB_go1anymal/seed-00001-2026-03-24-02-11-36/checkpoints/200M \
+    --task go1push_vel \
+    --agent0 go1 \
+    --agent1 anymal_c \
+    --mode viewer \
+    --num_episodes 2 \
+    --record_video
+
+# Single-line:
+python HARL/harl_mapush/test.py --checkpoint results/mapush/go1push_vel/happo/heterogeneous_flankingtimesOCB_go1anymal/seed-00001-2026-03-24-02-11-36/checkpoints/200M --task go1push_vel --agent0 go1 --agent1 anymal_c --mode viewer --num_episodes 2 --record_video
