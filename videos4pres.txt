@@ -82,3 +82,61 @@ python HARL/harl_mapush/test.py \
 
 # Single-line:
 python HARL/harl_mapush/test.py --checkpoint results/mapush/go1push_vel/happo/heterogeneous_flankingtimesOCB_go1anymal/seed-00001-2026-03-24-02-11-36/checkpoints/200M --task go1push_vel --agent0 go1 --agent1 anymal_c --mode viewer --num_episodes 2 --record_video
+
+
+# =============================================================================
+# vid_sec5_velocity_homo_go1go1
+# Run: velocity_happo_anymal_dualpushgate_contact_bigbox (vanillaGo1) — Homo Go1+Go1, velocity task, 200M
+# NOTE: This run predates the direction-only obs refactor, so --legacy_vel_obs is required
+# =============================================================================
+
+# Multi-line:
+python HARL/harl_mapush/test.py \
+    --checkpoint results/mapush/go1push_vel/happo/velocity_happo_anymal_dualpushgate_contact_bigbox/seed-00001-2026-03-02-09-57-52_vanillaGo1/checkpoints/200M \
+    --task go1push_vel \
+    --legacy_vel_obs \
+    --mode viewer \
+    --num_episodes 2 \
+    --record_video
+
+# Single-line:
+python HARL/harl_mapush/test.py --checkpoint results/mapush/go1push_vel/happo/velocity_happo_anymal_dualpushgate_contact_bigbox/seed-00001-2026-03-02-09-57-52_vanillaGo1/checkpoints/200M --task go1push_vel --legacy_vel_obs --mode viewer --num_episodes 2 --record_video
+
+
+# =============================================================================
+# vid_sec6_mappo_baseline_mid
+# Run: baseline MAPPO mid-level — Homo Go1+Go1, go1push_mid, 130M (best checkpoint)
+# Uses openrl_ws/test.py (MAPPO backend)
+# =============================================================================
+
+# Multi-line:
+python openrl_ws/test.py \
+    --checkpoint results/models/baseline_mappo/mid/checkpoints/rl_model_130000000_steps/module.pt \
+    --task go1push_mid \
+    --algo ppo \
+    --num_envs 1 \
+    --test_mode viewer \
+    --record_video
+
+# Single-line:
+python openrl_ws/test.py --checkpoint results/models/baseline_mappo/mid/checkpoints/rl_model_130000000_steps/module.pt --task go1push_mid --algo ppo --num_envs 1 --test_mode viewer --record_video
+
+
+# =============================================================================
+# vid_sec7_mappo_baseline_upper
+# Run: baseline MAPPO upper-level — Homo Go1+Go1, go1push_upper, 100M (93.3% SR)
+# Uses openrl_ws/test.py (MAPPO backend)
+# Mid-level loaded automatically from go1_push_upper_config.py command_network_path
+# =============================================================================
+
+# Multi-line:
+python openrl_ws/test.py \
+    --checkpoint results/models/baseline_mappo/upper/checkpoints/rl_model_100000000_steps/module.pt \
+    --task go1push_upper \
+    --algo ppo \
+    --num_envs 1 \
+    --test_mode viewer \
+    --record_video
+
+# Single-line:
+python openrl_ws/test.py --checkpoint results/models/baseline_mappo/upper/checkpoints/rl_model_100000000_steps/module.pt --task go1push_upper --algo ppo --num_envs 1 --test_mode viewer --record_video
